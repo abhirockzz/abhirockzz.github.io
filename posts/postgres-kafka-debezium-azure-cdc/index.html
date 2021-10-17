@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en" itemscope itemtype="http://schema.org/WebPage">
+  <head>
+    
+
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+
+  <title>Change Data Capture architecture using Debezium, Postgres and Kafka - Abhishek&#39;s blog</title>
+  <meta name="description" content="Step by step guide on setting up a change data capture based system on Azure using Debezium, Azure DB for PostgreSQL and Azure Event Hubs (for Kafka)">
+  <meta name="author" content="Abhishek Gupta"/><script type="application/ld+json">
+{
+    "@context": "http://schema.org",
+    "@type": "WebSite",
+    "name": "Abhishek\u0027s blog",
+    
+    "url": "https:\/\/abhirockzz.github.io\/"
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Organization",
+  "name": "",
+  "url": "https:\/\/abhirockzz.github.io\/"
+  
+  
+  
+  
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [{
+        "@type": "ListItem",
+        "position": 1,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io\/",
+          "name": "home"
+        }
+    },{
+        "@type": "ListItem",
+        "position": 3,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io\/posts\/postgres-kafka-debezium-azure-cdc\/",
+          "name": "Change data capture architecture using debezium, postgres and kafka"
+        }
+    }]
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Article",
+  "author": {
+    "name" : "Abhishek Gupta"
+  },
+  "headline": "Change Data Capture architecture using Debezium, Postgres and Kafka",
+  "description" : "Step by step guide on setting up a change data capture based system on Azure using Debezium, Azure DB for PostgreSQL and Azure Event Hubs (for Kafka)",
+  "inLanguage" : "en",
+  "wordCount":  1771 ,
+  "datePublished" : "2020-07-02T00:00:00",
+  "dateModified" : "2020-07-02T00:00:00",
+  "image" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+  "keywords" : [ "postgresql, kafka, azure, debezium" ],
+  "mainEntityOfPage" : "https:\/\/abhirockzz.github.io\/posts\/postgres-kafka-debezium-azure-cdc\/",
+  "publisher" : {
+    "@type": "Organization",
+    "name" : "https:\/\/abhirockzz.github.io\/",
+    "logo" : {
+        "@type" : "ImageObject",
+        "url" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+        "height" :  60 ,
+        "width" :  60
+    }
+  }
+}
+</script>
+
+<meta property="og:title" content="Change Data Capture architecture using Debezium, Postgres and Kafka" />
+<meta property="og:description" content="Step by step guide on setting up a change data capture based system on Azure using Debezium, Azure DB for PostgreSQL and Azure Event Hubs (for Kafka)">
+<meta property="og:image" content="https://abhirockzz.github.io/icon.jpg" />
+<meta property="og:url" content="https://abhirockzz.github.io/posts/postgres-kafka-debezium-azure-cdc/" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Abhishek&#39;s blog" />
+
+  <meta name="twitter:title" content="Change Data Capture architecture using Debezium, Postgres and Kafka" />
+  <meta name="twitter:description" content="Step by step guide on setting up a change data capture based system on Azure using Debezium, Azure DB for PostgreSQL and Azure Event Hubs (for Kafka)">
+  <meta name="twitter:image" content="https://abhirockzz.github.io/icon.jpg" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:site" content="@abhi_tweeter" />
+  <meta name="twitter:creator" content="@abhi_tweeter" />
+  <link href='https://abhirockzz.github.io/icons/myicon.png' rel='icon' type='image/x-icon'/>
+  <meta name="generator" content="Hugo 0.80.0" />
+  <link rel="alternate" href="https://abhirockzz.github.io/index.xml" type="application/rss+xml" title="Abhishek&#39;s blog"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css" integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.5.0/css/all.css" integrity="sha384-B4dIYHKNBt8Bc12p+WXckhzcICo0wtJAoU8YZTY5qE0Id1GSseTk6S+L3BlXeVIU" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous"><link rel="stylesheet" href="https://abhirockzz.github.io/css/main.css" /><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800" /><link rel="stylesheet" href="https://abhirockzz.github.io/css/syntax.css" /><link rel="stylesheet" href="https://abhirockzz.github.io/css/codeblock.css" /><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.css" integrity="sha384-h/L2W9KefUClHWaty3SLE5F/qvc4djlyR4qY3NUV5HGQBBW7stbcfff1+I/vmsHh" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/default-skin/default-skin.min.css" integrity="sha384-iD0dNku6PYSIQLyfTOpB06F2KCZJAKLOThS5HRe8b3ibhdEQ6eKsFf/EeFxdOt5R" crossorigin="anonymous">
+
+
+<script type="application/javascript">
+var doNotTrack = false;
+if (!doNotTrack) {
+	window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+	ga('create', 'UA-54762029-1', 'auto');
+	
+	ga('send', 'pageview');
+}
+</script>
+<script async src='https://www.google-analytics.com/analytics.js'></script>
+
+
+  </head>
+  <body>
+    <nav class="navbar navbar-default navbar-fixed-top navbar-custom">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#main-navbar">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="https://abhirockzz.github.io/">Abhishek&#39;s blog</a>
+    </div>
+
+    <div class="collapse navbar-collapse" id="main-navbar">
+      <ul class="nav navbar-nav navbar-right">
+        
+          
+            <li>
+              <a title="Blog" href="/">Blog</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="About" href="/about">About</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Books" href="/books">Books</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Open-source" href="/projects">Open-source</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Presentations" href="/presentations">Presentations</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Tags" href="/tags">Tags</a>
+            </li>
+          
+        
+
+        
+
+        
+      </ul>
+    </div>
+
+    
+      <div class="avatar-container">
+        <div class="avatar-img-border">
+          <a title="Abhishek&#39;s blog" href="https://abhirockzz.github.io/">
+            <img class="avatar-img" src="https://abhirockzz.github.io/icon.jpg" alt="Abhishek&#39;s blog" />
+          </a>
+        </div>
+      </div>
+    
+
+  </div>
+</nav>
+
+
+
+
+    
+
+
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+<div class="pswp__bg"></div>
+
+<div class="pswp__scroll-wrap">
+    
+    <div class="pswp__container">
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+    </div>
+    
+    <div class="pswp__ui pswp__ui--hidden">
+    <div class="pswp__top-bar">
+      
+      <div class="pswp__counter"></div>
+      <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+      <button class="pswp__button pswp__button--share" title="Share"></button>
+      <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+      <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+      
+      
+      <div class="pswp__preloader">
+        <div class="pswp__preloader__icn">
+          <div class="pswp__preloader__cut">
+            <div class="pswp__preloader__donut"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+      <div class="pswp__share-tooltip"></div>
+    </div>
+    <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+    </button>
+    <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+    </button>
+    <div class="pswp__caption">
+      <div class="pswp__caption__center"></div>
+    </div>
+    </div>
+    </div>
+</div>
+
+
+  
+  
+  
+
+
+
+
+
+
+  
+
+  <header class="header-section ">
+    
+    <div class="intro-header no-img">
+      <div class="container">
+        <div class="row">
+          <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+            <div class="posts-heading">
+              
+                <h1>Change Data Capture architecture using Debezium, Postgres and Kafka</h1>
+              
+              
+                <hr class="small">
+              
+              
+              
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+
+    
+<div class="container" role="main">
+  <div class="row">
+    <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+      <article role="main" class="blog-post">
+        <p><em>Change Data Capture (CDC)</em> is a technique used to track row-level changes in database tables in response to create, update and delete operations. Different databases use different techniques to expose these change data events - for example, <a href="https://www.postgresql.org/docs/current/static/logicaldecoding-explanation.html">logical decoding in PostgreSQL</a>, <a href="https://dev.mysql.com/doc/internals/en/binary-log-overview.html">MySQL binary log (binlog)</a> etc. This is a powerful capability, but useful only if there is a way to tap into these event logs and make it available to other services which depend on that information.</p>
+<p><a href="https://debezium.io/">Debezium</a> does just that! It is a distributed platform that builds on top of Change Data Capture features available in different databases. It provides a set of <a href="https://debezium.io/documentation/reference/1.2/connectors/index.html">Kafka Connect connectors</a> which tap into row-level changes (using CDC) in database table(s) and convert them into event streams. These event streams are sent to <a href="https://kafka.apache.org/">Apache Kafka</a> which is a scalable event streaming platform - a perfect fit! Once the change log events are in Kafka, they will be available to all the downstream applications.</p>
+<blockquote>
+<p>This is different compared to the &ldquo;polling&rdquo; technique adopted by the <a href="https://github.com/confluentinc/kafka-connect-jdbc">Kafka Connect JDBC connector</a></p>
+</blockquote>
+<p>The diagram (from the debezium.io website) summarises it nicely!</p>
+<p><img src="https://debezium.io/documentation/reference/1.2/_images/debezium-architecture.png" alt=""></p>
+<p>This blog is a guide to getting started with setting up a change data capture based system on Azure using Debezium, <a href="https://docs.microsoft.com/azure/postgresql/overview?WT.mc_id=devto-blog-abhishgu">Azure DB for PostgreSQL</a> and <a href="https://docs.microsoft.com/azure/event-hubs/event-hubs-about?WT.mc_id=devto-blog-abhishgu">Azure Event Hubs</a> (for Kafka). It will use the <a href="https://debezium.io/documentation/reference/1.2/connectors/postgresql.html">Debezium PostgreSQL connector</a> to stream database modifications from PostgreSQL to Kafka topics in Azure Event Hubs</p>
+<blockquote>
+<p>The related config files are available in the GitHub repo <a href="https://github.com/abhirockzz/">https://github.com/abhirockzz/</a></p>
+</blockquote>
+<p>Although I have used managed Azure services for demonstration purposes these instructions should work for any other setup as well e.g. a local Kafka cluster and PostgreSQL instance.</p>
+<h2 id="setup-postgresql-and-kafka-on-azure">Setup PostgreSQL and Kafka on Azure</h2>
+<p>This section will provide pointers on how to configure Azure Event Hubs and Azure DB for PostgreSQL. All you need is a <a href="https://docs.microsoft.com/azure/?WT.mc_id=devto-blog-abhishgu">Microsoft Azure account</a> - go ahead and <a href="https://azure.microsoft.com/free/?WT.mc_id=devto-blog-abhishgu">sign up for a free one!</a></p>
+<h3 id="azure-db-for-postgresql">Azure DB for PostgreSQL</h3>
+<p>Azure DB for PostgreSQL is a managed, relational database service based on the community version of open-source PostgreSQL database engine, and is available in two deployment modes.</p>
+<blockquote>
+<p>At the time of writing, it supports PostgreSQL version <code>11.6</code></p>
+</blockquote>
+<p>You can setup PostgreSQL on Azure using a variety of options including, the <a href="https://docs.microsoft.com/azure/postgresql/quickstart-create-server-database-portal?WT.mc_id=devto-blog-abhishgu">Azure Portal</a>, <a href="https://docs.microsoft.com/azure/postgresql/quickstart-create-server-database-azure-cli?WT.mc_id=devto-blog-abhishgu">Azure CLI</a>, <a href="https://docs.microsoft.com/azure/postgresql/quickstart-create-postgresql-server-database-using-azure-powershell?WT.mc_id=devto-blog-abhishgu">Azure PowerShell</a>, <a href="https://docs.microsoft.com/azure/postgresql/quickstart-create-postgresql-server-database-using-arm-template?tabs=azure-portal&amp;WT.mc_id=devto-blog-abhishgu">ARM template</a>. Once you&rsquo;ve done that, you can easily connect to the database using you favourite programming language such as <a href="https://docs.microsoft.com/azure/postgresql/connect-java?WT.mc_id=devto-blog-abhishgu">Java</a>, <a href="https://docs.microsoft.com/azure/postgresql/connect-csharp?WT.mc_id=devto-blog-abhishgu">.NET</a>, <a href="https://docs.microsoft.com/azure/postgresql/connect-nodejs?WT.mc_id=devto-blog-abhishgu">Node.js</a>, <a href="https://docs.microsoft.com/azure/postgresql/connect-python?WT.mc_id=devto-blog-abhishgu">Python</a>, <a href="https://docs.microsoft.com/azure/postgresql/connect-go?WT.mc_id=devto-blog-abhishgu">Go</a> etc.</p>
+<blockquote>
+<p>Although the above references are for Single Server deployment mode, please note that <a href="https://docs.microsoft.com/azure/postgresql/overview?WT.mc_id=devto-blog-abhishgu#azure-database-for-postgresql---hyperscale-citus">Hyperscale (Citus) is another deployment mode you can use</a> for &ldquo;workloads that are approaching &ndash; or already exceed &ndash; 100 GB of data.&rdquo;</p>
+</blockquote>
+<p>Please ensure that you keep the following PostgreSQL related information handy since you will need them to configure the Debezium Connector in the subsequent sections - database hostname (and port), username, password</p>
+<h3 id="azure-event-hubs">Azure Event Hubs</h3>
+<p>Azure Event Hubs is a fully managed data streaming platform and event ingestion service. <a href="https://docs.microsoft.com/azure/event-hubs/event-hubs-for-kafka-ecosystem-overview?WT.mc_id=devto-blog-abhishgu">It also provides a Kafka endpoint</a> that supports Apache Kafka protocol 1.0 and later and works with existing Kafka client applications and other tools in the Kafka ecosystem including <code>Kafka Connect</code> (demonstrated in this blog).</p>
+<p>You can use the <a href="https://docs.microsoft.com/azure/event-hubs/event-hubs-create?WT.mc_id=devto-blog-abhishgu">Azure Portal</a>, <a href="https://docs.microsoft.com/azure/event-hubs/event-hubs-quickstart-cli?WT.mc_id=devto-blog-abhishgu">Azure CLI</a>, <a href="https://docs.microsoft.com/azure/event-hubs/event-hubs-quickstart-powershell?WT.mc_id=devto-blog-abhishgu">PowerShell</a> or <a href="https://docs.microsoft.com/azure/event-hubs/event-hubs-resource-manager-namespace-event-hub?WT.mc_id=devto-blog-abhishgu">ARM template</a> to create an Azure Event Hubs namespace and other resources. To ensure that the Kafka functionality is enabled, all you need to do is choose the <code>Standard</code> or <a href="https://docs.microsoft.com/azure/event-hubs/event-hubs-dedicated-overview?WT.mc_id=devto-blog-abhishgu"><code>Dedicated</code></a> tier (since the Basic tier doesn&rsquo;t support Kafka on Event Hubs.)</p>
+<p>After the setup, please ensure that you keep the Connection String handy since you will need it to configure Kafka Connect. You can do so <a href="https://docs.microsoft.com/azure/event-hubs/event-hubs-get-connection-string?WT.mc_id=devto-blog-abhishgu">using the Azure Portal</a> or <a href="https://docs.microsoft.com/cli/azure/eventhubs/eventhub/authorization-rule/keys?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az-eventhubs-eventhub-authorization-rule-keys-list">Azure CLI</a></p>
+<h3 id="install-kafka">Install Kafka</h3>
+<p>To run Kafka Connect, I will be using a local Kafka installation just for convenience. <a href="https://kafka.apache.org/downloads">Just download Apache Kafka</a>, unzip its contents and you&rsquo;re good to go!</p>
+<h2 id="download-debezium-connector-and-start-kafka-connect">Download Debezium connector and start Kafka Connect</h2>
+<p>To start with, clone this Git repo:</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">git clone https://github.com/abhirockzz/debezium-azure-postgres-cdc
+
+<span class="nb">cd</span> debezium-azure-postgres-cdc
+</code></pre></div><p>Download Debezium PostgreSQL source connector JARs</p>
+<blockquote>
+<p><code>1.2.0</code> is the latest version at the time of writing</p>
+</blockquote>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash"><span class="nv">DEBEZIUM_CONNECTOR_VERSION</span><span class="o">=</span>1.2.0
+
+curl https://repo1.maven.org/maven2/io/debezium/debezium-connector-postgres/<span class="si">${</span><span class="nv">DEBEZIUM_CONNECTOR_VERSION</span><span class="si">}</span>.Final/debezium-connector-postgres-<span class="si">${</span><span class="nv">DEBEZIUM_CONNECTOR_VERSION</span><span class="si">}</span>.Final-plugin.tar.gz --output debezium-connector-postgres.tar.gz
+
+tar -xvzf debezium-connector-postgres.tar.gz
+</code></pre></div><p>You should now see a new folder named <code>debezium-connector-postgres</code>. Copy the connector JAR files to your Kafka installation:</p>
+<div class="highlight"><pre class="chroma"><code class="language-fallback" data-lang="fallback">export KAFKA_HOME=[path to kafka installation e.g. /Users/foo/work/kafka_2.12-2.3.0]
+
+cp debezium-connector-postgres/*.jar $KAFKA_HOME/libs
+
+//confirm
+ls -lrt $KAFKA_HOME/libs | grep debezium
+ls -lrt $KAFKA_HOME/libs | grep protobuf
+ls -lrt $KAFKA_HOME/libs | grep postgresql
+</code></pre></div><p>Before starting the Kafka Connect cluster, edit the <code>connect.properties</code> file to include appropriate values for the following attributes: <code>bootstrap.servers</code>, <code>sasl.jaas.config</code>, <code>producer.sasl.jaas.config</code>, <code>consumer.sasl.jaas.config</code> (just replace the placeholders)</p>
+<p>Start Kafka Connect cluster (I am running it in <code>distributed</code> mode):</p>
+<div class="highlight"><pre class="chroma"><code class="language-fallback" data-lang="fallback">export KAFKA_HOME=[path to kafka installation e.g. /Users/foo/work/kafka_2.12-2.3.0]
+
+$KAFKA_HOME/bin/connect-distributed.sh connect.properties
+</code></pre></div><p>Wait for the Kafka Connect instance to start - you should see Kafka Connect internal topics in Azure Event Hubs e.g.</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/i/xl53zykq2ss4iynjdufm.png" alt=""></p>
+<h2 id="configure-postgresql">Configure PostgreSQL</h2>
+<p>Before installing the connector, we need to:</p>
+<ul>
+<li>Ensure that the PostgreSQL instance is accessible from your Kafka Connect cluster</li>
+<li>Ensure that the PostrgeSQL replication setting is set to &ldquo;Logical&rdquo;</li>
+<li>Create a table which you can use to try out the change data capture feature</li>
+</ul>
+<p>If you&rsquo;re using Azure DB for PostgreSQL, create a firewall rule using <a href="https://docs.microsoft.com/en-us/azure/postgresql/howto-manage-firewall-using-cli#create-firewall-rule">az postgres server firewall-rule create</a> command to whitelist your Kafka Connect host. In my case, it was a local Kafka Connect cluster, so I simply navigated to the Azure portal (<strong>Connection security</strong> section of my PostrgreSQL instance) and chose <strong>Add current client IP address</strong> to make sure that my local IP was added to the firewall rule as such:</p>
+<p><img src="pg-firewall.PNG" alt=""></p>
+<p>To change the replication mode for Azure DB for PostgreSQL, you can use the <a href="https://docs.microsoft.com/cli/azure/postgres/server/configuration?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az-postgres-server-configuration-set">az postgres server configuration</a> command:</p>
+<div class="highlight"><pre class="chroma"><code class="language-fallback" data-lang="fallback">az postgres server configuration set --resource-group &lt;name of resource group&gt; --server-name &lt;name of server&gt; --name azure.replication_support --value logical
+</code></pre></div><p>.. or use the <strong>Replication</strong> menu of your PostgreSQL instance in the Azure Portal:</p>
+<p><img src="pg-replication.PNG" alt=""></p>
+<p>After updating the configuration, you will need to re-start the server which you can do using the CLI (<a href="https://docs.microsoft.com/cli/azure/postgres/server?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az-postgres-server-restart">az postgres server restart</a>) or the portal.</p>
+<p>Once the database is up and running, create the table - I have used <code>psql</code> CLI in this example, but feel free to use any other tool. For example, to connect to your PostgreSQL database on Azure over SSL (you will be prompted for the password):</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">psql -h &lt;POSTGRESQL_INSTANCE_NAME&gt;.postgres.database.azure.com -p <span class="m">5432</span> -U &lt;POSTGRES_USER_NAME&gt; -W -d &lt;POSTGRES_DB_NAME&gt; --set<span class="o">=</span><span class="nv">sslmode</span><span class="o">=</span>require
+
+//example
+psql -h my-pgsql.postgres.database.azure.com -p <span class="m">5432</span> -U foo@my-pgsql -W -d postgres --set<span class="o">=</span><span class="nv">sslmode</span><span class="o">=</span>require
+
+//to create the table
+CREATE TABLE todos <span class="o">(</span>id SERIAL, description VARCHAR<span class="o">(</span>30<span class="o">)</span>, todo_status VARCHAR<span class="o">(</span>10<span class="o">)</span>, PRIMARY KEY<span class="o">(</span>id<span class="o">))</span><span class="p">;</span>
+</code></pre></div><h2 id="install-debezium-postgresql-source-connector">Install Debezium PostgreSQL source connector</h2>
+<p>Update the <code>pg-source-connector.json</code> file with the details for the Azure PostgreSQL instance. Here is an example:</p>
+<div class="highlight"><pre class="chroma"><code class="language-json" data-lang="json"><span class="p">{</span>
+    <span class="nt">&#34;name&#34;</span><span class="p">:</span> <span class="s2">&#34;todo-test-connector&#34;</span><span class="p">,</span>
+    <span class="nt">&#34;config&#34;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="nt">&#34;connector.class&#34;</span><span class="p">:</span> <span class="s2">&#34;io.debezium.connector.postgresql.PostgresConnector&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;database.hostname&#34;</span><span class="p">:</span> <span class="s2">&#34;&lt;POSTGRES_INSTANCE_NAME&gt;.postgres.database.azure.com&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;database.port&#34;</span><span class="p">:</span> <span class="s2">&#34;5432&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;database.user&#34;</span><span class="p">:</span> <span class="s2">&#34;&lt;DB_USER_NAME&gt;&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;database.password&#34;</span><span class="p">:</span> <span class="s2">&#34;&lt;PASSWORD&gt;&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;database.dbname&#34;</span><span class="p">:</span> <span class="s2">&#34;&lt;DB_NAME e.g. postgres&gt;&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;database.server.name&#34;</span><span class="p">:</span> <span class="s2">&#34;&lt;LOGICAL_NAMESPACE e.g. todo-server&gt;&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;plugin.name&#34;</span><span class="p">:</span> <span class="s2">&#34;wal2json&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;table.whitelist&#34;</span><span class="p">:</span> <span class="s2">&#34;&lt;TABLE_NAMES e.g. public.todos&gt;&#34;</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div><p>Let&rsquo;s go through the configuration:</p>
+<blockquote>
+<p>For detailed info, check <a href="https://debezium.io/documentation/reference/1.2/connectors/postgresql.html#postgresql-connector-properties">Debezium documentation</a></p>
+</blockquote>
+<ul>
+<li><code>connector.class</code>: name of the connector class (this is a static value)</li>
+<li><code>database.hostname</code> and <code>database.port</code>: IP address or hostname for your PostgreSQL instance as well as the port (e.g. <code>5432</code>)</li>
+<li><code>database.user</code> and <code>database.password</code>: username and password for your PostgreSQL instance</li>
+<li><code>database.dbname</code>: database name e.g. <code>postgres</code></li>
+<li><code>database.server.name</code>: Logical name that identifies and provides a namespace for the particular PostgreSQL database server/cluster being monitored.</li>
+<li><code>table.whitelist</code>: comma-separated list of regex specifying which tables you want to monitor for change data capture</li>
+<li><code>plugin.name</code>: name of the logical decoding plug-in e.g. <code>wal2json</code></li>
+</ul>
+<blockquote>
+<p>At the time of writing, Debezium supports the following plugins: <code>decoderbufs</code>, <code>wal2json</code>, <code>wal2json_rds</code>, <code>wal2json_streaming</code>, <code>wal2json_rds_streaming</code> and <code>pgoutput</code>. I have used <code>wal2json</code> in this example, and it&rsquo;s <a href="https://docs.microsoft.com/azure/postgresql/concepts-logical?WT.mc_id=devto-blog-abhishgu">supported on Azure as well</a>!</p>
+</blockquote>
+<p>Finally, install the connector!</p>
+<div class="highlight"><pre class="chroma"><code class="language-fallback" data-lang="fallback">curl -X POST -H &#34;Content-Type: application/json&#34; --data @pg-source-connector.json http://localhost:8083/connectors
+</code></pre></div><p>Kafka Connect will now start monitoring the <code>todos</code> table for create, update and delete events</p>
+<h2 id="change-data-capture-in-action-">Change data capture in action &hellip;</h2>
+<p>Insert records:</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">psql -h &lt;POSTGRES_INSTANCE_NAME&gt;.postgres.database.azure.com -p <span class="m">5432</span> -U &lt;POSTGRES_USER_NAME&gt; -W -d &lt;POSTGRES_DB_NAME&gt; --set<span class="o">=</span><span class="nv">sslmode</span><span class="o">=</span>require
+
+INSERT INTO todos <span class="o">(</span>description, todo_status<span class="o">)</span> VALUES <span class="o">(</span><span class="s1">&#39;install postgresql&#39;</span>, <span class="s1">&#39;complete&#39;</span><span class="o">)</span><span class="p">;</span>
+INSERT INTO todos <span class="o">(</span>description, todo_status<span class="o">)</span> VALUES <span class="o">(</span><span class="s1">&#39;install kafka&#39;</span>, <span class="s1">&#39;complete&#39;</span><span class="o">)</span><span class="p">;</span>
+INSERT INTO todos <span class="o">(</span>description, todo_status<span class="o">)</span> VALUES <span class="o">(</span><span class="s1">&#39;setup source connector&#39;</span>, <span class="s1">&#39;pending&#39;</span><span class="o">)</span><span class="p">;</span>
+</code></pre></div><p>The connector should now spring into action and send the CDC events to a Event Hubs topic named <code>&lt;server name in config&gt;.&lt;table name&gt;</code> e.g. <code>todo-server.public.todos</code></p>
+<p>Let&rsquo;s introspect the contents of the topic to make sure everything is working as expected. I am using <a href="https://github.com/edenhill/kafkacat"><code>kafkacat</code></a> in this example, but you can also <a href="https://docs.microsoft.com/azure/event-hubs/apache-kafka-developer-guide?WT.mc_id=devto-blog-abhishgu#quickstarts-in-github">create a consumer app using any of these options listed here</a></p>
+<p>Update <code>metadata.broker.list</code> and <code>sasl.password</code> attributes in <code>kafkacat.conf</code> to include Kafka broker details. In a different terminal, use it to read the CDC payloads:</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash"><span class="nb">export</span> <span class="nv">KAFKACAT_CONFIG</span><span class="o">=</span>kafkacat.conf
+<span class="nb">export</span> <span class="nv">BROKER</span><span class="o">=</span>&lt;kafka broker&gt; e.g. <span class="k">for</span> event hubs - my-eventhubs-namespace.servicebus.windows.net:9093
+<span class="nb">export</span> <span class="nv">TOPIC</span><span class="o">=</span>&lt;server config&gt;.&lt;table name&gt; e.g. todo-server.public.todos
+
+kafkacat -b <span class="nv">$BROKER</span> -t <span class="nv">$TOPIC</span> -o beginning
+</code></pre></div><p>You should see the JSON payloads representing the change data events generated in PostgreSQL in response to the rows you had just added to the <code>todos</code> table. Here is a snippet of the payload:</p>
+<div class="highlight"><pre class="chroma"><code class="language-json" data-lang="json"><span class="p">{</span>
+    <span class="nt">&#34;schema&#34;</span><span class="p">:</span> <span class="p">{</span><span class="err">...</span><span class="p">},</span>
+    <span class="nt">&#34;payload&#34;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="nt">&#34;before&#34;</span><span class="p">:</span> <span class="kc">null</span><span class="p">,</span>
+        <span class="nt">&#34;after&#34;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="nt">&#34;id&#34;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+            <span class="nt">&#34;description&#34;</span><span class="p">:</span> <span class="s2">&#34;install postgresql&#34;</span><span class="p">,</span>
+            <span class="nt">&#34;todo_status&#34;</span><span class="p">:</span> <span class="s2">&#34;complete&#34;</span>
+        <span class="p">},</span>
+        <span class="nt">&#34;source&#34;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="nt">&#34;version&#34;</span><span class="p">:</span> <span class="s2">&#34;1.2.0.Final&#34;</span><span class="p">,</span>
+            <span class="nt">&#34;connector&#34;</span><span class="p">:</span> <span class="s2">&#34;postgresql&#34;</span><span class="p">,</span>
+            <span class="nt">&#34;name&#34;</span><span class="p">:</span> <span class="s2">&#34;fullfillment&#34;</span><span class="p">,</span>
+            <span class="nt">&#34;ts_ms&#34;</span><span class="p">:</span> <span class="mi">1593018069944</span><span class="p">,</span>
+            <span class="nt">&#34;snapshot&#34;</span><span class="p">:</span> <span class="s2">&#34;last&#34;</span><span class="p">,</span>
+            <span class="nt">&#34;db&#34;</span><span class="p">:</span> <span class="s2">&#34;postgres&#34;</span><span class="p">,</span>
+            <span class="nt">&#34;schema&#34;</span><span class="p">:</span> <span class="s2">&#34;public&#34;</span><span class="p">,</span>
+            <span class="nt">&#34;table&#34;</span><span class="p">:</span> <span class="s2">&#34;todos&#34;</span><span class="p">,</span>
+            <span class="nt">&#34;txId&#34;</span><span class="p">:</span> <span class="mi">602</span><span class="p">,</span>
+            <span class="nt">&#34;lsn&#34;</span><span class="p">:</span> <span class="mi">184579736</span><span class="p">,</span>
+            <span class="nt">&#34;xmin&#34;</span><span class="p">:</span> <span class="kc">null</span>
+        <span class="p">},</span>
+        <span class="nt">&#34;op&#34;</span><span class="p">:</span> <span class="s2">&#34;c&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;ts_ms&#34;</span><span class="p">:</span> <span class="mi">1593018069947</span><span class="p">,</span>
+        <span class="nt">&#34;transaction&#34;</span><span class="p">:</span> <span class="kc">null</span>
+    <span class="p">}</span>
+</code></pre></div><p>The event consists of the <code>payload</code> along with its <code>schema</code> (omitted for brevity). In <code>payload</code> section, notice how the create operation (<code>&quot;op&quot;: &quot;c&quot;</code>) is represented - <code>&quot;before&quot;: null</code> means that this was a newly <code>INSERT</code>ed row, <code>after</code> provides values for the each columns in the row, <code>source</code> provides the PostgreSQL instance metadata from where this event was picked up etc.</p>
+<p>You can try the same with update or delete operations as well and introspect the CDC events, e.g.</p>
+<div class="highlight"><pre class="chroma"><code class="language-sql" data-lang="sql"><span class="k">UPDATE</span> <span class="n">todos</span> <span class="k">SET</span> <span class="n">todo_status</span> <span class="o">=</span> <span class="s1">&#39;complete&#39;</span> <span class="k">WHERE</span> <span class="n">description</span> <span class="o">=</span> <span class="s1">&#39;setup source connector&#39;</span><span class="p">;</span>
+</code></pre></div><h2 id="optional-install-file-sink-connector">(Optional) Install File sink connector</h2>
+<p>As bonus, you can quickly test this with a File Sink connector as well. It is available out of the box in the Kafka distribution - all you need to do is install the connector. Just replace the <code>topics</code> and <code>file</code> attribute in <code>file-sink-connector.json</code> file</p>
+<div class="highlight"><pre class="chroma"><code class="language-json" data-lang="json"><span class="p">{</span>
+    <span class="nt">&#34;name&#34;</span><span class="p">:</span> <span class="s2">&#34;cdc-file-sink&#34;</span><span class="p">,</span>
+    <span class="nt">&#34;config&#34;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="nt">&#34;connector.class&#34;</span><span class="p">:</span> <span class="s2">&#34;org.apache.kafka.connect.file.FileStreamSinkConnector&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;tasks.max&#34;</span><span class="p">:</span> <span class="s2">&#34;1&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;topics&#34;</span><span class="p">:</span> <span class="s2">&#34;&lt;server name&gt;.&lt;table name&gt; e.g. todos-server.public.todos&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;file&#34;</span><span class="p">:</span> <span class="s2">&#34;&lt;enter full path to file e.g. /Users/foo/work/pg-cdc.txt&gt;&#34;</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div><p>To create the connector:</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">curl -X POST -H <span class="s2">&#34;Content-Type: application/json&#34;</span> --data @file-sink-connector.json http://localhost:8083/connectors
+</code></pre></div><p>Play around with the database records and monitor the records in the configured output sink file, e.g.</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">tail -f /Users/foo/work/pg-cdc.txt
+</code></pre></div><h2 id="conclusion">Conclusion</h2>
+<p>If you&rsquo;ve reached this far, thanks for reading (this rather lengthy tutorial)!</p>
+<p><img src="https://media.giphy.com/media/3osxYdXvsGw6wT5lIY/giphy.gif" alt=""></p>
+<p>Change Data Capture is a powerful technique which can help &ldquo;unlock the database&rdquo; by providing near real-time access to it&rsquo;s changes. This was a &ldquo;getting started&rdquo; guide meant to help you get up and running quickly, experiment with and iterate further. Hope you found it useful!</p>
+
+
+        
+          <div class="blog-tags">
+            
+              <a href="https://abhirockzz.github.io//tags/postgresql/">postgresql</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/kafka/">kafka</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/azure/">azure</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/debezium/">debezium</a>&nbsp;
+            
+          </div>
+        
+
+        
+
+        
+      </article>
+
+      
+        <ul class="pager blog-pager">
+          
+            <li class="previous">
+              <a href="https://abhirockzz.github.io/posts/eventhubs-rbac/" data-toggle="tooltip" data-placement="top" title="Azure Event Hubs &#39;Role Based Access Control&#39; in action">&larr; Previous Post</a>
+            </li>
+          
+          
+            <li class="next">
+              <a href="https://abhirockzz.github.io/posts/kafka-kubernetes-strimzi-3/" data-toggle="tooltip" data-placement="top" title="Kafka on Kubernetes, the Strimzi way! (Part 3)">Next Post &rarr;</a>
+            </li>
+          
+        </ul>
+      
+
+
+      
+
+    </div>
+  </div>
+</div>
+
+      
+<footer>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+        <ul class="list-inline text-center footer-links">
+          
+              <li>
+                <a href="https://github.com/abhirockzz" title="GitHub">
+                  <span class="fa-stack fa-lg">
+                    <i class="fas fa-circle fa-stack-2x"></i>
+                    <i class="fab fa-github fa-stack-1x fa-inverse"></i>
+                  </span>
+                </a>
+              </li>
+              <li>
+                <a href="https://twitter.com/abhi_tweeter" title="Twitter">
+                  <span class="fa-stack fa-lg">
+                    <i class="fas fa-circle fa-stack-2x"></i>
+                    <i class="fab fa-twitter fa-stack-1x fa-inverse"></i>
+                  </span>
+                </a>
+              </li>
+              <li>
+                <a href="https://linkedin.com/in/abhirockzz" title="LinkedIn">
+                  <span class="fa-stack fa-lg">
+                    <i class="fas fa-circle fa-stack-2x"></i>
+                    <i class="fab fa-linkedin fa-stack-1x fa-inverse"></i>
+                  </span>
+                </a>
+              </li>
+          
+          <li>
+            <a href="" title="RSS">
+              <span class="fa-stack fa-lg">
+                <i class="fas fa-circle fa-stack-2x"></i>
+                <i class="fas fa-rss fa-stack-1x fa-inverse"></i>
+              </span>
+            </a>
+          </li>
+          
+        </ul>
+        <p class="credits copyright text-muted">
+          
+            
+              <a href="https://abhirockzz.github.io">Abhishek Gupta</a>
+            
+          
+
+          &nbsp;&bull;&nbsp;&copy;
+          
+            2021
+          
+
+          
+            &nbsp;&bull;&nbsp;
+            <a href="https://abhirockzz.github.io/">Abhishek&#39;s blog</a>
+          
+        </p>
+        
+        <p class="credits theme-by text-muted">
+          <a href="https://gohugo.io">Hugo v0.80.0</a> powered &nbsp;&bull;&nbsp; Theme <a href="https://github.com/halogenica/beautifulhugo">Beautiful Hugo</a> adapted from <a href="https://deanattali.com/beautiful-jekyll/">Beautiful Jekyll</a>
+          
+        </p>
+      </div>
+    </div>
+  </div>
+</footer><script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.js" integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/contrib/auto-render.min.js" integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
+<script src="https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+<script src="https://abhirockzz.github.io/js/main.js"></script><script> renderMathInElement(document.body); </script><script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.js" integrity="sha384-QELNnmcmU8IR9ZAykt67vGr9/rZJdHbiWi64V88fCPaOohUlHCqUD/unNN0BXSqy" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe-ui-default.min.js" integrity="sha384-m67o7SkQ1ALzKZIFh4CiTA8tmadaujiTa9Vu+nqPSwDOqHrDmxLezTdFln8077+q" crossorigin="anonymous"></script><script src="https://abhirockzz.github.io/js/load-photoswipe.js"></script>
+
+
+
+
+
+
+
+
+
+    
+  </body>
+</html>
+

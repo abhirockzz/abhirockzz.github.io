@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en" itemscope itemtype="http://schema.org/WebPage">
+  <head>
+    
+
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+
+  <title>Azure Event Hubs &#39;Role Based Access Control&#39; in action - Abhishek&#39;s blog</title>
+  <meta name="description" content="How to use Azure Active Directory based authentication in your Azure Event Hubs client applications">
+  <meta name="author" content="Abhishek Gupta"/><script type="application/ld+json">
+{
+    "@context": "http://schema.org",
+    "@type": "WebSite",
+    "name": "Abhishek\u0027s blog",
+    
+    "url": "https:\/\/abhirockzz.github.io\/"
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Organization",
+  "name": "",
+  "url": "https:\/\/abhirockzz.github.io\/"
+  
+  
+  
+  
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [{
+        "@type": "ListItem",
+        "position": 1,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io\/",
+          "name": "home"
+        }
+    },{
+        "@type": "ListItem",
+        "position": 3,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io\/posts\/eventhubs-rbac\/",
+          "name": "Azure event hubs \u0027 role based access control\u0027 in action"
+        }
+    }]
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Article",
+  "author": {
+    "name" : "Abhishek Gupta"
+  },
+  "headline": "Azure Event Hubs \u0027Role Based Access Control\u0027 in action",
+  "description" : "How to use Azure Active Directory based authentication in your Azure Event Hubs client applications",
+  "inLanguage" : "en",
+  "wordCount":  1309 ,
+  "datePublished" : "2020-06-24T00:00:00",
+  "dateModified" : "2020-06-24T00:00:00",
+  "image" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+  "keywords" : [ "azure event hubs, security, rbac, azure" ],
+  "mainEntityOfPage" : "https:\/\/abhirockzz.github.io\/posts\/eventhubs-rbac\/",
+  "publisher" : {
+    "@type": "Organization",
+    "name" : "https:\/\/abhirockzz.github.io\/",
+    "logo" : {
+        "@type" : "ImageObject",
+        "url" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+        "height" :  60 ,
+        "width" :  60
+    }
+  }
+}
+</script>
+
+<meta property="og:title" content="Azure Event Hubs &#39;Role Based Access Control&#39; in action" />
+<meta property="og:description" content="How to use Azure Active Directory based authentication in your Azure Event Hubs client applications">
+<meta property="og:image" content="https://abhirockzz.github.io/icon.jpg" />
+<meta property="og:url" content="https://abhirockzz.github.io/posts/eventhubs-rbac/" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Abhishek&#39;s blog" />
+
+  <meta name="twitter:title" content="Azure Event Hubs &#39;Role Based Access Control&#39; in action" />
+  <meta name="twitter:description" content="How to use Azure Active Directory based authentication in your Azure Event Hubs client applications">
+  <meta name="twitter:image" content="https://abhirockzz.github.io/icon.jpg" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:site" content="@abhi_tweeter" />
+  <meta name="twitter:creator" content="@abhi_tweeter" />
+  <link href='https://abhirockzz.github.io/icons/myicon.png' rel='icon' type='image/x-icon'/>
+  <meta name="generator" content="Hugo 0.80.0" />
+  <link rel="alternate" href="https://abhirockzz.github.io/index.xml" type="application/rss+xml" title="Abhishek&#39;s blog"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css" integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.5.0/css/all.css" integrity="sha384-B4dIYHKNBt8Bc12p+WXckhzcICo0wtJAoU8YZTY5qE0Id1GSseTk6S+L3BlXeVIU" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous"><link rel="stylesheet" href="https://abhirockzz.github.io/css/main.css" /><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800" /><link rel="stylesheet" href="https://abhirockzz.github.io/css/syntax.css" /><link rel="stylesheet" href="https://abhirockzz.github.io/css/codeblock.css" /><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.css" integrity="sha384-h/L2W9KefUClHWaty3SLE5F/qvc4djlyR4qY3NUV5HGQBBW7stbcfff1+I/vmsHh" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/default-skin/default-skin.min.css" integrity="sha384-iD0dNku6PYSIQLyfTOpB06F2KCZJAKLOThS5HRe8b3ibhdEQ6eKsFf/EeFxdOt5R" crossorigin="anonymous">
+
+
+<script type="application/javascript">
+var doNotTrack = false;
+if (!doNotTrack) {
+	window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+	ga('create', 'UA-54762029-1', 'auto');
+	
+	ga('send', 'pageview');
+}
+</script>
+<script async src='https://www.google-analytics.com/analytics.js'></script>
+
+
+  </head>
+  <body>
+    <nav class="navbar navbar-default navbar-fixed-top navbar-custom">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#main-navbar">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="https://abhirockzz.github.io/">Abhishek&#39;s blog</a>
+    </div>
+
+    <div class="collapse navbar-collapse" id="main-navbar">
+      <ul class="nav navbar-nav navbar-right">
+        
+          
+            <li>
+              <a title="Blog" href="/">Blog</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="About" href="/about">About</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Books" href="/books">Books</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Open-source" href="/projects">Open-source</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Presentations" href="/presentations">Presentations</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Tags" href="/tags">Tags</a>
+            </li>
+          
+        
+
+        
+
+        
+      </ul>
+    </div>
+
+    
+      <div class="avatar-container">
+        <div class="avatar-img-border">
+          <a title="Abhishek&#39;s blog" href="https://abhirockzz.github.io/">
+            <img class="avatar-img" src="https://abhirockzz.github.io/icon.jpg" alt="Abhishek&#39;s blog" />
+          </a>
+        </div>
+      </div>
+    
+
+  </div>
+</nav>
+
+
+
+
+    
+
+
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+<div class="pswp__bg"></div>
+
+<div class="pswp__scroll-wrap">
+    
+    <div class="pswp__container">
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+    </div>
+    
+    <div class="pswp__ui pswp__ui--hidden">
+    <div class="pswp__top-bar">
+      
+      <div class="pswp__counter"></div>
+      <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+      <button class="pswp__button pswp__button--share" title="Share"></button>
+      <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+      <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+      
+      
+      <div class="pswp__preloader">
+        <div class="pswp__preloader__icn">
+          <div class="pswp__preloader__cut">
+            <div class="pswp__preloader__donut"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+      <div class="pswp__share-tooltip"></div>
+    </div>
+    <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+    </button>
+    <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+    </button>
+    <div class="pswp__caption">
+      <div class="pswp__caption__center"></div>
+    </div>
+    </div>
+    </div>
+</div>
+
+
+  
+  
+  
+
+
+
+
+
+
+  
+
+  <header class="header-section ">
+    
+    <div class="intro-header no-img">
+      <div class="container">
+        <div class="row">
+          <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+            <div class="posts-heading">
+              
+                <h1>Azure Event Hubs &#39;Role Based Access Control&#39; in action</h1>
+              
+              
+                <hr class="small">
+              
+              
+              
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+
+    
+<div class="container" role="main">
+  <div class="row">
+    <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+      <article role="main" class="blog-post">
+        <p><a href="https://docs.microsoft.com/azure/event-hubs/?WT.mc_id=devto-blog-abhishgu">Azure Event Hubs</a> is streaming platform and event ingestion service that can receive and process millions of events per second. In this blog, we are going to cover one of the security aspects related to Azure Event Hubs.</p>
+<p><img src="https://media.giphy.com/media/ABfNx2KM7dB7O/giphy.gif" alt=""></p>
+<p><code>Shared Access Signature (SAS)</code> is a commonly used authentication mechanism for Azure Event Hubs which can be used to enforce granular control over the type of access you want to grant - it works by configuring rules on Event Hubs resources (namespace or topic). However, it is recommended that you use Azure AD credentials (over <code>SAS</code>) whenever possible since it provides similar capabilities without the need to manage <code>SAS</code> tokens or worry about revoking a compromised <code>SAS</code>.</p>
+<blockquote>
+<p>To read more about this topic, check out &ldquo;<a href="https://docs.microsoft.com/azure/event-hubs/authenticate-shared-access-signature?WT.mc_id=devto-blog-abhishgu">Authenticate access to Event Hubs resources using shared access signatures (SAS)</a>&rdquo;.</p>
+</blockquote>
+<p>There a couple of ways in which you can do this:</p>
+<ul>
+<li>using <a href="https://docs.microsoft.com/azure/event-hubs/authenticate-managed-identity?tabs=latest&amp;WT.mc_id=devto-blog-abhishgu">Managed Identity</a> or</li>
+<li>by using <a href="https://docs.microsoft.com/azure/event-hubs/authenticate-application?WT.mc_id=devto-blog-abhishgu">service principal in your client applications</a></li>
+</ul>
+<p>We will explore the second option i.e. how to use Azure Active Directory based authentication in your Azure Event Hubs client applications. With a practical example, you will learn:</p>
+<ul>
+<li>Overview of Azure Event Hubs roles</li>
+<li>How to use Azure CLI to configure Service Principal and RBAC policies for Event Hubs</li>
+<li>Event Hubs supports <a href="https://docs.microsoft.com/azure/event-hubs/sdks?WT.mc_id=devto-blog-abhishgu">multiple programming languages with specific SDKs</a> and we&rsquo;ll see how to use RBAC with <code>Java</code> and <code>Go</code> clients</li>
+</ul>
+<blockquote>
+<p>The code is available in this GitHub repo - <a href="https://github.com/abhirockzz/azure-eventhubs-rbac-example">https://github.com/abhirockzz/azure-eventhubs-rbac-example</a></p>
+</blockquote>
+<h2 id="overview">Overview</h2>
+<p>This section provides a high level overview for you to get an understand the key terminologies: Roles, Security principals and Role based access control (<code>RBAC</code>).</p>
+<p><strong>Roles</strong>: Azure Event Hubs defines specific roles each of which allows you to take specific action on its resources - <code>Data Owner</code>, <code>Data Sender</code>, <code>Data Receiver</code>. They are quite self explanatory - Sender and Receiver roles <em>only</em> allow send and receive respectively, while the Owner role is like an admin privilege which allows you to complete access.</p>
+<blockquote>
+<p>For details on these roles, please refer to their documentation links - <a href="https://docs.microsoft.com/azure/role-based-access-control/built-in-roles?WT.mc_id=devto-blog-abhishgu#azure-event-hubs-data-owner">Azure Event Hubs Data Owner</a>, <a href="https://docs.microsoft.com/azure/role-based-access-control/built-in-roles?WT.mc_id=devto-blog-abhishgu#azure-event-hubs-data-sender">Azure Event Hubs Data Sender</a>, <a href="https://docs.microsoft.com/azure/role-based-access-control/built-in-roles?WT.mc_id=devto-blog-abhishgu#azure-event-hubs-data-receiver">Azure Event Hubs Data Receiver</a></p>
+</blockquote>
+<p><strong>RBAC, Service Principals</strong>: Service Principals are entities to who, these roles are granted - this is &ldquo;Role Based Access Control&rdquo; since the role you grant to the Service Principal defines <em>which actions</em> they can perform - in this case, the actions are: send, receive or everything!</p>
+<h3 id="-the-scenario">&hellip; the scenario</h3>
+<p>Here is the example we will use to learn this. There are two Event Hubs client apps - a Java producer and a Go consumer. We will configure fine grained rules (i.e. enforce RBAC) such that:</p>
+<ul>
+<li>Java app can <em>only send messages to</em> an Event Hubs topic, and,</li>
+<li>Go app can <em>only receive messages from</em> an Event Hubs topic</li>
+</ul>
+<p>Here are relevant code snippets:</p>
+<p>In the Java producer client, the <a href="https://docs.microsoft.com/java/api/com.azure.identity.defaultazurecredentialbuilder.defaultazurecredentialbuilder?view=azure-java-stable&amp;WT.mc_id=devto-blog-abhishgu"><code>DefaultAzureCredentialBuilder</code></a> is used.</p>
+<div class="highlight"><pre class="chroma"><code class="language-java" data-lang="java"><span class="n">String</span> <span class="n">eventhubsNamespace</span> <span class="o">=</span> <span class="n">System</span><span class="o">.</span><span class="na">getenv</span><span class="o">(</span><span class="s">&#34;EVENTHUBS_NAMESPACE&#34;</span><span class="o">);</span>
+<span class="n">String</span> <span class="n">eventhubName</span> <span class="o">=</span> <span class="n">System</span><span class="o">.</span><span class="na">getenv</span><span class="o">(</span><span class="s">&#34;EVENTHUB_NAME&#34;</span><span class="o">);</span>
+
+<span class="n">EventHubProducerClient</span> <span class="n">producer</span> <span class="o">=</span> <span class="k">new</span> <span class="n">EventHubClientBuilder</span><span class="o">().</span><span class="na">credential</span><span class="o">(</span><span class="n">eventhubsNamespace</span><span class="o">,</span> <span class="n">eventhubName</span><span class="o">,</span> <span class="k">new</span> <span class="n">DefaultAzureCredentialBuilder</span><span class="o">().</span><span class="na">build</span><span class="o">()).</span><span class="na">buildProducerClient</span><span class="o">();</span>
+</code></pre></div><p>By convention (default), the Java SDK tries to read pre-defined environment variables for Service Principal info and authenticate based on that. If this does not work, it falls back to try the <code>SAS</code> auth mechanism and looks for another set of environment variables</p>
+<p>Similarly, in the Go consumer client, the Event Hubs client creation process is greatly simplified as well</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="nx">ehNamespace</span> <span class="o">:=</span> <span class="nx">os</span><span class="p">.</span><span class="nf">Getenv</span><span class="p">(</span><span class="s">&#34;EVENTHUBS_NAMESPACE&#34;</span><span class="p">)</span>
+<span class="nx">ehName</span> <span class="o">:=</span> <span class="nx">os</span><span class="p">.</span><span class="nf">Getenv</span><span class="p">(</span><span class="s">&#34;EVENTHUB_NAME&#34;</span><span class="p">)</span>
+
+<span class="nx">hub</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">eventhub</span><span class="p">.</span><span class="nf">NewHubWithNamespaceNameAndEnvironment</span><span class="p">(</span><span class="nx">ehNamespace</span><span class="p">,</span> <span class="nx">ehName</span><span class="p">)</span>
+</code></pre></div><blockquote>
+<p>The developer experience is uniform across SDKs and <a href="https://godoc.org/github.com/Azure/azure-event-hubs-go#NewHubWithNamespaceNameAndEnvironment"><code>NewHubWithNamespaceNameAndEnvironment</code></a> does the same thing as the <code>DefaultAzureCredentialBuilder</code> in terms of following a fixed convention attempting to authenticate using Azure Active Directory (AAD) backed Service Principal first, followed by SAS mechanism</p>
+</blockquote>
+<p>With that said, you do need a few things to get through this tutorial:</p>
+<h2 id="pre-requisites">Pre-requisites</h2>
+<p>You will need a <a href="https://docs.microsoft.com/azure/?WT.mc_id=devto-blog-abhishgu">Microsoft Azure account</a>. Go ahead and <a href="https://azure.microsoft.com/free/?WT.mc_id=devto-blog-abhishgu">sign up for a free one!</a></p>
+<p><code>Azure CLI</code> or <code>Azure Cloud Shell</code> - you can either choose to install the <a href="https://docs.microsoft.com/cli/azure/install-azure-cli?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu">Azure CLI</a> if you don&rsquo;t have it already (should be quick!) or just use the <a href="https://azure.microsoft.com/features/cloud-shell/?WT.mc_id=devto-blog-abhishgu">Azure Cloud Shell</a> from your browser.</p>
+<p>Let&rsquo;s get going.. start off by setting up Azure Event Hubs</p>
+<h2 id="setup-azure-event-hubs">Setup Azure Event Hubs</h2>
+<p>This is all done via Azure CLI, but you can also use the Azure Portal if you like. The end goal is to have an <a href="https://docs.microsoft.com/azure/event-hubs/event-hubs-features?WT.mc_id=devto-blog-abhishgu#namespace">Azure Event Hubs namespace</a> along with an Event Hub (aka topic)</p>
+<p>Create an Azure resource group if you don&rsquo;t have one already</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash"><span class="nv">AZURE_SUBSCRIPTION</span><span class="o">=[</span>to be filled<span class="o">]</span>
+<span class="nv">AZURE_RESOURCE_GROUP</span><span class="o">=[</span>to be filled<span class="o">]</span>
+<span class="nv">AZURE_LOCATION</span><span class="o">=[</span>to be filled<span class="o">]</span>
+
+az account <span class="nb">set</span> --subscription <span class="nv">$AZURE_SUBSCRIPTION</span>
+az group create --name <span class="nv">$AZURE_RESOURCE_GROUP</span> --location <span class="nv">$AZURE_LOCATION</span>
+</code></pre></div><p>Use <a href="https://docs.microsoft.com/cli/azure/eventhubs/namespace?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az-eventhubs-namespace-create"><code>az eventhubs namespace create</code></a> to create an Event Hubs namespace</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash"><span class="nv">EVENT_HUBS_NAMESPACE</span><span class="o">=[</span>to be filled<span class="o">]</span>
+
+az eventhubs namespace create --name <span class="nv">$EVENT_HUBS_NAMESPACE</span> --resource-group <span class="nv">$AZURE_RESOURCE_GROUP</span> --location <span class="nv">$AZURE_LOCATION</span>  --enable-auto-inflate <span class="nb">false</span>
+</code></pre></div><p>And then create an Event Hub using <a href="https://docs.microsoft.com/cli/azure/eventhubs/eventhub?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az-eventhubs-eventhub-create"><code>az eventhubs eventhub create</code></a></p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash"><span class="nv">EVENT_HUB_NAME</span><span class="o">=[</span>to be filled<span class="o">]</span>
+
+az eventhubs eventhub create --name <span class="nv">$EVENT_HUB_NAME</span> --resource-group <span class="nv">$AZURE_RESOURCE_GROUP</span> --namespace-name <span class="nv">$EVENT_HUBS_NAMESPACE</span> --partition-count <span class="m">3</span>
+</code></pre></div><p>.. now for the the key parts&hellip;</p>
+<h2 id="-security-configuration">&hellip; security configuration</h2>
+<p>We will use Azure CLI to create Service Principals using <a href="https://docs.microsoft.com/cli/azure/ad/sp?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az-ad-sp-create-for-rbac"><code>az ad sp create-for-rbac</code></a></p>
+<p>For the sender application (we name it <code>eh-sender-sp</code>)</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">az ad sp create-for-rbac -n <span class="s2">&#34;eh-sender-sp&#34;</span>
+</code></pre></div><p>You will get a JSON response as such - please note down the <code>appId</code>, <code>password</code> and <code>tenant</code></p>
+<div class="highlight"><pre class="chroma"><code class="language-json" data-lang="json"><span class="p">{</span>
+  <span class="nt">&#34;appId&#34;</span><span class="p">:</span> <span class="s2">&#34;fe7280c7-5705-4789-b17f-71a472340429&#34;</span><span class="p">,</span>
+  <span class="nt">&#34;displayName&#34;</span><span class="p">:</span> <span class="s2">&#34;eh-sender-sp&#34;</span><span class="p">,</span>
+  <span class="nt">&#34;name&#34;</span><span class="p">:</span> <span class="s2">&#34;http://eh-sender-sp&#34;</span><span class="p">,</span>
+  <span class="nt">&#34;password&#34;</span><span class="p">:</span> <span class="s2">&#34;29c719dd-f2b3-46de-b71c-4004fb6116ee&#34;</span><span class="p">,</span>
+  <span class="nt">&#34;tenant&#34;</span><span class="p">:</span> <span class="s2">&#34;42f988bf-86f1-42af-91ab-2d7cd011db42&#34;</span>
+<span class="p">}</span>
+</code></pre></div><p>For the receiver application (we name it <code>eh-receiver-sp</code>)</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">az ad sp create-for-rbac -n <span class="s2">&#34;eh-receiver-sp&#34;</span>
+</code></pre></div><p>You will get a JSON response - please note down the <code>appId</code>, <code>password</code> and <code>tenant</code></p>
+<blockquote>
+<p>You can also use the Azure Portal to <a href="https://docs.microsoft.com/azure/active-directory/develop/quickstart-register-app?WT.mc_id=devto-blog-abhishgu">create a Service Principal</a> and <a href="https://docs.microsoft.com/azure/active-directory/develop/howto-create-service-principal-portal?WT.mc_id=devto-blog-abhishgu#create-a-new-application-secret">generate a Client Secret</a></p>
+</blockquote>
+<h3 id="enforce-rbac">Enforce RBAC</h3>
+<p>Going through this process using CLI involves a few steps, but it&rsquo;s beneficial in the long term e.g. for automation. It can also be <a href="https://docs.microsoft.com/azure/role-based-access-control/role-assignments-portal?WT.mc_id=devto-blog-abhishgu">carried out using the Azure Portal</a></p>
+<p>Get the IDs for both the roles using <a href="https://docs.microsoft.com/cli/azure/role/definition?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az-role-definition-list"><code>az role definition list</code></a></p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash"><span class="nv">EH_SENDER_ROLE_ID</span><span class="o">=</span><span class="k">$(</span>az role definition list -n <span class="s2">&#34;Azure Event Hubs Data Sender&#34;</span> -o tsv --query <span class="s1">&#39;[0].id&#39;</span><span class="k">)</span>
+<span class="nv">EH_RECEIVER_ROLE_ID</span><span class="o">=</span><span class="k">$(</span>az role definition list -n <span class="s2">&#34;Azure Event Hubs Data Receiver&#34;</span> -o tsv --query <span class="s1">&#39;[0].id&#39;</span><span class="k">)</span>
+</code></pre></div><blockquote>
+<p><code>Azure Event Hubs Data Sender</code> and <code>Azure Event Hubs Data Receiver</code> are the role names</p>
+</blockquote>
+<p>Get the subscription ID for Azure Event Hubs namespace using <a href="https://docs.microsoft.com/cli/azure/eventhubs/namespace?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az-eventhubs-namespace-show"><code>az eventhubs namespace show</code></a></p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash"><span class="nb">export</span> <span class="nv">RESOURCE_GROUP</span><span class="o">=[</span>replace with resource group name<span class="o">]</span>
+<span class="nb">export</span> <span class="nv">EVENTHUBS_NAMESPACE</span><span class="o">=[</span>replace with namespace<span class="o">]</span>
+
+<span class="nv">EVENTHUBS_ID</span><span class="o">=</span><span class="k">$(</span>az eventhubs namespace show --resource-group <span class="nv">$RESOURCE_GROUP</span> --name <span class="nv">$EVENTHUBS_NAMESPACE</span> -o tsv --query <span class="s1">&#39;id&#39;</span><span class="k">)</span>
+</code></pre></div><p>Assign roles using <a href="https://docs.microsoft.com/cli/azure/role/assignment?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az-role-assignment-create"><code>az role assignment create</code></a></p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash"><span class="nb">export</span> <span class="nv">SENDER_SP_ID</span><span class="o">=[</span>replace with Service Principal <span class="s2">&#34;appId&#34;</span> <span class="k">for</span> the sender SP<span class="o">]</span>
+<span class="nb">export</span> <span class="nv">RECEIVER_SP_ID</span><span class="o">=[</span>replace with Service Principal <span class="s2">&#34;appId&#34;</span> <span class="k">for</span> the receiver SP<span class="o">]</span>
+
+az role assignment create --assignee <span class="nv">$SENDER_SP_ID</span> --role <span class="nv">$EH_SENDER_ROLE_ID</span> --scope <span class="nv">$EVENTHUBS_ID</span>
+az role assignment create --assignee <span class="nv">$RECEIVER_SP_ID</span> --role <span class="nv">$EH_RECEIVER_ROLE_ID</span> --scope <span class="nv">$EVENTHUBS_ID</span>
+</code></pre></div><p>Alright, you&rsquo;re all set!</p>
+<h2 id="lets-try-it-out">Let&rsquo;s try it out</h2>
+<p>Clone the sample apps from GitHub</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">git clone https://github.com/abhirockzz/azure-eventhubs-rbac-example.git
+</code></pre></div><p>Start the Go consumer application:</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash"><span class="nb">export</span> <span class="nv">EVENTHUBS_NAMESPACE</span><span class="o">=[</span>replace with namespace<span class="o">]</span>
+<span class="nb">export</span> <span class="nv">EVENTHUB_NAME</span><span class="o">=[</span>replace with name of the Event Hub<span class="o">]</span>
+
+<span class="nb">export</span> <span class="nv">AZURE_TENANT_ID</span><span class="o">=[</span>replace with Service Principal <span class="s2">&#34;tenant&#34;</span> <span class="k">for</span> the receiver SP<span class="o">]</span>
+<span class="nb">export</span> <span class="nv">AZURE_CLIENT_ID</span><span class="o">=[</span>replace with Service Principal <span class="s2">&#34;appId&#34;</span> <span class="k">for</span> the receiver SP<span class="o">]</span>
+<span class="nb">export</span> <span class="nv">AZURE_CLIENT_SECRET</span><span class="o">=[</span>replace with Service Principal <span class="s2">&#34;password&#34;</span> <span class="k">for</span> the receiver SP<span class="o">]</span>
+
+<span class="nb">cd</span> azure-eventhubs-rbac-example/consumer-go
+
+go run main.go
+</code></pre></div><p>The program will block, waiting for events&hellip;.</p>
+<p>In another terminal, start producer application - this will just send 10 events end exit (re-run if you want to send more events)</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash"><span class="nb">cd</span> azure-eventhubs-rbac-example/producer-java
+
+//build the Java app - it uses Maven
+mvn clean install
+
+<span class="nb">export</span> <span class="nv">EVENTHUBS_NAMESPACE</span><span class="o">=[</span>replace with namespace<span class="o">]</span>
+<span class="nb">export</span> <span class="nv">EVENTHUB_NAME</span><span class="o">=[</span>replace with name of the Event Hub<span class="o">]</span>
+
+<span class="nb">export</span> <span class="nv">AZURE_TENANT_ID</span><span class="o">=[</span>replace with Service Principal <span class="s2">&#34;tenant&#34;</span> <span class="k">for</span> the producer SP<span class="o">]</span>
+<span class="nb">export</span> <span class="nv">AZURE_CLIENT_ID</span><span class="o">=[</span>replace with Service Principal <span class="s2">&#34;appId&#34;</span> <span class="k">for</span> the producer SP<span class="o">]</span>
+<span class="nb">export</span> <span class="nv">AZURE_CLIENT_SECRET</span><span class="o">=[</span>replace with Service Principal <span class="s2">&#34;password&#34;</span> <span class="k">for</span> the producer SP<span class="o">]</span>
+
+java -jar target/eventhubs-java-producer-jar-with-dependencies.jar
+</code></pre></div><p>You should see the received events in the consumer app terminal!</p>
+<blockquote>
+<p>As an exercise, to simulate an error scenario, you exchange can the client details for sender and consumer apps to see how they behave.</p>
+</blockquote>
+<h2 id="conclusion">Conclusion</h2>
+<p>Hopefully this was useful in demonstrating how to use RBAC for Event Hubs applications using Azure Active Directory. In a future blog post, I will try to cover Managed Identity as well. Until then, stay tuned!</p>
+<p><img src="https://media.giphy.com/media/1ZkMDj88mQ1rO/giphy.gif" alt=""></p>
+
+
+        
+          <div class="blog-tags">
+            
+              <a href="https://abhirockzz.github.io//tags/azure-event-hubs/">azure event hubs</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/security/">security</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/rbac/">rbac</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/azure/">azure</a>&nbsp;
+            
+          </div>
+        
+
+        
+
+        
+      </article>
+
+      
+        <ul class="pager blog-pager">
+          
+            <li class="previous">
+              <a href="https://abhirockzz.github.io/posts/kafka-kubernetes-strimzi-2/" data-toggle="tooltip" data-placement="top" title="Kafka on Kubernetes, the Strimzi way! (Part 2)">&larr; Previous Post</a>
+            </li>
+          
+          
+            <li class="next">
+              <a href="https://abhirockzz.github.io/posts/postgres-kafka-debezium-azure-cdc/" data-toggle="tooltip" data-placement="top" title="Change Data Capture architecture using Debezium, Postgres and Kafka">Next Post &rarr;</a>
+            </li>
+          
+        </ul>
+      
+
+
+      
+
+    </div>
+  </div>
+</div>
+
+      
+<footer>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+        <ul class="list-inline text-center footer-links">
+          
+              <li>
+                <a href="https://github.com/abhirockzz" title="GitHub">
+                  <span class="fa-stack fa-lg">
+                    <i class="fas fa-circle fa-stack-2x"></i>
+                    <i class="fab fa-github fa-stack-1x fa-inverse"></i>
+                  </span>
+                </a>
+              </li>
+              <li>
+                <a href="https://twitter.com/abhi_tweeter" title="Twitter">
+                  <span class="fa-stack fa-lg">
+                    <i class="fas fa-circle fa-stack-2x"></i>
+                    <i class="fab fa-twitter fa-stack-1x fa-inverse"></i>
+                  </span>
+                </a>
+              </li>
+              <li>
+                <a href="https://linkedin.com/in/abhirockzz" title="LinkedIn">
+                  <span class="fa-stack fa-lg">
+                    <i class="fas fa-circle fa-stack-2x"></i>
+                    <i class="fab fa-linkedin fa-stack-1x fa-inverse"></i>
+                  </span>
+                </a>
+              </li>
+          
+          <li>
+            <a href="" title="RSS">
+              <span class="fa-stack fa-lg">
+                <i class="fas fa-circle fa-stack-2x"></i>
+                <i class="fas fa-rss fa-stack-1x fa-inverse"></i>
+              </span>
+            </a>
+          </li>
+          
+        </ul>
+        <p class="credits copyright text-muted">
+          
+            
+              <a href="https://abhirockzz.github.io">Abhishek Gupta</a>
+            
+          
+
+          &nbsp;&bull;&nbsp;&copy;
+          
+            2021
+          
+
+          
+            &nbsp;&bull;&nbsp;
+            <a href="https://abhirockzz.github.io/">Abhishek&#39;s blog</a>
+          
+        </p>
+        
+        <p class="credits theme-by text-muted">
+          <a href="https://gohugo.io">Hugo v0.80.0</a> powered &nbsp;&bull;&nbsp; Theme <a href="https://github.com/halogenica/beautifulhugo">Beautiful Hugo</a> adapted from <a href="https://deanattali.com/beautiful-jekyll/">Beautiful Jekyll</a>
+          
+        </p>
+      </div>
+    </div>
+  </div>
+</footer><script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.js" integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/contrib/auto-render.min.js" integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
+<script src="https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+<script src="https://abhirockzz.github.io/js/main.js"></script><script> renderMathInElement(document.body); </script><script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.js" integrity="sha384-QELNnmcmU8IR9ZAykt67vGr9/rZJdHbiWi64V88fCPaOohUlHCqUD/unNN0BXSqy" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe-ui-default.min.js" integrity="sha384-m67o7SkQ1ALzKZIFh4CiTA8tmadaujiTa9Vu+nqPSwDOqHrDmxLezTdFln8077+q" crossorigin="anonymous"></script><script src="https://abhirockzz.github.io/js/load-photoswipe.js"></script>
+
+
+
+
+
+
+
+
+
+    
+  </body>
+</html>
+

@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en" itemscope itemtype="http://schema.org/WebPage">
+  <head>
+    
+
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+
+  <title>How to Ingest data from Kafka into Azure Data Explorer - Abhishek&#39;s blog</title>
+  <meta name="description" content="This blog will cover data ingestion from Kafka to Azure Data Explorer (Kusto) using Kafka Connect - all using Docker.">
+  <meta name="author" content="Abhishek Gupta"/><script type="application/ld+json">
+{
+    "@context": "http://schema.org",
+    "@type": "WebSite",
+    "name": "Abhishek\u0027s blog",
+    
+    "url": "https:\/\/abhirockzz.github.io\/"
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Organization",
+  "name": "",
+  "url": "https:\/\/abhirockzz.github.io\/"
+  
+  
+  
+  
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [{
+        "@type": "ListItem",
+        "position": 1,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io\/",
+          "name": "home"
+        }
+    },{
+        "@type": "ListItem",
+        "position": 3,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io\/posts\/kafka-azure-data-explorer\/",
+          "name": "How to ingest data from kafka into azure data explorer"
+        }
+    }]
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Article",
+  "author": {
+    "name" : "Abhishek Gupta"
+  },
+  "headline": "How to Ingest data from Kafka into Azure Data Explorer",
+  "description" : "This blog will cover data ingestion from Kafka to Azure Data Explorer (Kusto) using Kafka Connect - all using Docker.",
+  "inLanguage" : "en",
+  "wordCount":  1517 ,
+  "datePublished" : "2020-08-21T00:00:00",
+  "dateModified" : "2020-08-21T00:00:00",
+  "image" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+  "keywords" : [ "" ],
+  "mainEntityOfPage" : "https:\/\/abhirockzz.github.io\/posts\/kafka-azure-data-explorer\/",
+  "publisher" : {
+    "@type": "Organization",
+    "name" : "https:\/\/abhirockzz.github.io\/",
+    "logo" : {
+        "@type" : "ImageObject",
+        "url" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+        "height" :  60 ,
+        "width" :  60
+    }
+  }
+}
+</script>
+
+<meta property="og:title" content="How to Ingest data from Kafka into Azure Data Explorer" />
+<meta property="og:description" content="This blog will cover data ingestion from Kafka to Azure Data Explorer (Kusto) using Kafka Connect - all using Docker.">
+<meta property="og:image" content="https://abhirockzz.github.io/icon.jpg" />
+<meta property="og:url" content="https://abhirockzz.github.io/posts/kafka-azure-data-explorer/" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Abhishek&#39;s blog" />
+
+  <meta name="twitter:title" content="How to Ingest data from Kafka into Azure Data Explorer" />
+  <meta name="twitter:description" content="This blog will cover data ingestion from Kafka to Azure Data Explorer (Kusto) using Kafka Connect - all using Docker.">
+  <meta name="twitter:image" content="https://abhirockzz.github.io/icon.jpg" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:site" content="@abhi_tweeter" />
+  <meta name="twitter:creator" content="@abhi_tweeter" />
+  <link href='https://abhirockzz.github.io/icons/myicon.png' rel='icon' type='image/x-icon'/>
+  <meta name="generator" content="Hugo 0.80.0" />
+  <link rel="alternate" href="https://abhirockzz.github.io/index.xml" type="application/rss+xml" title="Abhishek&#39;s blog"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css" integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.5.0/css/all.css" integrity="sha384-B4dIYHKNBt8Bc12p+WXckhzcICo0wtJAoU8YZTY5qE0Id1GSseTk6S+L3BlXeVIU" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous"><link rel="stylesheet" href="https://abhirockzz.github.io/css/main.css" /><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800" /><link rel="stylesheet" href="https://abhirockzz.github.io/css/syntax.css" /><link rel="stylesheet" href="https://abhirockzz.github.io/css/codeblock.css" /><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.css" integrity="sha384-h/L2W9KefUClHWaty3SLE5F/qvc4djlyR4qY3NUV5HGQBBW7stbcfff1+I/vmsHh" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/default-skin/default-skin.min.css" integrity="sha384-iD0dNku6PYSIQLyfTOpB06F2KCZJAKLOThS5HRe8b3ibhdEQ6eKsFf/EeFxdOt5R" crossorigin="anonymous">
+
+
+<script type="application/javascript">
+var doNotTrack = false;
+if (!doNotTrack) {
+	window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+	ga('create', 'UA-54762029-1', 'auto');
+	
+	ga('send', 'pageview');
+}
+</script>
+<script async src='https://www.google-analytics.com/analytics.js'></script>
+
+
+  </head>
+  <body>
+    <nav class="navbar navbar-default navbar-fixed-top navbar-custom">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#main-navbar">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="https://abhirockzz.github.io/">Abhishek&#39;s blog</a>
+    </div>
+
+    <div class="collapse navbar-collapse" id="main-navbar">
+      <ul class="nav navbar-nav navbar-right">
+        
+          
+            <li>
+              <a title="Blog" href="/">Blog</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="About" href="/about">About</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Books" href="/books">Books</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Open-source" href="/projects">Open-source</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Presentations" href="/presentations">Presentations</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Tags" href="/tags">Tags</a>
+            </li>
+          
+        
+
+        
+
+        
+      </ul>
+    </div>
+
+    
+      <div class="avatar-container">
+        <div class="avatar-img-border">
+          <a title="Abhishek&#39;s blog" href="https://abhirockzz.github.io/">
+            <img class="avatar-img" src="https://abhirockzz.github.io/icon.jpg" alt="Abhishek&#39;s blog" />
+          </a>
+        </div>
+      </div>
+    
+
+  </div>
+</nav>
+
+
+
+
+    
+
+
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+<div class="pswp__bg"></div>
+
+<div class="pswp__scroll-wrap">
+    
+    <div class="pswp__container">
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+    </div>
+    
+    <div class="pswp__ui pswp__ui--hidden">
+    <div class="pswp__top-bar">
+      
+      <div class="pswp__counter"></div>
+      <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+      <button class="pswp__button pswp__button--share" title="Share"></button>
+      <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+      <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+      
+      
+      <div class="pswp__preloader">
+        <div class="pswp__preloader__icn">
+          <div class="pswp__preloader__cut">
+            <div class="pswp__preloader__donut"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+      <div class="pswp__share-tooltip"></div>
+    </div>
+    <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+    </button>
+    <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+    </button>
+    <div class="pswp__caption">
+      <div class="pswp__caption__center"></div>
+    </div>
+    </div>
+    </div>
+</div>
+
+
+  
+  
+  
+
+
+
+
+
+
+  
+
+  <header class="header-section ">
+    
+    <div class="intro-header no-img">
+      <div class="container">
+        <div class="row">
+          <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+            <div class="posts-heading">
+              
+                <h1>How to Ingest data from Kafka into Azure Data Explorer</h1>
+              
+              
+                <hr class="small">
+              
+              
+              
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+
+    
+<div class="container" role="main">
+  <div class="row">
+    <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+      <article role="main" class="blog-post">
+        <p>This blog will cover data ingestion from <a href="https://kafka.apache.org/">Kafka</a> to <a href="https://docs.microsoft.com/azure/data-explorer/data-explorer-overview?WT.mc_id=devto-blog-abhishgu">Azure Data Explorer</a> (Kusto) using <a href="https://kafka.apache.org/documentation/#connect">Kafka Connect</a>.</p>
+<p>Azure Data Explorer is a fast and scalable data exploration service that lets you collect, store, and analyze large volumes of data from any diverse sources, such as websites, applications, IoT devices, and more. Kafka Connect platform allows you to stream data between Apache Kafka and external systems in a scalable and reliable manner. The <a href="https://github.com/Azure/kafka-sink-azure-kusto">Kafka Connect Sink connector for Azure Data Explorer</a> allows you to move data in Kafka topics to Azure Data Explorer tables which you can later query and analyze.</p>
+<blockquote>
+<p>Here is the GitHub repo for this blog - <a href="https://github.com/abhirockzz/kafka-kusto-ingestion-tutorial">https://github.com/abhirockzz/kafka-kusto-ingestion-tutorial</a></p>
+</blockquote>
+<p>The goal is to get started <em>quickly</em>, so we will keep things simple and Docker-ize everything! This includes Kafka, Zookeeper, Kafka Connect worker and the event generator application - defined in <a href="https://github.com/abhirockzz/kafka-kusto-ingestion-tutorial/blob/master/docker-compose.yaml">docker-compose.yaml</a></p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/i/ugzr1zhx64wflz9qd43u.jpg" alt=""></p>
+<p>Over the course of this tutorial, you will:</p>
+<ul>
+<li>Get an overview of the individual components</li>
+<li>Configure and setup Azure Data Explorer and install the connector</li>
+<li>Run the end to end demo</li>
+</ul>
+<blockquote>
+<p>If you&rsquo;re looking for a comprehensive coverage of data ingestion with Azure Data Explorer, Kafka and Kubernetes and like a hands-on learning experience, please check out this workshop! <a href="https://github.com/Azure/azure-kusto-labs">https://github.com/Azure/azure-kusto-labs</a></p>
+</blockquote>
+<h2 id="pre-requisites">Pre-requisites</h2>
+<ul>
+<li>
+<p>You will need a <a href="https://docs.microsoft.com/azure/?WT.mc_id=devto-blog-abhishgu">Microsoft Azure account</a>. Maybe try a <a href="https://azure.microsoft.com/free/?WT.mc_id=devto-blog-abhishgu">free one?</a></p>
+</li>
+<li>
+<p>Install <a href="https://docs.microsoft.com/cli/azure/install-azure-cli?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu">Azure CLI</a> if you don&rsquo;t have it already (should be quick!) or just use the <a href="https://azure.microsoft.com/features/cloud-shell/?WT.mc_id=devto-blog-abhishgu">Azure Cloud Shell</a> from your browser.</p>
+</li>
+<li>
+<p><a href="https://docs.docker.com/get-docker/">Docker</a> and <a href="https://docs.docker.com/compose/install">Docker Compose</a> installed</p>
+</li>
+</ul>
+<h2 id="overview">Overview</h2>
+<p>As previously mentioned, all the components are defined inside <code>docker-compose.yaml</code> file. Let&rsquo;s go over it bit by bit:</p>
+<p>The Kafka and Zookeeper part is pretty straightforward - using the <a href="https://hub.docker.com/r/debezium/kafka/">debezium</a> images</p>
+<div class="highlight"><pre class="chroma"><code class="language-yaml" data-lang="yaml"><span class="w">  </span><span class="nt">zookeeper</span><span class="p">:</span><span class="w">
+</span><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l">debezium/zookeeper:1.2</span><span class="w">
+</span><span class="w">    </span><span class="nt">ports</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span>- <span class="m">2181</span><span class="p">:</span><span class="m">2181</span><span class="w">
+</span><span class="w">  </span><span class="nt">kafka</span><span class="p">:</span><span class="w">
+</span><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l">debezium/kafka:1.2</span><span class="w">
+</span><span class="w">    </span><span class="nt">ports</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span>- <span class="m">9092</span><span class="p">:</span><span class="m">9092</span><span class="w">
+</span><span class="w">    </span><span class="nt">links</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span>- <span class="l">zookeeper</span><span class="w">
+</span><span class="w">    </span><span class="nt">depends_on</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span>- <span class="l">zookeeper</span><span class="w">
+</span><span class="w">    </span><span class="nt">environment</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span>- <span class="l">ZOOKEEPER_CONNECT=zookeeper:2181</span><span class="w">
+</span><span class="w">      </span>- <span class="l">KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092</span><span class="w">
+</span></code></pre></div><p>The <code>events-producer</code> service is a <a href="https://github.com/abhirockzz/kafka-kusto-ingestion-tutorial/tree/master/storm-events-producer">simple application</a> that sends Storm Events data to a Kafka topic. Storm Events data is a canonical example used throughout the Azure Data Explorer documentation (for example, <a href="https://docs.microsoft.com/azure/data-explorer/ingest-sample-data?WT.mc_id=devto-blog-abhishgu#ingest-data">check this Quickstart</a> and <a href="https://kustosamplefiles.blob.core.windows.net/samplefiles/StormEvents.csv?st=2018-08-31T22%3A02%3A25Z&amp;se=2020-09-01T22%3A02%3A00Z&amp;sp=r&amp;sv=2018-03-28&amp;sr=b&amp;sig=LQIbomcKI8Ooz425hWtjeq6d61uEaq21UVX7YrM61N4%3D">the complete CSV file</a>). The producer app uses the original CSV, but only includes selected fields (such as start and end time, state, source etc.) rather than the entire row (which has more than 20 columns). Here is the sample data:</p>
+<div class="highlight"><pre class="chroma"><code class="language-fallback" data-lang="fallback">2007-01-01 00:00:00.0000000,2007-01-01 05:00:00.0000000,23357,WISCONSIN,Winter Storm,COOP Observer
+2007-01-01 00:00:00.0000000,2007-01-01 06:00:00.0000000,9488,NEW YORK,Winter Weather,Department of Highways
+2007-01-01 00:00:00.0000000,2007-01-01 06:00:00.0000000,9487,NEW YORK,Winter Weather,Department of Highways
+...
+</code></pre></div><p>The service component in Docker Compose is defined as such:</p>
+<div class="highlight"><pre class="chroma"><code class="language-yaml" data-lang="yaml"><span class="w">  </span><span class="nt">events-producer</span><span class="p">:</span><span class="w">
+</span><span class="w">    </span><span class="nt">build</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span><span class="nt">context</span><span class="p">:</span><span class="w"> </span><span class="l">./storm-events-producer</span><span class="w">
+</span><span class="w">    </span><span class="nt">links</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span>- <span class="l">kafka</span><span class="w">
+</span><span class="w">    </span><span class="nt">depends_on</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span>- <span class="l">kafka</span><span class="w">
+</span><span class="w">    </span><span class="nt">environment</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span>- <span class="l">KAFKA_BOOTSTRAP_SERVER=kafka:9092</span><span class="w">
+</span><span class="w">      </span>- <span class="l">KAFKA_TOPIC=storm-events</span><span class="w">
+</span><span class="w">      </span>- <span class="l">SOURCE_FILE=StormEvents.csv</span><span class="w">
+</span></code></pre></div><p>The sink connector is where a lot of the magic happens! Let&rsquo;s explore it:</p>
+<h3 id="kafka-sink-connector-for-azure-data-explorer">Kafka Sink Connector for Azure Data Explorer</h3>
+<p>Here is the <code>kusto-connect</code> service in docker compose file:</p>
+<div class="highlight"><pre class="chroma"><code class="language-yaml" data-lang="yaml"><span class="w">  </span><span class="nt">kusto-connect</span><span class="p">:</span><span class="w">
+</span><span class="w">    </span><span class="nt">build</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span><span class="nt">context</span><span class="p">:</span><span class="w"> </span><span class="l">./connector</span><span class="w">
+</span><span class="w">    </span><span class="nt">ports</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span>- <span class="m">8083</span><span class="p">:</span><span class="m">8083</span><span class="w">
+</span><span class="w">    </span><span class="nt">links</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span>- <span class="l">kafka</span><span class="w">
+</span><span class="w">    </span><span class="nt">depends_on</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span>- <span class="l">kafka</span><span class="w">
+</span><span class="w">    </span><span class="nt">environment</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span>- <span class="l">BOOTSTRAP_SERVERS=kafka:9092</span><span class="w">
+</span><span class="w">      </span>- <span class="l">GROUP_ID=adx</span><span class="w">
+</span><span class="w">      </span>- <span class="l">CONFIG_STORAGE_TOPIC=my_connect_configs</span><span class="w">
+</span><span class="w">      </span>- <span class="l">OFFSET_STORAGE_TOPIC=my_connect_offsets</span><span class="w">
+</span><span class="w">      </span>- <span class="l">STATUS_STORAGE_TOPIC=my_connect_statuses</span><span class="w">
+</span></code></pre></div><p>The container is built from a <code>Dockerfile</code> - this makes it easier for you to run it locally as opposed to pulling it from an external Docker registry</p>
+<div class="highlight"><pre class="chroma"><code class="language-Dockerfile" data-lang="Dockerfile"><span class="k">FROM</span><span class="s"> debezium/connect:1.2</span><span class="err">
+</span><span class="err"></span><span class="k">WORKDIR</span><span class="s"> $KAFKA_HOME/connect</span><span class="err">
+</span><span class="err"></span><span class="k">ARG</span> KUSTO_KAFKA_SINK_VERSION<span class="err">
+</span><span class="err"></span><span class="k">RUN</span> curl -L -O https://github.com/Azure/kafka-sink-azure-kusto/releases/download/v<span class="nv">$KUSTO_KAFKA_SINK_VERSION</span>/kafka-sink-azure-kusto-<span class="nv">$KUSTO_KAFKA_SINK_VERSION</span>-jar-with-dependencies.jar<span class="err">
+</span></code></pre></div><p>It&rsquo;s based on top of the <a href="https://hub.docker.com/r/debezium/connect/">Debezium Kafka Connect</a> image. Simply download the Kusto Connector JAR (<a href="https://github.com/Azure/kafka-sink-azure-kusto/releases/tag/v1.0.1">version 1.0.1</a> at the time of writing) and place it in the Kafka Connect plugins directory. That&rsquo;s it!</p>
+<p>Here is what the sink connector configuration file looks like:</p>
+<div class="highlight"><pre class="chroma"><code class="language-json" data-lang="json"><span class="p">{</span>
+    <span class="nt">&#34;name&#34;</span><span class="p">:</span> <span class="s2">&#34;storm&#34;</span><span class="p">,</span>
+    <span class="nt">&#34;config&#34;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="nt">&#34;connector.class&#34;</span><span class="p">:</span> <span class="s2">&#34;com.microsoft.azure.kusto.kafka.connect.sink.KustoSinkConnector&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;flush.size.bytes&#34;</span><span class="p">:</span> <span class="mi">10000</span><span class="p">,</span>
+        <span class="nt">&#34;flush.interval.ms&#34;</span><span class="p">:</span> <span class="mi">50000</span><span class="p">,</span>
+        <span class="nt">&#34;tasks.max&#34;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="nt">&#34;topics&#34;</span><span class="p">:</span> <span class="s2">&#34;storm-events&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;kusto.tables.topics.mapping&#34;</span><span class="p">:</span> <span class="s2">&#34;[{&#39;topic&#39;: &#39;storm-events&#39;,&#39;db&#39;: &#39;&lt;enter database name&gt;&#39;, &#39;table&#39;: &#39;Storms&#39;,&#39;format&#39;: &#39;csv&#39;, &#39;mapping&#39;:&#39;Storms_CSV_Mapping&#39;}]&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;aad.auth.authority&#34;</span><span class="p">:</span> <span class="s2">&#34;&lt;enter tenant ID&gt;&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;aad.auth.appid&#34;</span><span class="p">:</span> <span class="s2">&#34;&lt;enter application ID&gt;&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;aad.auth.appkey&#34;</span><span class="p">:</span> <span class="s2">&#34;&lt;enter client secret&gt;&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;kusto.url&#34;</span><span class="p">:</span> <span class="s2">&#34;https://ingest-&lt;name of cluster&gt;.&lt;region&gt;.kusto.windows.net&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;key.converter&#34;</span><span class="p">:</span> <span class="s2">&#34;org.apache.kafka.connect.storage.StringConverter&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;value.converter&#34;</span><span class="p">:</span> <span class="s2">&#34;org.apache.kafka.connect.storage.StringConverter&#34;</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div><p>The process of loading/importing data into a table in Azure Data Explorer is <a href="https://docs.microsoft.com/azure/data-explorer/ingest-data-overview?WT.mc_id=devto-blog-abhishgu">known as Ingestion</a>. This is how the the connector operates as well.</p>
+<p><img src="https://docs.microsoft.com/en-us/azure/data-explorer/media/data-ingestion-overview/data-management-and-ingestion-overview.png" alt="Azure Data Explore documentation"></p>
+<p>Behind the scenes, it uses the following modules in the <a href="https://docs.microsoft.com/azure/data-explorer/kusto/api/java/kusto-java-client-library?WT.mc_id=devto-blog-abhishgu">Java SDK for Azure Data Explorer</a></p>
+<ul>
+<li><code>data</code>: to connect, issue (control) commands and query data</li>
+<li><code>ingest</code>: to ingest data</li>
+</ul>
+<p>At the time of writing, the data formats supported by the connector are: <code>csv</code>, <code>json</code>, <code>txt</code>, <code>avro</code>, <code>apacheAvro</code>, <code>tsv</code>, <code>scsv</code>, <code>sohsv</code> and <code>psv</code>. Data in the Kafka topics is written to files on disk. These are then sent to Azure Data Explorer based on the following connector configurations - when file has reached <code>flush.size.bytes</code> <strong>or</strong> the <code>flush.interval.ms</code> interval has passed.</p>
+<blockquote>
+<p>The only exception to the above mechanism is the <code>avro</code> and <code>apacheAvro</code> data types which are handled as byte arrays</p>
+</blockquote>
+<p>By &ldquo;sent to Azure Data Explorer&rdquo;, what I really mean that the file is queued for Ingestion (using <a href="https://github.com/Azure/azure-kusto-java/blob/35d682a89b6b76be5196d73ad10a52fd47ef9ad5/ingest/src/main/java/com/microsoft/azure/kusto/ingest/IngestClient.java#L31">IngestClient.ingestFromFile</a>)</p>
+<p>Alright, lots of theory so far&hellip;</p>
+<h2 id="-lets-try-it-out">.. let&rsquo;s try it out!</h2>
+<p>Clone this repo:</p>
+<div class="highlight"><pre class="chroma"><code class="language-shell" data-lang="shell">git clone https://github.com/abhirockzz/kafka-kusto-ingestion-tutorial
+<span class="nb">cd</span> kafka-kusto-ingestion-tutorial
+</code></pre></div><p>Start off creating an Azure Data Explorer cluster and database <a href="https://docs.microsoft.com/azure/data-explorer/create-cluster-database-portal?WT.mc_id=devto-blog-abhishgu">using Azure Portal</a>, <a href="https://docs.microsoft.com/azure/data-explorer/create-cluster-database-cli?WT.mc_id=devto-blog-abhishgu">Azure CLI</a> or any of the client SDKs such as <a href="https://docs.microsoft.com/azure/data-explorer/create-cluster-database-python?WT.mc_id=devto-blog-abhishgu">Python</a>.</p>
+<p>Once that&rsquo;s done, create a table (<code>Storms</code>) and respective mapping (<code>Storms_CSV_Mapping</code>):</p>
+<div class="highlight"><pre class="chroma"><code class="language-fallback" data-lang="fallback">.create table Storms (StartTime: datetime, EndTime: datetime, EventId: int, State: string, EventType: string, Source: string)
+
+.create table Storms ingestion csv mapping &#39;Storms_CSV_Mapping&#39; &#39;[{&#34;Name&#34;:&#34;StartTime&#34;,&#34;datatype&#34;:&#34;datetime&#34;,&#34;Ordinal&#34;:0}, {&#34;Name&#34;:&#34;EndTime&#34;,&#34;datatype&#34;:&#34;datetime&#34;,&#34;Ordinal&#34;:1},{&#34;Name&#34;:&#34;EventId&#34;,&#34;datatype&#34;:&#34;int&#34;,&#34;Ordinal&#34;:2},{&#34;Name&#34;:&#34;State&#34;,&#34;datatype&#34;:&#34;string&#34;,&#34;Ordinal&#34;:3},{&#34;Name&#34;:&#34;EventType&#34;,&#34;datatype&#34;:&#34;string&#34;,&#34;Ordinal&#34;:4},{&#34;Name&#34;:&#34;Source&#34;,&#34;datatype&#34;:&#34;string&#34;,&#34;Ordinal&#34;:5}]&#39;
+</code></pre></div><h3 id="start-containers-and-install-the-connector">Start containers and install the connector</h3>
+<p>Before installing the connector, we need to create a Service Principal in order for the connector to authenticate and connect to Azure Data Explorer service.</p>
+<p>Use <a href="https://docs.microsoft.com/cli/azure/ad/sp?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az-ad-sp-create-for-rbac">az ad sp create-for-rbac</a> command:</p>
+<div class="highlight"><pre class="chroma"><code class="language-fallback" data-lang="fallback">az ad sp create-for-rbac -n &#34;kusto-sp&#34;
+</code></pre></div><p>You will get a JSON response as such - please note down the <code>appId</code>, <code>password</code> and <code>tenant</code> as you will be using them in subsequent steps</p>
+<div class="highlight"><pre class="chroma"><code class="language-json" data-lang="json"><span class="p">{</span>
+  <span class="nt">&#34;appId&#34;</span><span class="p">:</span> <span class="s2">&#34;fe7280c7-5705-4789-b17f-71a472340429&#34;</span><span class="p">,</span>
+  <span class="nt">&#34;displayName&#34;</span><span class="p">:</span> <span class="s2">&#34;kusto-sp&#34;</span><span class="p">,</span>
+  <span class="nt">&#34;name&#34;</span><span class="p">:</span> <span class="s2">&#34;http://kusto-sp&#34;</span><span class="p">,</span>
+  <span class="nt">&#34;password&#34;</span><span class="p">:</span> <span class="s2">&#34;29c719dd-f2b3-46de-b71c-4004fb6116ee&#34;</span><span class="p">,</span>
+  <span class="nt">&#34;tenant&#34;</span><span class="p">:</span> <span class="s2">&#34;42f988bf-86f1-42af-91ab-2d7cd011db42&#34;</span>
+<span class="p">}</span>
+</code></pre></div><p><strong>Add permissions to your database</strong></p>
+<p>Provide appropriate role to the Service principal you just created. To assign the <code>admin</code> role, <a href="https://docs.microsoft.com/en-us/azure/data-explorer/manage-database-permissions#manage-permissions-in-the-azure-portal">follow this guide</a> to use the Azure portal or use the following command in your Data Explorer cluster</p>
+<div class="highlight"><pre class="chroma"><code class="language-fallback" data-lang="fallback">.add database &lt;database name&gt; admins  (&#39;aadapp=&lt;service principal AppID&gt;;&lt;service principal TenantID&gt;&#39;) &#39;AAD App&#39;
+</code></pre></div><p>Start the containers:</p>
+<div class="highlight"><pre class="chroma"><code class="language-shell" data-lang="shell">docker-compose up
+</code></pre></div><p>The producer application will start sending events to the <code>storm-events</code> topic. You should see logs similar to:</p>
+<div class="highlight"><pre class="chroma"><code class="language-shell" data-lang="shell">....
+events-producer_1  <span class="p">|</span> sent message to partition <span class="m">0</span> offset <span class="m">0</span>
+events-producer_1  <span class="p">|</span> event  2007-01-01 00:00:00.0000000,2007-01-01 00:00:00.0000000,13208,NORTH CAROLINA,Thunderstorm Wind,Public
+events-producer_1  <span class="p">|</span> 
+events-producer_1  <span class="p">|</span> sent message to partition <span class="m">0</span> offset <span class="m">1</span>
+events-producer_1  <span class="p">|</span> event  2007-01-01 00:00:00.0000000,2007-01-01 05:00:00.0000000,23358,WISCONSIN,Winter Storm,COOP Observer
+events-producer_1  <span class="p">|</span> 
+events-producer_1  <span class="p">|</span> sent message to partition <span class="m">0</span> offset <span class="m">2</span>
+events-producer_1  <span class="p">|</span> event  2007-01-01 00:00:00.0000000,2007-01-01 05:00:00.0000000,23357,WISCONSIN,Winter Storm,COOP Observer
+events-producer_1  <span class="p">|</span> 
+events-producer_1  <span class="p">|</span> sent message to partition <span class="m">0</span> offset <span class="m">3</span>
+events-producer_1  <span class="p">|</span> event  2007-01-01 00:00:00.0000000,2007-01-01 06:00:00.0000000,9494,NEW YORK,Winter Weather,Department of Highways
+events-producer_1  <span class="p">|</span> 
+events-producer_1  <span class="p">|</span> sent message to partition <span class="m">0</span> offset <span class="m">4</span>
+events-producer_1  <span class="p">|</span> 2020/08/20 16:51:35 event  2007-01-01 00:00:00.0000000,2007-01-01 06:00:00.0000000,9488,NEW YORK,Winter Weather,Department of Highways
+....
+</code></pre></div><p>We can now install the sink connector to consume these events and ingest them into Azure Data Explorer</p>
+<p>Replace the values for following attributes in <code>adx-sink-config.json</code>: <code>aad.auth.authority</code>, <code>aad.auth.appid</code>, <code>aad.auth.appkey</code>, <code>kusto.tables.topics.mapping</code> (the database name) and <code>kusto.url</code></p>
+<div class="highlight"><pre class="chroma"><code class="language-json" data-lang="json"><span class="p">{</span>
+    <span class="nt">&#34;name&#34;</span><span class="p">:</span> <span class="s2">&#34;storm&#34;</span><span class="p">,</span>
+    <span class="nt">&#34;config&#34;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="nt">&#34;connector.class&#34;</span><span class="p">:</span> <span class="s2">&#34;com.microsoft.azure.kusto.kafka.connect.sink.KustoSinkConnector&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;flush.size.bytes&#34;</span><span class="p">:</span> <span class="mi">10000</span><span class="p">,</span>
+        <span class="nt">&#34;flush.interval.ms&#34;</span><span class="p">:</span> <span class="mi">50000</span><span class="p">,</span>
+        <span class="nt">&#34;tasks.max&#34;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="nt">&#34;topics&#34;</span><span class="p">:</span> <span class="s2">&#34;storm-events&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;kusto.tables.topics.mapping&#34;</span><span class="p">:</span> <span class="s2">&#34;[{&#39;topic&#39;: &#39;storm-events&#39;,&#39;db&#39;: &#39;&lt;enter database name&gt;&#39;, &#39;table&#39;: &#39;Storms&#39;,&#39;format&#39;: &#39;csv&#39;, &#39;mapping&#39;:&#39;Storms_CSV_Mapping&#39;}]&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;aad.auth.authority&#34;</span><span class="p">:</span> <span class="s2">&#34;&lt;enter tenant ID&gt;&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;aad.auth.appid&#34;</span><span class="p">:</span> <span class="s2">&#34;&lt;enter application ID&gt;&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;aad.auth.appkey&#34;</span><span class="p">:</span> <span class="s2">&#34;&lt;enter client secret&gt;&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;kusto.url&#34;</span><span class="p">:</span> <span class="s2">&#34;https://ingest-&lt;name of cluster&gt;.&lt;region&gt;.kusto.windows.net&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;key.converter&#34;</span><span class="p">:</span> <span class="s2">&#34;org.apache.kafka.connect.storage.StringConverter&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;value.converter&#34;</span><span class="p">:</span> <span class="s2">&#34;org.apache.kafka.connect.storage.StringConverter&#34;</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div><p>In a different terminnal, keep a track of the connector service logs:</p>
+<div class="highlight"><pre class="chroma"><code class="language-shell" data-lang="shell">docker-compose logs -f <span class="p">|</span> grep kusto-connect
+</code></pre></div><p>Install the connector:</p>
+<div class="highlight"><pre class="chroma"><code class="language-shell" data-lang="shell">curl -X POST -H <span class="s2">&#34;Content-Type: application/json&#34;</span> --data @adx-sink-config.json http://localhost:8083/connectors
+
+//check status
+curl http://localhost:8083/connectors/storm/status
+</code></pre></div><p>The connector should spring into action. Meanwhile in the other terminal, you should see logs similar to:</p>
+<div class="highlight"><pre class="chroma"><code class="language-shell" data-lang="shell">kusto-connect_1    <span class="p">|</span> INFO   <span class="o">||</span>  Refreshing Ingestion Resources   <span class="o">[</span>com.microsoft.azure.kusto.ingest.ResourceManager<span class="o">]</span>
+kusto-connect_1    <span class="p">|</span> INFO   <span class="o">||</span>  Kusto ingestion: file <span class="o">(</span>/tmp/kusto-sink-connector-0a8a9fa2-9e4b-414d-bae1-5d01f3969522/kafka_storm-events_0_0.csv.gz<span class="o">)</span> of size <span class="o">(</span>9192<span class="o">)</span> at current offset <span class="o">(</span>93<span class="o">)</span>   <span class="o">[</span>com.microsoft.azure.kusto.kafka.connect.sink.TopicPartitionWriter<span class="o">]</span>
+kusto-connect_1    <span class="p">|</span> INFO   <span class="o">||</span>  WorkerSinkTask<span class="o">{</span><span class="nv">id</span><span class="o">=</span>storm-0<span class="o">}</span> Committing offsets asynchronously using sequence number 1: <span class="o">{</span>storm-events-0<span class="o">=</span>OffsetAndMetadata<span class="o">{</span><span class="nv">offset</span><span class="o">=</span>94, <span class="nv">leaderEpoch</span><span class="o">=</span>null, <span class="nv">metadata</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="o">}}</span>   <span class="o">[</span>org.apache.kafka.connect.runtime.WorkerSinkTask<span class="o">]</span>
+ct.runtime.WorkerSinkTask<span class="o">]</span>
+kusto-connect_1    <span class="p">|</span> INFO   <span class="o">||</span>  Kusto ingestion: file <span class="o">(</span>/tmp/kusto-sink-connector-0a8a9fa2-9e4b-414d-bae1-5d01f3969522/kafka_storm-events_0_94.csv.gz<span class="o">)</span> of size <span class="o">(</span>1864<span class="o">)</span> at current offset <span class="o">(</span>111<span class="o">)</span>   <span class="o">[</span>com.microsoft.azure.kusto.kafka.connect.sink.TopicPartitionWriter<span class="o">]</span>
+kusto-connect_1    <span class="p">|</span> INFO   <span class="o">||</span>  WorkerSinkTask<span class="o">{</span><span class="nv">id</span><span class="o">=</span>storm-0<span class="o">}</span> Committing offsets asynchronously using sequence number 2: <span class="o">{</span>storm-events-0<span class="o">=</span>OffsetAndMetadata<span class="o">{</span><span class="nv">offset</span><span class="o">=</span>112, <span class="nv">leaderEpoch</span><span class="o">=</span>null, <span class="nv">metadata</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="o">}}</span>   <span class="o">[</span>org.apache.kafka.connect.runtime.WorkerSinkTask<span class="o">]</span>
+....
+</code></pre></div><p>Wait for sometime before data ends up in the <code>Storms</code> table. To confirm, check the row count and confirm that there are no failures in the ingestion process:</p>
+<div class="highlight"><pre class="chroma"><code class="language-fallback" data-lang="fallback">Storms | count
+
+. show ingestion failures
+</code></pre></div><p>Once there is some data, try out a few queries. To see all the records:</p>
+<div class="highlight"><pre class="chroma"><code class="language-fallback" data-lang="fallback">Storms
+</code></pre></div><p>Use <code>where</code> and <code>project</code> to filter specific data</p>
+<div class="highlight"><pre class="chroma"><code class="language-fallback" data-lang="fallback">Storms
+| where EventType == &#39;Drought&#39; and State == &#39;TEXAS&#39;
+| project StartTime, EndTime, Source, EventId
+</code></pre></div><p>Use the <a href="https://docs.microsoft.com/azure/data-explorer/write-queries?WT.mc_id=devto-blog-abhishgu#summarize"><code>summarize</code> operator</a></p>
+<div class="highlight"><pre class="chroma"><code class="language-fallback" data-lang="fallback">Storms
+| summarize event_count=count() by State
+| where event_count &gt; 10
+| project State, event_count
+| render columnchart
+</code></pre></div><p><img src="https://dev-to-uploads.s3.amazonaws.com/i/0foqgrg0zpr0fdmm9bu8.png" alt=""></p>
+<p>These are just few examples. Dig into the <a href="https://docs.microsoft.com/azure/data-explorer/kusto/query/?WT.mc_id=devto-blog-abhishgu">Kusto Query Language documentation</a> or explore tutorials about <a href="https://docs.microsoft.com/azure/data-explorer/ingest-json-formats?tabs=kusto-query-language&amp;WT.mc_id=devto-blog-abhishgu">how to ingest JSON formatted sample data into Azure Data Explorer</a>, using <a href="https://docs.microsoft.com/azure/data-explorer/write-queries?WT.mc_id=devto-blog-abhishgu#scalar-operators">scalar operators</a>, <a href="https://docs.microsoft.com/azure/data-explorer/kusto/query/tutorial?pivots=azuredataexplorer&amp;WT.mc_id=devto-blog-abhishgu#timecharts">timecharts</a> etc.</p>
+<blockquote>
+<p>If you want to re-start from scratch, simply stop the containers (<code>docker-compose down -v</code>), delete (<code>.drop table Storms</code>) and re-create the <code>Storms</code> table (along with the mapping) and re-start containers (<code>docker-compose up</code>)</p>
+</blockquote>
+<h3 id="clean-up">Clean up</h3>
+<p>To delete the Azure Data Explorer cluster/database, use <a href="https://docs.microsoft.com/cli/azure/kusto/cluster?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az-kusto-cluster-delete">az cluster delete</a> or <a href="https://docs.microsoft.com/cli/azure/kusto/database?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az-kusto-database-delete">az kusto database delete</a></p>
+<div class="highlight"><pre class="chroma"><code class="language-fallback" data-lang="fallback">az kusto cluster delete -n &lt;cluster name&gt; -g &lt;resource group name&gt;
+az kusto database delete -n &lt;database name&gt; --cluster-name &lt;cluster name&gt; -g &lt;resource group name&gt;
+</code></pre></div><h2 id="thats-a-wrap">That&rsquo;s a wrap!</h2>
+<p>I hope this helps you get started building data ingestion pipelines from Kafka to Azure Data Explorer using the Kafka Connect sink connector. This is not the only way to ingest data into Azure Data Explorer (of course!). You&rsquo;re welcome to explore the documentation and explore other techniques such as <a href="https://docs.microsoft.com/azure/data-explorer/ingest-data-one-click?WT.mc_id=devto-blog-abhishgu">One-click Ingestion</a>, using <a href="https://docs.microsoft.com/azure/data-explorer/ingest-data-event-grid-overview?WT.mc_id=devto-blog-abhishgu">Event Grid</a>, <a href="https://docs.microsoft.com/azure/data-explorer/ingest-data-iot-hub-overview?WT.mc_id=devto-blog-abhishgu">IoT Hub</a> and much more!</p>
+<p>Until next time, Happy Exploring!</p>
+<p><img src="https://media.giphy.com/media/l4KibOaou932EC7Dy/giphy.gif" alt=""></p>
+
+
+        
+
+        
+
+        
+      </article>
+
+      
+        <ul class="pager blog-pager">
+          
+            <li class="previous">
+              <a href="https://abhirockzz.github.io/posts/postgres-debezium-pgoutput/" data-toggle="tooltip" data-placement="top" title="PostgreSQL pgoutput plugin for change data capture">&larr; Previous Post</a>
+            </li>
+          
+          
+            <li class="next">
+              <a href="https://abhirockzz.github.io/posts/azure-stream-analytics-tutorial/" data-toggle="tooltip" data-placement="top" title="Build a pipeline to join streams of real time data">Next Post &rarr;</a>
+            </li>
+          
+        </ul>
+      
+
+
+      
+
+    </div>
+  </div>
+</div>
+
+      
+<footer>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+        <ul class="list-inline text-center footer-links">
+          
+              <li>
+                <a href="https://github.com/abhirockzz" title="GitHub">
+                  <span class="fa-stack fa-lg">
+                    <i class="fas fa-circle fa-stack-2x"></i>
+                    <i class="fab fa-github fa-stack-1x fa-inverse"></i>
+                  </span>
+                </a>
+              </li>
+              <li>
+                <a href="https://twitter.com/abhi_tweeter" title="Twitter">
+                  <span class="fa-stack fa-lg">
+                    <i class="fas fa-circle fa-stack-2x"></i>
+                    <i class="fab fa-twitter fa-stack-1x fa-inverse"></i>
+                  </span>
+                </a>
+              </li>
+              <li>
+                <a href="https://linkedin.com/in/abhirockzz" title="LinkedIn">
+                  <span class="fa-stack fa-lg">
+                    <i class="fas fa-circle fa-stack-2x"></i>
+                    <i class="fab fa-linkedin fa-stack-1x fa-inverse"></i>
+                  </span>
+                </a>
+              </li>
+          
+          <li>
+            <a href="" title="RSS">
+              <span class="fa-stack fa-lg">
+                <i class="fas fa-circle fa-stack-2x"></i>
+                <i class="fas fa-rss fa-stack-1x fa-inverse"></i>
+              </span>
+            </a>
+          </li>
+          
+        </ul>
+        <p class="credits copyright text-muted">
+          
+            
+              <a href="https://abhirockzz.github.io">Abhishek Gupta</a>
+            
+          
+
+          &nbsp;&bull;&nbsp;&copy;
+          
+            2021
+          
+
+          
+            &nbsp;&bull;&nbsp;
+            <a href="https://abhirockzz.github.io/">Abhishek&#39;s blog</a>
+          
+        </p>
+        
+        <p class="credits theme-by text-muted">
+          <a href="https://gohugo.io">Hugo v0.80.0</a> powered &nbsp;&bull;&nbsp; Theme <a href="https://github.com/halogenica/beautifulhugo">Beautiful Hugo</a> adapted from <a href="https://deanattali.com/beautiful-jekyll/">Beautiful Jekyll</a>
+          
+        </p>
+      </div>
+    </div>
+  </div>
+</footer><script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.js" integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/contrib/auto-render.min.js" integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
+<script src="https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+<script src="https://abhirockzz.github.io/js/main.js"></script><script> renderMathInElement(document.body); </script><script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.js" integrity="sha384-QELNnmcmU8IR9ZAykt67vGr9/rZJdHbiWi64V88fCPaOohUlHCqUD/unNN0BXSqy" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe-ui-default.min.js" integrity="sha384-m67o7SkQ1ALzKZIFh4CiTA8tmadaujiTa9Vu+nqPSwDOqHrDmxLezTdFln8077+q" crossorigin="anonymous"></script><script src="https://abhirockzz.github.io/js/load-photoswipe.js"></script>
+
+
+
+
+
+
+
+
+
+    
+  </body>
+</html>
+

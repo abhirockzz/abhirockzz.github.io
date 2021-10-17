@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en" itemscope itemtype="http://schema.org/WebPage">
+  <head>
+    
+
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+
+  <title>Integrate Kafka and Cassandra using Kafka Connect - Abhishek&#39;s blog</title>
+  <meta name="description" content="This blog post demonstrates how you can use an open source solution (connector based) to ingest data from Kafka into Azure Cosmos DB Cassandra API.">
+  <meta name="author" content="Abhishek Gupta"/><script type="application/ld+json">
+{
+    "@context": "http://schema.org",
+    "@type": "WebSite",
+    "name": "Abhishek\u0027s blog",
+    
+    "url": "https:\/\/abhirockzz.github.io\/"
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Organization",
+  "name": "",
+  "url": "https:\/\/abhirockzz.github.io\/"
+  
+  
+  
+  
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [{
+        "@type": "ListItem",
+        "position": 1,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io\/",
+          "name": "home"
+        }
+    },{
+        "@type": "ListItem",
+        "position": 3,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io\/posts\/kafka-cassandra-ingestion\/",
+          "name": "Integrate kafka and cassandra using kafka connect"
+        }
+    }]
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Article",
+  "author": {
+    "name" : "Abhishek Gupta"
+  },
+  "headline": "Integrate Kafka and Cassandra using Kafka Connect",
+  "description" : "This blog post demonstrates how you can use an open source solution (connector based) to ingest data from Kafka into Azure Cosmos DB Cassandra API.",
+  "inLanguage" : "en",
+  "wordCount":  2402 ,
+  "datePublished" : "2020-12-17T00:00:00",
+  "dateModified" : "2020-12-17T00:00:00",
+  "image" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+  "keywords" : [ "" ],
+  "mainEntityOfPage" : "https:\/\/abhirockzz.github.io\/posts\/kafka-cassandra-ingestion\/",
+  "publisher" : {
+    "@type": "Organization",
+    "name" : "https:\/\/abhirockzz.github.io\/",
+    "logo" : {
+        "@type" : "ImageObject",
+        "url" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+        "height" :  60 ,
+        "width" :  60
+    }
+  }
+}
+</script>
+
+<meta property="og:title" content="Integrate Kafka and Cassandra using Kafka Connect" />
+<meta property="og:description" content="This blog post demonstrates how you can use an open source solution (connector based) to ingest data from Kafka into Azure Cosmos DB Cassandra API.">
+<meta property="og:image" content="https://abhirockzz.github.io/icon.jpg" />
+<meta property="og:url" content="https://abhirockzz.github.io/posts/kafka-cassandra-ingestion/" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Abhishek&#39;s blog" />
+
+  <meta name="twitter:title" content="Integrate Kafka and Cassandra using Kafka Connect" />
+  <meta name="twitter:description" content="This blog post demonstrates how you can use an open source solution (connector based) to ingest data from Kafka into Azure Cosmos DB Cassandra API.">
+  <meta name="twitter:image" content="https://abhirockzz.github.io/icon.jpg" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:site" content="@abhi_tweeter" />
+  <meta name="twitter:creator" content="@abhi_tweeter" />
+  <link href='https://abhirockzz.github.io/icons/myicon.png' rel='icon' type='image/x-icon'/>
+  <meta name="generator" content="Hugo 0.80.0" />
+  <link rel="alternate" href="https://abhirockzz.github.io/index.xml" type="application/rss+xml" title="Abhishek&#39;s blog"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css" integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.5.0/css/all.css" integrity="sha384-B4dIYHKNBt8Bc12p+WXckhzcICo0wtJAoU8YZTY5qE0Id1GSseTk6S+L3BlXeVIU" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous"><link rel="stylesheet" href="https://abhirockzz.github.io/css/main.css" /><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800" /><link rel="stylesheet" href="https://abhirockzz.github.io/css/syntax.css" /><link rel="stylesheet" href="https://abhirockzz.github.io/css/codeblock.css" /><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.css" integrity="sha384-h/L2W9KefUClHWaty3SLE5F/qvc4djlyR4qY3NUV5HGQBBW7stbcfff1+I/vmsHh" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/default-skin/default-skin.min.css" integrity="sha384-iD0dNku6PYSIQLyfTOpB06F2KCZJAKLOThS5HRe8b3ibhdEQ6eKsFf/EeFxdOt5R" crossorigin="anonymous">
+
+
+<script type="application/javascript">
+var doNotTrack = false;
+if (!doNotTrack) {
+	window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+	ga('create', 'UA-54762029-1', 'auto');
+	
+	ga('send', 'pageview');
+}
+</script>
+<script async src='https://www.google-analytics.com/analytics.js'></script>
+
+
+  </head>
+  <body>
+    <nav class="navbar navbar-default navbar-fixed-top navbar-custom">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#main-navbar">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="https://abhirockzz.github.io/">Abhishek&#39;s blog</a>
+    </div>
+
+    <div class="collapse navbar-collapse" id="main-navbar">
+      <ul class="nav navbar-nav navbar-right">
+        
+          
+            <li>
+              <a title="Blog" href="/">Blog</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="About" href="/about">About</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Books" href="/books">Books</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Open-source" href="/projects">Open-source</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Presentations" href="/presentations">Presentations</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Tags" href="/tags">Tags</a>
+            </li>
+          
+        
+
+        
+
+        
+      </ul>
+    </div>
+
+    
+      <div class="avatar-container">
+        <div class="avatar-img-border">
+          <a title="Abhishek&#39;s blog" href="https://abhirockzz.github.io/">
+            <img class="avatar-img" src="https://abhirockzz.github.io/icon.jpg" alt="Abhishek&#39;s blog" />
+          </a>
+        </div>
+      </div>
+    
+
+  </div>
+</nav>
+
+
+
+
+    
+
+
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+<div class="pswp__bg"></div>
+
+<div class="pswp__scroll-wrap">
+    
+    <div class="pswp__container">
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+    </div>
+    
+    <div class="pswp__ui pswp__ui--hidden">
+    <div class="pswp__top-bar">
+      
+      <div class="pswp__counter"></div>
+      <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+      <button class="pswp__button pswp__button--share" title="Share"></button>
+      <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+      <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+      
+      
+      <div class="pswp__preloader">
+        <div class="pswp__preloader__icn">
+          <div class="pswp__preloader__cut">
+            <div class="pswp__preloader__donut"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+      <div class="pswp__share-tooltip"></div>
+    </div>
+    <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+    </button>
+    <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+    </button>
+    <div class="pswp__caption">
+      <div class="pswp__caption__center"></div>
+    </div>
+    </div>
+    </div>
+</div>
+
+
+  
+  
+  
+
+
+
+
+
+
+  
+
+  <header class="header-section ">
+    
+    <div class="intro-header no-img">
+      <div class="container">
+        <div class="row">
+          <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+            <div class="posts-heading">
+              
+                <h1>Integrate Kafka and Cassandra using Kafka Connect</h1>
+              
+              
+                <hr class="small">
+              
+              
+              
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+
+    
+<div class="container" role="main">
+  <div class="row">
+    <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+      <article role="main" class="blog-post">
+        <p>This blog post demonstrates how you can use an open source solution (connector based) to ingest data from Kafka into Azure Cosmos DB Cassandra API. It uses a simple yet practical scenario along with a re-usable setup using Docker Compose to help with iterative development and testing. You will learn about:</p>
+<ul>
+<li>Overview of Kafka Connect along with the details of the integration</li>
+<li>How to configure and use the connector to work with Azure Cosmos DB</li>
+<li>Use the connector to write data to multiple tables from a single Kafka topic</li>
+</ul>
+<p>By the end of the article, you should have a working end to end integration and be able to validate it.</p>
+<p><a href="https://docs.microsoft.com/azure/cosmos-db/cassandra-introduction?WT.mc_id=data-11341-abhishgu">Azure Cosmos DB Cassandra API</a> is a fully managed cloud service that is compatible with Cassandra Query Language (CQL) v3.11 API. It has no operational overhead and you can benefit from all the underlying <a href="https://docs.microsoft.com/azure/cosmos-db/introduction?WT.mc_id=data-11341-abhishgu#key-benefits">Azure Cosmos DB capabilities</a> such as global distribution, automatic scale out partitioning, availability and latency guarantees, encryption at rest, backups etc.</p>
+<p>Your existing Cassandra applications can work with the Azure Cosmos DB Cassandra API since it works with <a href="https://cassandra.apache.org/doc/latest/getting_started/drivers.html?highlight=driver">CQLv4 compliant drivers</a> (see examples for <a href="https://docs.microsoft.com/azure/cosmos-db/create-cassandra-java-v4?WT.mc_id=data-11341-abhishgu">Java</a>, <a href="https://docs.microsoft.com/azure/cosmos-db/create-cassandra-dotnet-core?WT.mc_id=data-11341-abhishgu">.Net Core</a>, <a href="https://docs.microsoft.com/azure/cosmos-db/create-cassandra-nodejs?WT.mc_id=data-11341-abhishgu">Node.js</a>, <a href="https://docs.microsoft.com/azure/cosmos-db/create-cassandra-python?WT.mc_id=data-11341-abhishgu">Python</a> etc.) But, you also need to think about integrating with other systems with existing data and bringing that into Azure Cosmos DB. One such system is <a href="https://kafka.apache.org/">Apache Kafka</a>, which is a distributed streaming platform. It is used in industries and organizations to solve a <a href="https://kafka.apache.org/uses">wide variety of problems</a> ranging from traditional asynchronous messaging, website activity tracking, log aggregation, real-time fraud detection and much more! It has a rich ecosystem of technologies such as <a href="https://kafka.apache.org/26/documentation/streams">Kafka Streams</a> for stream processing and <a href="https://kafka.apache.org/documentation/#connect">Kafka Connect</a> for real-time data integration.</p>
+<p>Thanks to its <a href="https://kafka.apache.org/documentation/#design">scalable design</a>, Apache Kafka often serves as a central component in the overall data architecture with other systems pumping data into it. These could be click stream events, logs, sensor data, orders, database change-events etc. You name it! So, as you can imagine, there is a lot of data in Apache Kafka (topics) but it&rsquo;s only useful when consumed or ingested into other systems. You could achieve this by writing good old plumbing code using the <a href="https://kafka.apache.org/documentation/#api">Kafka Producer/Consumer</a> APIs <a href="https://cwiki.apache.org/confluence/display/KAFKA/Clients">using a language and client SDK of your choice</a>. But you can do better!</p>
+<blockquote>
+<p>The code and configuration associated with this blog post is available in this GitHub repository - <a href="https://github.com/abhirockzz/kafka-cosmosdb-cassandra">https://github.com/abhirockzz/kafka-cosmosdb-cassandra</a></p>
+</blockquote>
+<h2 id="hello-kafka-connect">Hello, Kafka Connect</h2>
+<p>Kafka Connect is a platform to stream data between Apache Kafka and other systems in a scalable and reliable manner. Besides the fact that it only depends on Kafka, the great thing about it is the fact that it provides a suite of ready-to-use connectors. This means that you do not need to write custom integration code to glue systems together; no code, just configuration! In case an existing connector is not available, you can leverage the powerful Kafka Connect framework to build your own connectors.</p>
+<p>There are two broad categories of connectors offered by Kafka Connect:</p>
+<ul>
+<li>Source connector: It is used to to extract data &ldquo;from&rdquo; an external system and send it to Apache Kafka.</li>
+<li>Sink connector: It is used to send existing data in Apache Kafka &ldquo;to&rdquo; an external system.</li>
+</ul>
+<p>In this blog post, we will be using the open source <a href="https://docs.datastax.com/en/kafka/doc/kafka/kafkaIntro.html">DataStax Apache Kafka connector</a> which is a Sink connector that works on top of Kafka Connect framework to ingest records from a Kafka topic into rows of one or more Cassandra table(s).</p>
+<h2 id="solution-overview">Solution overview</h2>
+<p>At a high level, the solution is quite simple! But a diagram should be helpful nonetheless.</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/i/ea0kusc997f0ndjarxr7.png" alt=""></p>
+<p>Sample weather data continuously generated into a Kafka topic. This is picked up by the connector and sent to Azure Cosmos DB and can be queried using any Cassandra client driver.</p>
+<p>Except Azure Cosmos DB, the rest of the components of the solution run as <a href="https://docs.docker.com/get-started/overview/">Docker</a> containers (using <a href="https://docs.docker.com/compose/reference/overview/">Docker Compose</a>). This includes Kafka (and Zookeeper), Kafka Connect worker (the Cassandra connector) along with the sample data generator (<a href="https://golang.org/">Go</a>) application. Having said that, the instructions would work with any Kafka cluster and Kafka Connect workers, provided all the components are configured to access and communicate with each other as required. For example, you could have a Kafka cluster on <a href="https://docs.microsoft.com/azure/hdinsight/?WT.mc_id=11341-blog-abhishgu">Azure HD Insight</a> or <a href="https://www.confluent.io/blog/confluent-cloud-managed-kafka-service-azure-marketplace/">Confluent Cloud on Azure Marketplace</a>.</p>
+<h3 id="docker-compose-services">Docker Compose services</h3>
+<p>Here is a breakdown of the components and their service definitions - you can refer to the complete <code>docker-compose</code> file <a href="https://github.com/abhirockzz/kafka-cosmosdb-cassandra/blob/master/docker-compose.yaml">in the GitHub repo</a>.</p>
+<p>The <a href="https://hub.docker.com/r/debezium/kafka/">debezium</a> images are used to run Kafka and Zookeeper. They just work and are great for iterative development with quick feedback loop, demos etc.</p>
+<div class="highlight"><pre class="chroma"><code class="language-yaml" data-lang="yaml"><span class="w">  </span><span class="nt">zookeeper</span><span class="p">:</span><span class="w">
+</span><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l">debezium/zookeeper:1.2</span><span class="w">
+</span><span class="w">    </span><span class="nt">ports</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span>- <span class="m">2181</span><span class="p">:</span><span class="m">2181</span><span class="w">
+</span><span class="w">  </span><span class="nt">kafka</span><span class="p">:</span><span class="w">
+</span><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l">debezium/kafka:1.2</span><span class="w">
+</span><span class="w">    </span><span class="nt">ports</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span>- <span class="m">9092</span><span class="p">:</span><span class="m">9092</span><span class="w">
+</span><span class="w">    </span><span class="nt">links</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span>- <span class="l">zookeeper</span><span class="w">
+</span><span class="w">    </span><span class="nt">depends_on</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span>- <span class="l">zookeeper</span><span class="w">
+</span><span class="w">    </span><span class="nt">environment</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span>- <span class="l">ZOOKEEPER_CONNECT=zookeeper:2181</span><span class="w">
+</span><span class="w">      </span>- <span class="l">KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092</span><span class="w">
+</span></code></pre></div><p>To run as a Docker container, the DataStax Apache Kafka Connector is baked on top of an existing Docker image - <a href="https://github.com/debezium/docker-images/tree/master/connect-base/1.2">debezium/connect-base</a>. This image includes an installation of Kafka and its Kafka Connect libraries, thus making it really convenient to add custom connectors.</p>
+<div class="highlight"><pre class="chroma"><code class="language-yaml" data-lang="yaml"><span class="w">  </span><span class="nt">cassandra-connector</span><span class="p">:</span><span class="w">
+</span><span class="w">    </span><span class="nt">build</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span><span class="nt">context</span><span class="p">:</span><span class="w"> </span><span class="l">./connector</span><span class="w">
+</span><span class="w">    </span><span class="nt">ports</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span>- <span class="m">8083</span><span class="p">:</span><span class="m">8083</span><span class="w">
+</span><span class="w">    </span><span class="nt">links</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span>- <span class="l">kafka</span><span class="w">
+</span><span class="w">    </span><span class="nt">depends_on</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span>- <span class="l">kafka</span><span class="w">
+</span><span class="w">    </span><span class="nt">environment</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span>- <span class="l">BOOTSTRAP_SERVERS=kafka:9092</span><span class="w">
+</span><span class="w">      </span>- <span class="l">GROUP_ID=cass</span><span class="w">
+</span><span class="w">      </span>- <span class="l">CONFIG_STORAGE_TOPIC=cass_connect_configs</span><span class="w">
+</span><span class="w">      </span>- <span class="l">OFFSET_STORAGE_TOPIC=cass_connect_offsets</span><span class="w">
+</span><span class="w">      </span>- <span class="l">STATUS_STORAGE_TOPIC=cass_connect_statuses</span><span class="w">
+</span></code></pre></div><p>The <a href="https://github.com/abhirockzz/kafka-cosmosdb-cassandra/blob/master/connector/Dockerfile">Dockerfile</a> is quite compact. It downloads the connectors and unzips it to appropriate directory in the filesystem (plugin path) for the Kafka Connect framework to detect it.</p>
+<div class="highlight"><pre class="chroma"><code class="language-dockerfile" data-lang="dockerfile"><span class="k">FROM</span><span class="s"> debezium/connect-base:1.2</span><span class="err">
+</span><span class="err"></span><span class="k">WORKDIR</span><span class="s"> $KAFKA_HOME/connect</span><span class="err">
+</span><span class="err"></span><span class="k">RUN</span> curl -L -O https://downloads.datastax.com/kafka/kafka-connect-cassandra-sink.tar.gz<span class="err">
+</span><span class="err"></span><span class="k">RUN</span> tar zxf kafka-connect-cassandra-sink.tar.gz<span class="err">
+</span><span class="err"></span><span class="k">RUN</span> rm kafka-connect-cassandra-sink.tar.gz<span class="err">
+</span></code></pre></div><p>Finally, the <code>data-generator</code> service seeds randomly generated (JSON) data into the <code>weather-data</code> Kafka topic. You can refer to the code and <code>Dockerfile</code> in <a href="https://github.com/abhirockzz/kafka-cosmosdb-cassandra/blob/master/data-generator/">the GitHub repo</a></p>
+<div class="highlight"><pre class="chroma"><code class="language-yaml" data-lang="yaml"><span class="w">  </span><span class="nt">data-generator</span><span class="p">:</span><span class="w">
+</span><span class="w">    </span><span class="nt">build</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span><span class="nt">context</span><span class="p">:</span><span class="w"> </span><span class="l">./data-generator</span><span class="w">
+</span><span class="w">    </span><span class="nt">ports</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span>- <span class="m">8080</span><span class="p">:</span><span class="m">8080</span><span class="w">
+</span><span class="w">    </span><span class="nt">links</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span>- <span class="l">kafka</span><span class="w">
+</span><span class="w">    </span><span class="nt">depends_on</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span>- <span class="l">kafka</span><span class="w">
+</span><span class="w">    </span><span class="nt">environment</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span>- <span class="l">KAFKA_BROKER=kafka:9092</span><span class="w">
+</span><span class="w">      </span>- <span class="l">KAFKA_TOPIC=weather-data</span><span class="w">
+</span></code></pre></div><p>Let&rsquo;s move on to the practical aspects! Make sure you have the following ready before you proceed.</p>
+<h2 id="pre-requisites">Pre-requisites</h2>
+<ul>
+<li>You will need a <a href="https://docs.microsoft.com/azure/?product=featured&amp;WT.mc_id=acloudguru-blog-abhishgu">Microsoft Azure account</a>. Don&rsquo;t worry, you can get it <a href="https://azure.microsoft.com/free/?WT.mc_id=acloudguru-blog-abhishgu">for free</a> if you don&rsquo;t have one already!</li>
+<li>Install <a href="https://docs.docker.com/get-docker/">Docker</a> and <a href="https://docs.docker.com/compose/install">Docker Compose</a></li>
+</ul>
+<p>Finally, clone this GitHub repo:</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">git clone https://github.com/abhirockzz/kafka-cosmosdb-cassandra
+<span class="nb">cd</span> kafka-cosmos-cassandra
+</code></pre></div><p>The next sections will guide you through:</p>
+<ul>
+<li>Set up an Azure Cosmos DB account, Cassandra keyspace and tables</li>
+<li>Bootstrap the integration pipeline</li>
+<li>Understand the configuration and start a connector instance</li>
+<li>Test the end to end result and run queries on data in Azure Cosmos DB tables</li>
+</ul>
+<h2 id="setup-and-configure-azure-cosmos-db">Setup and configure Azure Cosmos DB</h2>
+<p>Start by creating an <a href="https://docs.microsoft.com/azure/cosmos-db/create-cassandra-api-account-java?WT.mc_id=devto-blog-abhishgu#create-a-database-account">Azure Cosmos DB account</a> with the <strong>Cassandra API</strong> option selected</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/i/5wn5vbji2wa3uvu5os62.png" alt=""></p>
+<p>Using the Azure portal, create the Cassandra Keyspace and the tables required for the demo application.</p>
+<div class="highlight"><pre class="chroma"><code class="language-sql" data-lang="sql"><span class="k">CREATE</span> <span class="n">KEYSPACE</span> <span class="n">weather</span> <span class="k">WITH</span> <span class="n">REPLICATION</span> <span class="o">=</span> <span class="err">{</span><span class="s1">&#39;class&#39;</span> <span class="p">:</span> <span class="s1">&#39;NetworkTopologyStrategy&#39;</span><span class="p">,</span> <span class="s1">&#39;datacenter1&#39;</span> <span class="p">:</span> <span class="mi">1</span><span class="err">}</span><span class="p">;</span>
+
+<span class="k">CREATE</span> <span class="k">TABLE</span> <span class="n">weather</span><span class="p">.</span><span class="n">data_by_state</span> <span class="p">(</span><span class="n">station_id</span> <span class="nb">text</span><span class="p">,</span> <span class="n">temp</span> <span class="nb">int</span><span class="p">,</span> <span class="k">state</span> <span class="nb">text</span><span class="p">,</span> <span class="n">ts</span> <span class="k">timestamp</span><span class="p">,</span> <span class="k">PRIMARY</span> <span class="k">KEY</span> <span class="p">(</span><span class="k">state</span><span class="p">,</span> <span class="n">ts</span><span class="p">))</span> <span class="k">WITH</span> <span class="n">CLUSTERING</span> <span class="k">ORDER</span> <span class="k">BY</span> <span class="p">(</span><span class="n">ts</span> <span class="k">DESC</span><span class="p">)</span> <span class="k">AND</span> <span class="n">cosmosdb_cell_level_timestamp</span><span class="o">=</span><span class="k">true</span> <span class="k">AND</span> <span class="n">cosmosdb_cell_level_timestamp_tombstones</span><span class="o">=</span><span class="k">true</span> <span class="k">AND</span> <span class="n">cosmosdb_cell_level_timetolive</span><span class="o">=</span><span class="k">true</span><span class="p">;</span>
+
+<span class="k">CREATE</span> <span class="k">TABLE</span> <span class="n">weather</span><span class="p">.</span><span class="n">data_by_station</span> <span class="p">(</span><span class="n">station_id</span> <span class="nb">text</span><span class="p">,</span> <span class="n">temp</span> <span class="nb">int</span><span class="p">,</span> <span class="k">state</span> <span class="nb">text</span><span class="p">,</span> <span class="n">ts</span> <span class="k">timestamp</span><span class="p">,</span> <span class="k">PRIMARY</span> <span class="k">KEY</span> <span class="p">(</span><span class="n">station_id</span><span class="p">,</span> <span class="n">ts</span><span class="p">))</span> <span class="k">WITH</span> <span class="n">CLUSTERING</span> <span class="k">ORDER</span> <span class="k">BY</span> <span class="p">(</span><span class="n">ts</span> <span class="k">DESC</span><span class="p">)</span> <span class="k">AND</span> <span class="n">cosmosdb_cell_level_timestamp</span><span class="o">=</span><span class="k">true</span> <span class="k">AND</span> <span class="n">cosmosdb_cell_level_timestamp_tombstones</span><span class="o">=</span><span class="k">true</span> <span class="k">AND</span> <span class="n">cosmosdb_cell_level_timetolive</span><span class="o">=</span><span class="k">true</span><span class="p">;</span>
+</code></pre></div><p>That&rsquo;s it for the database part! It&rsquo;s time to start up other components.</p>
+<h2 id="start-integration-pipeline">Start integration pipeline</h2>
+<p>Since everything is Docker-ized, all you need is a single command to bootstrap services locally - Kafka, Zookeeper, Kafka Connect worker and the sample data generator application.</p>
+<div class="highlight"><pre class="chroma"><code class="language-shell" data-lang="shell">docker-compose --project-name kafka-cosmos-cassandra up --build
+</code></pre></div><blockquote>
+<p>It might take a while to download and start the containers: this is just a one time process.</p>
+</blockquote>
+<p>To confirm whether all the containers have started:</p>
+<div class="highlight"><pre class="chroma"><code class="language-shell" data-lang="shell">docker-compose -p kafka-cosmos-cassandra ps
+
+
+<span class="c1">#output</span>
+
+                  Name                                Command             State                    Ports                  
+--------------------------------------------------------------------------------------------------------------------------
+kafka-cosmos-cassandra_cassandra-           /docker-entrypoint.sh start   Up      0.0.0.0:8083-&gt;8083/tcp, 8778/tcp,       
+connector_1                                                                       9092/tcp, 9779/tcp                      
+kafka-cosmos-cassandra_datagen_1            /app/orders-gen               Up      0.0.0.0:8080-&gt;8080/tcp                  
+kafka-cosmos-cassandra_kafka_1              /docker-entrypoint.sh start   Up      8778/tcp, 0.0.0.0:9092-&gt;9092/tcp,       
+                                                                                  9779/tcp                                
+kafka-cosmos-cassandra_zookeeper_1          /docker-entrypoint.sh start   Up      0.0.0.0:2181-&gt;2181/tcp, 2888/tcp,       
+                                                                                  3888/tcp, 8778/tcp, 9779/tcp
+</code></pre></div><p>The data generator application will start pumping data into the <code>weather-data</code> topic in Kafka. You can also do quick sanity check to confirm. Peek into the Docker container running the Kafka connect worker:</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">docker <span class="nb">exec</span> -it kafka-cosmos-cassandra_cassandra-connector_1 bash
+</code></pre></div><p>Once you drop into the container shell, just start the usual Kafka console consumer process and you should see weather data (in JSON format) flowing in.</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash"><span class="nb">cd</span> ../bin
+./kafka-console-consumer.sh --bootstrap-server kafka:9092 --topic weather-data
+
+<span class="c1">#output</span>
+
+<span class="o">{</span><span class="s2">&#34;stationid&#34;</span>:<span class="s2">&#34;station-7&#34;</span>,<span class="s2">&#34;temp&#34;</span>:<span class="s2">&#34;64&#34;</span>,<span class="s2">&#34;state&#34;</span>:<span class="s2">&#34;state-17&#34;</span>,<span class="s2">&#34;created&#34;</span>:<span class="s2">&#34;2020-11-28T04:51:06Z&#34;</span><span class="o">}</span>
+<span class="o">{</span><span class="s2">&#34;stationid&#34;</span>:<span class="s2">&#34;station-9&#34;</span>,<span class="s2">&#34;temp&#34;</span>:<span class="s2">&#34;65&#34;</span>,<span class="s2">&#34;state&#34;</span>:<span class="s2">&#34;state-1&#34;</span>,<span class="s2">&#34;created&#34;</span>:<span class="s2">&#34;2020-11-28T04:51:09Z&#34;</span><span class="o">}</span>
+<span class="o">{</span><span class="s2">&#34;stationid&#34;</span>:<span class="s2">&#34;station-3&#34;</span>,<span class="s2">&#34;temp&#34;</span>:<span class="s2">&#34;60&#34;</span>,<span class="s2">&#34;state&#34;</span>:<span class="s2">&#34;state-9&#34;</span>,<span class="s2">&#34;created&#34;</span>:<span class="s2">&#34;2020-11-28T04:51:12Z&#34;</span><span class="o">}</span>
+<span class="o">{</span><span class="s2">&#34;stationid&#34;</span>:<span class="s2">&#34;station-8&#34;</span>,<span class="s2">&#34;temp&#34;</span>:<span class="s2">&#34;60&#34;</span>,<span class="s2">&#34;state&#34;</span>:<span class="s2">&#34;state-3&#34;</span>,<span class="s2">&#34;created&#34;</span>:<span class="s2">&#34;2020-11-28T04:51:15Z&#34;</span><span class="o">}</span>
+<span class="o">{</span><span class="s2">&#34;stationid&#34;</span>:<span class="s2">&#34;station-5&#34;</span>,<span class="s2">&#34;temp&#34;</span>:<span class="s2">&#34;65&#34;</span>,<span class="s2">&#34;state&#34;</span>:<span class="s2">&#34;state-7&#34;</span>,<span class="s2">&#34;created&#34;</span>:<span class="s2">&#34;2020-11-28T04:51:18Z&#34;</span><span class="o">}</span>
+<span class="o">{</span><span class="s2">&#34;stationid&#34;</span>:<span class="s2">&#34;station-6&#34;</span>,<span class="s2">&#34;temp&#34;</span>:<span class="s2">&#34;60&#34;</span>,<span class="s2">&#34;state&#34;</span>:<span class="s2">&#34;state-4&#34;</span>,<span class="s2">&#34;created&#34;</span>:<span class="s2">&#34;2020-11-28T04:51:21Z&#34;</span><span class="o">}</span>
+....
+</code></pre></div><h2 id="cassandra-sink-connector-setup">Cassandra Sink connector setup</h2>
+<p>Copy the JSON contents below to a file (you can name it <code>cassandra-sink-config.json</code>). You will need to update it as per your setup and the rest of this section will provide guidance around this topic.</p>
+<div class="highlight"><pre class="chroma"><code class="language-json" data-lang="json"><span class="p">{</span>
+    <span class="nt">&#34;name&#34;</span><span class="p">:</span> <span class="s2">&#34;kafka-cosmosdb-sink&#34;</span><span class="p">,</span>
+    <span class="nt">&#34;config&#34;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="nt">&#34;connector.class&#34;</span><span class="p">:</span> <span class="s2">&#34;com.datastax.oss.kafka.sink.CassandraSinkConnector&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;tasks.max&#34;</span><span class="p">:</span> <span class="s2">&#34;1&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;topics&#34;</span><span class="p">:</span> <span class="s2">&#34;weather-data&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;contactPoints&#34;</span><span class="p">:</span> <span class="s2">&#34;&lt;cosmos db account name&gt;.cassandra.cosmos.azure.com&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;port&#34;</span><span class="p">:</span> <span class="mi">10350</span><span class="p">,</span>
+        <span class="nt">&#34;loadBalancing.localDc&#34;</span><span class="p">:</span> <span class="s2">&#34;&lt;cosmos db region e.g. Southeast Asia&gt;&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;auth.username&#34;</span><span class="p">:</span> <span class="s2">&#34;&lt;enter username for cosmosdb account&gt;&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;auth.password&#34;</span><span class="p">:</span> <span class="s2">&#34;&lt;enter password for cosmosdb account&gt;&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;ssl.hostnameValidation&#34;</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+        <span class="nt">&#34;ssl.provider&#34;</span><span class="p">:</span> <span class="s2">&#34;JDK&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;ssl.keystore.path&#34;</span><span class="p">:</span> <span class="s2">&#34;/etc/alternatives/jre/lib/security/cacerts/&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;ssl.keystore.password&#34;</span><span class="p">:</span> <span class="s2">&#34;changeit&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;datastax-java-driver.advanced.connection.init-query-timeout&#34;</span><span class="p">:</span> <span class="mi">5000</span><span class="p">,</span>
+        <span class="nt">&#34;maxConcurrentRequests&#34;</span><span class="p">:</span> <span class="mi">500</span><span class="p">,</span>
+        <span class="nt">&#34;maxNumberOfRecordsInBatch&#34;</span><span class="p">:</span> <span class="mi">32</span><span class="p">,</span>
+        <span class="nt">&#34;queryExecutionTimeout&#34;</span><span class="p">:</span> <span class="mi">30</span><span class="p">,</span>
+        <span class="nt">&#34;connectionPoolLocalSize&#34;</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span>
+        <span class="nt">&#34;topic.weather-data.weather.data_by_state.mapping&#34;</span><span class="p">:</span> <span class="s2">&#34;station_id=value.stationid, temp=value.temp, state=value.state, ts=value.created&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;topic.weather-data.weather.data_by_station.mapping&#34;</span><span class="p">:</span> <span class="s2">&#34;station_id=value.stationid, temp=value.temp, state=value.state, ts=value.created&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;key.converter&#34;</span><span class="p">:</span> <span class="s2">&#34;org.apache.kafka.connect.storage.StringConverter&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;value.converter&#34;</span><span class="p">:</span> <span class="s2">&#34;org.apache.kafka.connect.json.JsonConverter&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;value.converter.schemas.enable&#34;</span><span class="p">:</span> <span class="kc">false</span><span class="p">,</span>
+        <span class="nt">&#34;offset.flush.interval.ms&#34;</span><span class="p">:</span> <span class="mi">10000</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div><p>Here is a summary of the attributes:</p>
+<p><strong>Basic connectivity</strong></p>
+<ul>
+<li><code>contactPoints</code>: enter the contact point for Cosmos DB Cassandra</li>
+<li><code>loadBalancing.localDc</code>: enter the region for Cosmos DB account e.g. Southeast Asia</li>
+<li><code>auth.username</code>: enter the username</li>
+<li><code>auth.password</code>: enter the password</li>
+<li><code>port</code>: enter the port value (this is <code>10350</code>, not <code>9042</code>. leave it as is)</li>
+</ul>
+<p>You can access this info the Azure Portal:</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/i/n4ptcfx9bjz5eq6b0yju.png" alt=""></p>
+<p><strong>SSL configuration</strong></p>
+<p>Azure Cosmos DB enforces <a href="https://docs.microsoft.com/azure/cosmos-db/database-security?WT.mc_id=data-11341-abhishgu">secure connectivity over SSL</a> and Kafka Connect connector supports SSL as well.</p>
+<ul>
+<li><code>ssl.keystore.path</code>: path to the JDK keystore (inside the container it is <code>/etc/alternatives/jre/lib/security/cacerts/</code>)</li>
+<li><code>ssl.keystore.password</code>: JDK keystore (default) password</li>
+<li><code>ssl.hostnameValidation</code>: We turn onn node hostname validation</li>
+<li><code>ssl.provider</code>: <code>JDK</code> is used as the SSL provider</li>
+</ul>
+<blockquote>
+<p>The value for <code>ssl.keystore.path</code> should <em>not</em> be updated since it points to a path inside the Docker container of the Kafka Connect worker. It goes without saying that, this would be different for a production grade deployment where you would have to update the Docker container to add your certificate etc.</p>
+</blockquote>
+<p><strong>Kafka to Cassandra mapping</strong></p>
+<p>To push data from Kafka topics to Cassandra, the connector must be configured by providing mapping between records in Kafka topics and the columns in the Cassandra table(s). One of the nice capabilities of the connector is that it allows you to write to <em>multiple</em> Cassandra tables using data from a single Kafka topic. This is really helpful in scenarios where you need derived representations (tables) of events in your Kafka topic(s).</p>
+<p>Take a look at the following mapping attributes:</p>
+<ul>
+<li><code>&quot;topic.weather-data.weather.data_by_state.mapping&quot;: &quot;station_id=value.stationid, temp=value.temp, state=value.state, ts=value.created&quot;</code></li>
+<li><code>&quot;topic.weather-data.weather.data_by_station.mapping&quot;: &quot;station_id=value.stationid, temp=value.temp, state=value.state, ts=value.created&quot;</code></li>
+</ul>
+<p>Let&rsquo;s break it down:</p>
+<ul>
+<li>The key (e.g. <code>topic.weather-data.weather.data_by_state.mapping</code>) is nothing but a combination of the Kafka topic name and the Cassandra table (including the keyspace). Note that define mappings for two tables (<code>data_by_state</code> and <code>data_by_station</code>) using separate config parameters.</li>
+<li>The value is comma-separated entries of the Cassandra column name and the corresponding JSON attribute of the event in the Kafka topic e.g. <code>station_id=value.stationid</code> refers to <code>station_id</code> which is a column in the <code>data_by_station</code> table and <code>value.stationid</code> refers to <code>stationid</code> which is an attribute in the JSON payload (which looks like this - <code>{&quot;stationid&quot;:&quot;station-7&quot;,&quot;temp&quot;:&quot;64&quot;,&quot;state&quot;:&quot;state-17&quot;,&quot;created&quot;:&quot;2020-11-28T04:51:06Z&quot;}</code>)</li>
+</ul>
+<blockquote>
+<p>Check out <a href="https://docs.datastax.com/en/kafka/doc/kafka/kafkaMapTopicTable.html">https://docs.datastax.com/en/kafka/doc/kafka/kafkaMapTopicTable.html</a> for details</p>
+</blockquote>
+<p><strong>Generic parameters</strong></p>
+<ul>
+<li><code>key.converter</code>: We use the string converter <code>org.apache.kafka.connect.storage.StringConverter</code></li>
+<li><code>value.converter</code>: since the data in Kafka topics is JSON, we make use of <code>org.apache.kafka.connect.json.JsonConverter</code></li>
+<li><code>value.converter.schemas.enable</code>: This is important - our JSON payload does not have a schema associated with it (for the purposes of the demo app). We need to instruct Kafka Connect to not look for a schema by setting this to <code>false</code>. Not doing so will result in failures.</li>
+</ul>
+<p><strong>Passing Java driver level configs</strong></p>
+<p><code>datastax-java-driver.advanced.connection.init-query-timeout: 5000</code></p>
+<p>Although the connector provides sane defaults, you can pass in the Java driver properties as connector configuration parameters. The Java driver uses <code>500 ms</code> as the default value for the <code>init-query-timeout</code> parameter (which is quite low in my opinion), given the fact that it is used as &ldquo;timeout to use for internal queries that run as part of the initialization process&rdquo; (read more here <a href="https://docs.datastax.com/en/developer/java-driver/4.2/manual/core/configuration/reference/">https://docs.datastax.com/en/developer/java-driver/4.2/manual/core/configuration/reference/</a>)</p>
+<p>I did face some issues due to this and was glad to see that it was tunable! Setting it to <code>5000 ms</code> worked for me but it can probably be set slightly lower and it would still work just fine e.g. 2000 ms</p>
+<blockquote>
+<p>Please leave the other attributes unchanged</p>
+</blockquote>
+<p>For more details around the configuration, please refer to the documentation - <a href="https://docs.datastax.com/en/kafka/doc/kafka/kafkaConfigTasksTOC.html">https://docs.datastax.com/en/kafka/doc/kafka/kafkaConfigTasksTOC.html</a></p>
+<p>Install the connector using the Kafka Connect REST endpoint:</p>
+<div class="highlight"><pre class="chroma"><code class="language-shell" data-lang="shell">curl -X POST -H <span class="s2">&#34;Content-Type: application/json&#34;</span> --data @cassandra-sink-config.json http://localhost:8083/connectors
+
+<span class="c1"># check status</span>
+curl http://localhost:8080/connectors/kafka-cosmosdb-sink/status
+</code></pre></div><p>If all goes well, the connector should start weaving its magic. It should authenticate to Azure Cosmos DB and start ingesting data from the Kafka topic (<code>weather-data</code>) into Cassandra tables - <code>weather.data_by_state</code> and <code>weather.data_by_station</code></p>
+<p>You can now query data in the tables. Head over to the Azure portal, <a href="https://docs.microsoft.com/azure/cosmos-db/cassandra-support?WT.mc_id=data-11341-abhishgu#hosted-cql-shell-preview">bring up the Hosted CQL Shell</a> for your Azure Cosmos DB account.</p>
+<p><img src="https://docs.microsoft.com/en-us/azure/cosmos-db/media/cassandra-support/cqlsh.png" alt=""></p>
+<h2 id="query-azure-cosmos-db">Query Azure Cosmos DB</h2>
+<p>Check the <code>data_by_state</code> and <code>data_by_station</code> tables. Here are some sample queries to get you started:</p>
+<div class="highlight"><pre class="chroma"><code class="language-sql" data-lang="sql"><span class="k">select</span> <span class="o">*</span> <span class="k">from</span> <span class="n">weather</span><span class="p">.</span><span class="n">data_by_state</span> <span class="k">where</span> <span class="k">state</span> <span class="o">=</span> <span class="s1">&#39;state-1&#39;</span><span class="p">;</span>
+<span class="k">select</span> <span class="o">*</span> <span class="k">from</span> <span class="n">weather</span><span class="p">.</span><span class="n">data_by_state</span> <span class="k">where</span> <span class="k">state</span> <span class="k">IN</span> <span class="p">(</span><span class="s1">&#39;state-1&#39;</span><span class="p">,</span> <span class="s1">&#39;state-2&#39;</span><span class="p">);</span>
+<span class="k">select</span> <span class="o">*</span> <span class="k">from</span> <span class="n">weather</span><span class="p">.</span><span class="n">data_by_state</span> <span class="k">where</span> <span class="k">state</span> <span class="o">=</span> <span class="s1">&#39;state-3&#39;</span> <span class="k">and</span> <span class="n">ts</span> <span class="o">&gt;</span> <span class="n">toTimeStamp</span><span class="p">(</span><span class="s1">&#39;2020-11-26&#39;</span><span class="p">);</span>
+
+<span class="k">select</span> <span class="o">*</span> <span class="k">from</span> <span class="n">weather</span><span class="p">.</span><span class="n">data_by_station</span> <span class="k">where</span> <span class="n">station_id</span> <span class="o">=</span> <span class="s1">&#39;station-1&#39;</span><span class="p">;</span>
+<span class="k">select</span> <span class="o">*</span> <span class="k">from</span> <span class="n">weather</span><span class="p">.</span><span class="n">data_by_station</span> <span class="k">where</span> <span class="n">station_id</span> <span class="k">IN</span> <span class="p">(</span><span class="s1">&#39;station-1&#39;</span><span class="p">,</span> <span class="s1">&#39;station-2&#39;</span><span class="p">);</span>
+<span class="k">select</span> <span class="o">*</span> <span class="k">from</span> <span class="n">weather</span><span class="p">.</span><span class="n">data_by_station</span> <span class="k">where</span> <span class="n">station_id</span> <span class="k">IN</span> <span class="p">(</span><span class="s1">&#39;station-2&#39;</span><span class="p">,</span> <span class="s1">&#39;station-3&#39;</span><span class="p">)</span> <span class="k">and</span> <span class="n">ts</span> <span class="o">&gt;</span> <span class="n">toTimeStamp</span><span class="p">(</span><span class="s1">&#39;2020-11-26&#39;</span><span class="p">);</span>
+</code></pre></div><h3 id="clean-up">Clean up</h3>
+<p>To stop the containers, you can:</p>
+<div class="highlight"><pre class="chroma"><code class="language-shell" data-lang="shell">docker-compose -p kafka-cosmos-cassandra down -v
+</code></pre></div><p>You can either <a href="https://docs.microsoft.com/azure/cosmos-db/create-cassandra-go?WT.mc_id=data-11341-abhishgu#clean-up-resources">delete the keyspace/table or the Azure Cosmos DB account</a>.</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>To summarize, you learnt how to use Kafka Connect for real-time data integration between Apache Kafka and Azure Cosmos DB. Since the sample adopts a Docker container based approach, you can easily customize this as per your own unique requirements, rinse and repeat!</p>
+<p>The use case and data-flow demonstrated in this article was relatively simple, but the rich Kafka Connect ecosystem of connectors allows you to integrate disparate systems and stitch together complex data pipelines without having to write custom integration code. For example, to migrate/integrate with another RDBMS (via Kafka), you could potentially use the Kafka Connect JDBC Source connector to pull database records into Kafka, transform or enrich them in a streaming fashion using Kafka Streams, re-write them back to a Kafka topic and then bring that data into Azure Cosmos DB using the approach outlined in this article. The are lots of possibilities and the solution will depend on the use case and requirements.</p>
+<p>You would obviously need to setup, configure and operate these connectors. At the very core, Kafka Connect cluster instances are just JVM processes and inherently stateless (all the state handling is offloaded to Kafka). Hence, you&rsquo;ve a lot of flexibility in terms of your overall architecture as well as orchestration: for example, running them in Kubernetes for fault-tolerance and scalability!</p>
+<h2 id="additional-resources">Additional resources</h2>
+<p>If you want to explore further, I would recommend:</p>
+<ul>
+<li><a href="https://docs.microsoft.com/azure/cosmos-db/cassandra-spark-generic?WT.mc_id=data-11341-abhishgu">Integrating Azure Cosmos DB Cassandra API and Apache Spark</a></li>
+<li><a href="https://docs.microsoft.com/azure/cosmos-db/cassandra-migrate-cosmos-db-databricks?WT.mc_id=data-11341-abhishgu">Migrate data from Cassandra to Azure Cosmos DB Cassandra API account using Azure Databricks</a></li>
+<li><a href="https://kafka.apache.org/documentation/#connect_development">How to write new connectors for Kafka Connect</a></li>
+<li><a href="https://docs.datastax.com/en/kafka/doc/kafka/kafkaArchitecture.html">Understanding the architecture for DataStax Apache Kafka Connector</a></li>
+<li>Explore <a href="https://debezium.io/documentation/reference/1.2/connectors/index.html">Debezium connectors</a></li>
+</ul>
+
+
+        
+
+        
+
+        
+      </article>
+
+      
+        <ul class="pager blog-pager">
+          
+            <li class="previous">
+              <a href="https://abhirockzz.github.io/posts/golang-serverless-backend/" data-toggle="tooltip" data-placement="top" title="Build a Serverless app using Go and Azure Functions">&larr; Previous Post</a>
+            </li>
+          
+          
+            <li class="next">
+              <a href="https://abhirockzz.github.io/posts/postgres-kafka-cassandra/" data-toggle="tooltip" data-placement="top" title="Learn how to setup data pipeline from PostgreSQL to Cassandra using Kafka Connect">Next Post &rarr;</a>
+            </li>
+          
+        </ul>
+      
+
+
+      
+
+    </div>
+  </div>
+</div>
+
+      
+<footer>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+        <ul class="list-inline text-center footer-links">
+          
+              <li>
+                <a href="https://github.com/abhirockzz" title="GitHub">
+                  <span class="fa-stack fa-lg">
+                    <i class="fas fa-circle fa-stack-2x"></i>
+                    <i class="fab fa-github fa-stack-1x fa-inverse"></i>
+                  </span>
+                </a>
+              </li>
+              <li>
+                <a href="https://twitter.com/abhi_tweeter" title="Twitter">
+                  <span class="fa-stack fa-lg">
+                    <i class="fas fa-circle fa-stack-2x"></i>
+                    <i class="fab fa-twitter fa-stack-1x fa-inverse"></i>
+                  </span>
+                </a>
+              </li>
+              <li>
+                <a href="https://linkedin.com/in/abhirockzz" title="LinkedIn">
+                  <span class="fa-stack fa-lg">
+                    <i class="fas fa-circle fa-stack-2x"></i>
+                    <i class="fab fa-linkedin fa-stack-1x fa-inverse"></i>
+                  </span>
+                </a>
+              </li>
+          
+          <li>
+            <a href="" title="RSS">
+              <span class="fa-stack fa-lg">
+                <i class="fas fa-circle fa-stack-2x"></i>
+                <i class="fas fa-rss fa-stack-1x fa-inverse"></i>
+              </span>
+            </a>
+          </li>
+          
+        </ul>
+        <p class="credits copyright text-muted">
+          
+            
+              <a href="https://abhirockzz.github.io">Abhishek Gupta</a>
+            
+          
+
+          &nbsp;&bull;&nbsp;&copy;
+          
+            2021
+          
+
+          
+            &nbsp;&bull;&nbsp;
+            <a href="https://abhirockzz.github.io/">Abhishek&#39;s blog</a>
+          
+        </p>
+        
+        <p class="credits theme-by text-muted">
+          <a href="https://gohugo.io">Hugo v0.80.0</a> powered &nbsp;&bull;&nbsp; Theme <a href="https://github.com/halogenica/beautifulhugo">Beautiful Hugo</a> adapted from <a href="https://deanattali.com/beautiful-jekyll/">Beautiful Jekyll</a>
+          
+        </p>
+      </div>
+    </div>
+  </div>
+</footer><script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.js" integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/contrib/auto-render.min.js" integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
+<script src="https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+<script src="https://abhirockzz.github.io/js/main.js"></script><script> renderMathInElement(document.body); </script><script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.js" integrity="sha384-QELNnmcmU8IR9ZAykt67vGr9/rZJdHbiWi64V88fCPaOohUlHCqUD/unNN0BXSqy" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe-ui-default.min.js" integrity="sha384-m67o7SkQ1ALzKZIFh4CiTA8tmadaujiTa9Vu+nqPSwDOqHrDmxLezTdFln8077+q" crossorigin="anonymous"></script><script src="https://abhirockzz.github.io/js/load-photoswipe.js"></script>
+
+
+
+
+
+
+
+
+
+    
+  </body>
+</html>
+

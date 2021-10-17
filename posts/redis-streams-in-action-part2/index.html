@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en" itemscope itemtype="http://schema.org/WebPage">
+  <head>
+    
+
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+
+  <title>Redis Streams in Action — Part 2 (Tweets consumer app) - Abhishek&#39;s blog</title>
+  <meta name="description" content="Build a Rust app to consume from the Twitter Streaming API">
+  <meta name="author" content="Abhishek Gupta"/><script type="application/ld+json">
+{
+    "@context": "http://schema.org",
+    "@type": "WebSite",
+    "name": "Abhishek\u0027s blog",
+    
+    "url": "https:\/\/abhirockzz.github.io\/"
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Organization",
+  "name": "",
+  "url": "https:\/\/abhirockzz.github.io\/"
+  
+  
+  
+  
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [{
+        "@type": "ListItem",
+        "position": 1,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io\/",
+          "name": "home"
+        }
+    },{
+        "@type": "ListItem",
+        "position": 3,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io\/posts\/redis-streams-in-action-part2\/",
+          "name": "Redis streams in action — part 2 ( tweets consumer app)"
+        }
+    }]
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Article",
+  "author": {
+    "name" : "Abhishek Gupta"
+  },
+  "headline": "Redis Streams in Action — Part 2 (Tweets consumer app)",
+  "description" : "Build a Rust app to consume from the Twitter Streaming API",
+  "inLanguage" : "en",
+  "wordCount":  1231 ,
+  "datePublished" : "2021-05-28T00:00:00",
+  "dateModified" : "2021-05-28T00:00:00",
+  "image" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+  "keywords" : [ "redis, rust, go, java, azure, cloud, docker, serverless" ],
+  "mainEntityOfPage" : "https:\/\/abhirockzz.github.io\/posts\/redis-streams-in-action-part2\/",
+  "publisher" : {
+    "@type": "Organization",
+    "name" : "https:\/\/abhirockzz.github.io\/",
+    "logo" : {
+        "@type" : "ImageObject",
+        "url" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+        "height" :  60 ,
+        "width" :  60
+    }
+  }
+}
+</script>
+
+<meta property="og:title" content="Redis Streams in Action — Part 2 (Tweets consumer app)" />
+<meta property="og:description" content="Build a Rust app to consume from the Twitter Streaming API">
+<meta property="og:image" content="https://abhirockzz.github.io/icon.jpg" />
+<meta property="og:url" content="https://abhirockzz.github.io/posts/redis-streams-in-action-part2/" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Abhishek&#39;s blog" />
+
+  <meta name="twitter:title" content="Redis Streams in Action — Part 2 (Tweets consumer app)" />
+  <meta name="twitter:description" content="Build a Rust app to consume from the Twitter Streaming API">
+  <meta name="twitter:image" content="https://abhirockzz.github.io/icon.jpg" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:site" content="@abhi_tweeter" />
+  <meta name="twitter:creator" content="@abhi_tweeter" />
+  <link href='https://abhirockzz.github.io/icons/myicon.png' rel='icon' type='image/x-icon'/>
+  <meta name="generator" content="Hugo 0.80.0" />
+  <link rel="alternate" href="https://abhirockzz.github.io/index.xml" type="application/rss+xml" title="Abhishek&#39;s blog"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css" integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.5.0/css/all.css" integrity="sha384-B4dIYHKNBt8Bc12p+WXckhzcICo0wtJAoU8YZTY5qE0Id1GSseTk6S+L3BlXeVIU" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous"><link rel="stylesheet" href="https://abhirockzz.github.io/css/main.css" /><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800" /><link rel="stylesheet" href="https://abhirockzz.github.io/css/syntax.css" /><link rel="stylesheet" href="https://abhirockzz.github.io/css/codeblock.css" /><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.css" integrity="sha384-h/L2W9KefUClHWaty3SLE5F/qvc4djlyR4qY3NUV5HGQBBW7stbcfff1+I/vmsHh" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/default-skin/default-skin.min.css" integrity="sha384-iD0dNku6PYSIQLyfTOpB06F2KCZJAKLOThS5HRe8b3ibhdEQ6eKsFf/EeFxdOt5R" crossorigin="anonymous">
+
+
+<script type="application/javascript">
+var doNotTrack = false;
+if (!doNotTrack) {
+	window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+	ga('create', 'UA-54762029-1', 'auto');
+	
+	ga('send', 'pageview');
+}
+</script>
+<script async src='https://www.google-analytics.com/analytics.js'></script>
+
+
+  </head>
+  <body>
+    <nav class="navbar navbar-default navbar-fixed-top navbar-custom">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#main-navbar">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="https://abhirockzz.github.io/">Abhishek&#39;s blog</a>
+    </div>
+
+    <div class="collapse navbar-collapse" id="main-navbar">
+      <ul class="nav navbar-nav navbar-right">
+        
+          
+            <li>
+              <a title="Blog" href="/">Blog</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="About" href="/about">About</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Books" href="/books">Books</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Open-source" href="/projects">Open-source</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Presentations" href="/presentations">Presentations</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Tags" href="/tags">Tags</a>
+            </li>
+          
+        
+
+        
+
+        
+      </ul>
+    </div>
+
+    
+      <div class="avatar-container">
+        <div class="avatar-img-border">
+          <a title="Abhishek&#39;s blog" href="https://abhirockzz.github.io/">
+            <img class="avatar-img" src="https://abhirockzz.github.io/icon.jpg" alt="Abhishek&#39;s blog" />
+          </a>
+        </div>
+      </div>
+    
+
+  </div>
+</nav>
+
+
+
+
+    
+
+
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+<div class="pswp__bg"></div>
+
+<div class="pswp__scroll-wrap">
+    
+    <div class="pswp__container">
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+    </div>
+    
+    <div class="pswp__ui pswp__ui--hidden">
+    <div class="pswp__top-bar">
+      
+      <div class="pswp__counter"></div>
+      <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+      <button class="pswp__button pswp__button--share" title="Share"></button>
+      <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+      <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+      
+      
+      <div class="pswp__preloader">
+        <div class="pswp__preloader__icn">
+          <div class="pswp__preloader__cut">
+            <div class="pswp__preloader__donut"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+      <div class="pswp__share-tooltip"></div>
+    </div>
+    <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+    </button>
+    <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+    </button>
+    <div class="pswp__caption">
+      <div class="pswp__caption__center"></div>
+    </div>
+    </div>
+    </div>
+</div>
+
+
+  
+  
+  
+
+
+
+
+
+
+  
+
+  <header class="header-section ">
+    
+    <div class="intro-header no-img">
+      <div class="container">
+        <div class="row">
+          <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+            <div class="posts-heading">
+              
+                <h1>Redis Streams in Action — Part 2 (Tweets consumer app)</h1>
+              
+              
+                <hr class="small">
+              
+              
+              
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+
+    
+<div class="container" role="main">
+  <div class="row">
+    <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+      <article role="main" class="blog-post">
+        <p>Welcome to this series of blog posts which covers <a href="https://redis.io/topics/streams-intro">Redis Streams</a> with the help of a practical example. We will use a sample application to make Twitter data available for search and query in real-time. <a href="https://redisearch.io/">RediSearch</a> and <a href="https://redis.io/topics/streams-intro">Redis Streams</a> serve as the backbone of this solution that consists of several co-operating components, each of which will we covered in a dedicated blog post.</p>
+<blockquote>
+<p>The code is available in this GitHub repo - <a href="https://github.com/abhirockzz/redis-streams-in-action">https://github.com/abhirockzz/redis-streams-in-action</a></p>
+</blockquote>
+<p>In this part, we look at the service which interacts with the Twitter Streaming API to consume tweets and move them on to the next part in the processing pipeline.</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/p77ceg4yz8z0ybag3jj3.jpg" alt=""></p>
+<p>Our end goal is to be able to process tweets and make them available for search and queries via <code>RediSearch</code>. One could write a &ldquo;do it all&rdquo; service to consume tweets and directly store them in <code>RediSearch</code>. But, in order to scale to handle the volume of tweets, we need a service to act as a buffer and decouple our producer (the application we will focus in this blog) and consumer (covered in next blog).</p>
+<p>This is exactly what our first component facilitates - it consumes streaming Twitter data and forwards it to Redis Streams. We will deploy it to <a href="https://docs.microsoft.com/azure/container-instances/container-instances-overview?WT.mc_id=data-17927-abhishgu">Azure Container Instances</a>, validate it&rsquo;s functionality and also walk-through how it works along with the code.</p>
+<blockquote>
+<p>As you will see in the later parts of this series, this also provides a foundation for scale-out architecture.</p>
+</blockquote>
+<p>All in all, this blog post is short and simple! It lays down the ground work for other parts of the solution which will be covered in subsequent posts. Please don&rsquo;t worry about the fact that the service is written in Rust (in case you don&rsquo;t know it already). The logic can be easily ported over to your favorite programming language.</p>
+<h2 id="pre-requisites">Pre-requisites</h2>
+<p>Start by getting a <a href="https://azure.microsoft.com/free/?WT.mc_id=data-17927-abhishgu">free Azure account</a> if you don&rsquo;t have one already and <a href="https://docs.microsoft.com/cli/azure/install-azure-cli?WT.mc_id=data-17927-abhishgu">install the Azure CLI</a> as well.</p>
+<p>We will be deploying the tweets consumer application to <a href="https://docs.microsoft.com/azure/container-instances/container-instances-overview?WT.mc_id=data-17927-abhishgu">Azure Container Instances</a> using regular Docker CLI commands. This capability is enabled by <a href="https://docs.docker.com/engine/context/aci-integration/">integration between Docker and Azure</a>. Just ensure that you have Docker Desktop version 2.3.0.5 or later, for <a href="https://desktop.docker.com/win/edge/Docker%20Desktop%20Installer.exe">Windows</a>, <a href="https://desktop.docker.com/mac/edge/Docker.dmg">macOS</a>, or install the <a href="https://docs.docker.com/engine/context/aci-integration/#install-the-docker-aci-integration-cli-on-linux">Docker ACI Integration CLI for Linux</a>.</p>
+<p>To use the Twitter Streaming API, you will also need a Twitter developer account. If you don&rsquo;t have one already, please <a href="https://developer.twitter.com/en/apply-for-access">follow these instructions</a> on how to set it up.</p>
+<h2 id="deploy-the-app-to-azure-container-instances">Deploy the app to Azure Container Instances</h2>
+<p>To start off, setup the Enterprise tier of Azure Cache for Redis, <a href="https://docs.microsoft.com/azure/azure-cache-for-redis/quickstart-create-redis-enterprise?WT.mc_id=data-17927-abhishgu">using this quickstart</a>.Once you finish this step, ensure that you save the following information: the Redis host name and Access key</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/gq0ogkhc9hr9co8e04zh.png" alt=""></p>
+<p>The tweets consumer application is available as a <a href="https://hub.docker.com/r/abhirockzz/tweets-redis-streams-producer-rust">Docker container</a> - the easiest way is to simply re-use it. If you wish to build you own image, please use the <a href="https://github.com/abhirockzz/redis-streams-in-action/blob/master/tweets-consumer/Dockerfile"><code>Dockerfile</code> available in the GitHub repo</a>.</p>
+<p>You will now see how convenient it is to deploy it to Azure Container Instances, that allows you to run Docker containers on-demand in a managed, serverless Azure environment.</p>
+<p>First, <a href="https://docs.microsoft.com/azure/container-instances/quickstart-docker-cli?WT.mc_id=data-17927-abhishgu#create-azure-context">create an Azure context</a> to associate Docker with an Azure subscription and resource group so you can create and manage container instances.</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">docker login azure
+docker context create aci aci-context
+docker context use aci-context
+</code></pre></div><p>Set the environment variables - make sure to update Redis host and credentials as per your account:</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash"><span class="nb">export</span> <span class="nv">REDIS_HOSTNAME</span><span class="o">=</span>&lt;redis host port e.g. my-redis-host:10000&gt;
+<span class="nb">export</span> <span class="nv">IS_TLS</span><span class="o">=</span><span class="nb">true</span>
+<span class="nb">export</span> <span class="nv">REDIS_PASSWORD</span><span class="o">=</span>&lt;redis access key <span class="o">(</span>password<span class="o">)</span>&gt;
+
+<span class="c1"># don&#39;t forget your twitter api credentials</span>
+<span class="nb">export</span> <span class="nv">TWITTER_API_KEY</span><span class="o">=</span>&lt;api key&gt;
+<span class="nb">export</span> <span class="nv">TWITTER_API_KEY_SECRET</span><span class="o">=</span>&lt;api key secret&gt;
+<span class="nb">export</span> <span class="nv">TWITTER_ACCESS_TOKEN</span><span class="o">=</span>&lt;access token&gt;
+<span class="nb">export</span> <span class="nv">TWITTER_ACCESS_TOKEN_SECRET</span><span class="o">=</span>&lt;access token secret&gt;
+</code></pre></div><p>Just execute the good old <code>docker run</code>:</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">docker run -d --name redis-streams-producer <span class="se">\
+</span><span class="se"></span>-e <span class="nv">REDIS_HOSTNAME</span><span class="o">=</span><span class="nv">$REDIS_HOSTNAME</span> <span class="se">\
+</span><span class="se"></span>-e <span class="nv">IS_TLS</span><span class="o">=</span><span class="nv">$IS_TLS</span> <span class="se">\
+</span><span class="se"></span>-e <span class="nv">REDIS_PASSWORD</span><span class="o">=</span><span class="nv">$REDIS_PASSWORD</span> <span class="se">\
+</span><span class="se"></span>-e <span class="nv">TWITTER_API_KEY</span><span class="o">=</span><span class="nv">$TWITTER_API_KEY</span> <span class="se">\
+</span><span class="se"></span>-e <span class="nv">TWITTER_API_KEY_SECRET</span><span class="o">=</span><span class="nv">$TWITTER_API_KEY_SECRET</span> <span class="se">\
+</span><span class="se"></span>-e <span class="nv">TWITTER_ACCESS_TOKEN</span><span class="o">=</span><span class="nv">$TWITTER_ACCESS_TOKEN</span> <span class="se">\
+</span><span class="se"></span>-e <span class="nv">TWITTER_ACCESS_TOKEN_SECRET</span><span class="o">=</span><span class="nv">$TWITTER_ACCESS_TOKEN_SECRET</span> <span class="se">\
+</span><span class="se"></span>abhirockzz/tweets-redis-streams-producer-rust
+</code></pre></div><p>A container should now be created in Azure and you should see an output similar to this:</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash"><span class="o">[</span>+<span class="o">]</span> Running 2/2
+ ⠿ Group redis-streams-producer  Created                                                                             4.2s
+ ⠿ redis-streams-producer        Created                                                                            15.8s
+</code></pre></div><p>Validate this using the Azure portal:</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/c8a4is8xpv4i6u7w04n2.png" alt=""></p>
+<p>To check the container logs:</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">docker logs redis-streams-producer
+</code></pre></div><h2 id="so-does-it-work">So, does it work?</h2>
+<p>Well, it should! To confirm, connect to the Redis instance using <code>redis-cli</code>:</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">redis-cli -h &lt;redis cache host&gt; -p &lt;redis port&gt; -a &lt;access key&gt; --tls
+</code></pre></div><p>&hellip; and run the <a href="https://redis.io/commands/xrange">XRANGE</a> command to introspect Redis Streams:</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">XRANGE tweets_stream - + COUNT <span class="m">5</span>
+</code></pre></div><p>This will return the first five tweets. You can change the <code>COUNT</code> as per your requirements.</p>
+<blockquote>
+<p>The <code>-</code> and <code>+</code> special IDs mean respectively the minimum ID possible and the maximum ID possible inside the stream</p>
+</blockquote>
+<p>That&rsquo;s all you need to confirm that our application is able to consume tweets and add them to Redis Streams. As mentioned before, the rest of the components in our solution will build on top of this foundation.</p>
+<p>You can either pause the app for now or delete it:</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash"><span class="c1">#to pause</span>
+docker stop redis-streams-producer
+
+<span class="c1">#to delete</span>
+docker rm redis-streams-producer
+</code></pre></div><p>Now that you&rsquo;ve seen the application in action, let&rsquo;s quickly walk through &ldquo;how&rdquo; things work. If you&rsquo;re interested in exploring some Rust code, you will find it useful.</p>
+<h2 id="code-walk-through">Code walk through</h2>
+<blockquote>
+<p>You can <a href="https://github.com/abhirockzz/redis-streams-in-action/tree/master/tweets-consumer/src">refer to the code here</a></p>
+</blockquote>
+<p>The app uses the following libraries:</p>
+<ul>
+<li>A Rust library for accessing the <a href="https://github.com/tesaguri/twitter-stream-rs">Twitter Streaming API</a> (uses <a href="https://github.com/tokio-rs/tokio">tokio</a>)</li>
+<li><a href="https://github.com/mitsuhiko/redis-rs">redis-rs</a>, a Rust library for Redis with both high and low-level APIs</li>
+<li><a href="https://github.com/serde-rs/serde">serde</a> and <a href="https://github.com/serde-rs/json">serde json</a></li>
+</ul>
+<p>It starts by connecting to Redis and Twitter:</p>
+<div class="highlight"><pre class="chroma"><code class="language-rust" data-lang="rust"><span class="k">fn</span> <span class="nf">connect_redis</span><span class="p">()</span><span class="w"> </span>-&gt; <span class="nc">redis</span>::<span class="n">Connection</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span><span class="w">    </span><span class="n">println</span><span class="o">!</span><span class="p">(</span><span class="s">&#34;Connecting to Redis&#34;</span><span class="p">);</span><span class="w">
+</span><span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">redis_host_name</span><span class="w"> </span><span class="o">=</span><span class="w">
+</span><span class="w">        </span><span class="n">env</span>::<span class="n">var</span><span class="p">(</span><span class="s">&#34;REDIS_HOSTNAME&#34;</span><span class="p">).</span><span class="n">expect</span><span class="p">(</span><span class="s">&#34;missing environment variable REDIS_HOSTNAME&#34;</span><span class="p">);</span><span class="w">
+</span><span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">redis_password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">env</span>::<span class="n">var</span><span class="p">(</span><span class="s">&#34;REDIS_PASSWORD&#34;</span><span class="p">).</span><span class="n">unwrap_or_default</span><span class="p">();</span><span class="w">
+</span><span class="w">
+</span><span class="w">    </span><span class="c1">//if Redis server needs secure connection
+</span><span class="c1"></span><span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">uri_scheme</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">match</span><span class="w"> </span><span class="n">env</span>::<span class="n">var</span><span class="p">(</span><span class="s">&#34;IS_TLS&#34;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span><span class="w">        </span><span class="nb">Ok</span><span class="p">(</span><span class="n">_</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="s">&#34;rediss&#34;</span><span class="p">,</span><span class="w">
+</span><span class="w">        </span><span class="nb">Err</span><span class="p">(</span><span class="n">_</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="s">&#34;redis&#34;</span><span class="p">,</span><span class="w">
+</span><span class="w">    </span><span class="p">};</span><span class="w">
+</span><span class="w">
+</span><span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">redis_conn_url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">format</span><span class="o">!</span><span class="p">(</span><span class="s">&#34;{}://:{}@{}&#34;</span><span class="p">,</span><span class="w"> </span><span class="n">uri_scheme</span><span class="p">,</span><span class="w"> </span><span class="n">redis_password</span><span class="p">,</span><span class="w"> </span><span class="n">redis_host_name</span><span class="p">);</span><span class="w">
+</span><span class="w">    </span><span class="n">println</span><span class="o">!</span><span class="p">(</span><span class="s">&#34;redis_conn_url {}&#34;</span><span class="p">,</span><span class="w"> </span><span class="n">redis_conn_url</span><span class="p">);</span><span class="w">
+</span><span class="w">
+</span><span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">client</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">redis</span>::<span class="n">Client</span>::<span class="n">open</span><span class="p">(</span><span class="n">redis_conn_url</span><span class="p">).</span><span class="n">expect</span><span class="p">(</span><span class="s">&#34;check Redis connection URL&#34;</span><span class="p">);</span><span class="w">
+</span><span class="w">    </span><span class="n">client</span><span class="p">.</span><span class="n">get_connection</span><span class="p">().</span><span class="n">expect</span><span class="p">(</span><span class="s">&#34;failed to connect to Redis&#34;</span><span class="p">)</span><span class="w">
+</span><span class="w"></span><span class="p">}</span><span class="w">
+</span></code></pre></div><p>Rather than follow a specific set of keywords or a user, we simply connect to the <a href="https://developer.twitter.com/en/docs/twitter-api/tweets/sampled-stream/api-reference/get-tweets-sample-stream">Twitter sample stream</a>, which provides access to about 1% of all Tweets in real-time:</p>
+<div class="highlight"><pre class="chroma"><code class="language-rust" data-lang="rust"><span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">twitter_token</span><span class="p">();</span><span class="w">
+</span><span class="w">
+</span><span class="w">    </span><span class="n">TwitterStream</span>::<span class="n">sample</span><span class="p">(</span><span class="o">&amp;</span><span class="n">token</span><span class="p">)</span><span class="w">
+</span><span class="w">        </span><span class="p">.</span><span class="n">try_flatten_stream</span><span class="p">()</span><span class="w">
+</span><span class="w">        </span><span class="p">.</span><span class="n">try_for_each</span><span class="p">(</span><span class="o">|</span><span class="n">json</span><span class="o">|</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span><span class="w">            </span><span class="kd">let</span><span class="w"> </span><span class="n">msg</span>: <span class="nc">model</span>::<span class="n">StreamMessage</span><span class="w"> </span><span class="o">=</span><span class="w">
+</span><span class="w">                </span><span class="n">serde_json</span>::<span class="n">from_str</span><span class="p">(</span><span class="o">&amp;</span><span class="n">json</span><span class="p">).</span><span class="n">expect</span><span class="p">(</span><span class="s">&#34;failed to convert tweet JSON to struct&#34;</span><span class="p">);</span><span class="w">
+</span><span class="w">            </span><span class="n">process</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span><span class="w"> </span><span class="n">c</span><span class="p">.</span><span class="n">clone</span><span class="p">());</span><span class="w">
+</span><span class="w">            </span><span class="n">future</span>::<span class="n">ok</span><span class="p">(())</span><span class="w">
+</span><span class="w">        </span><span class="p">})</span><span class="w">
+</span><span class="w">        </span><span class="p">.</span><span class="k">await</span><span class="w">
+</span><span class="w">        </span><span class="p">.</span><span class="n">expect</span><span class="p">(</span><span class="s">&#34;error connecting to Twitter stream!&#34;</span><span class="p">);</span><span class="w">
+</span></code></pre></div><p>Bulk of the logic is encapsulated in the <code>process</code> function. Let&rsquo;s go through that bit by bit.
+<code>twitter-stream</code> crate returns each tweet in raw JSON form. It is converted into a <code>model::StreamMessage</code> which is a struct that&rsquo;s modeled as per the data we intend to extract from the raw tweet.</p>
+<p>We use <code>serde_json</code> to get this done:</p>
+<div class="highlight"><pre class="chroma"><code class="language-rust" data-lang="rust"><span class="n">serde_json</span>::<span class="n">from_str</span><span class="p">(</span><span class="o">&amp;</span><span class="n">json</span><span class="p">).</span><span class="n">expect</span><span class="p">(</span><span class="s">&#34;json to struct conversion failed&#34;</span><span class="p">);</span><span class="w">
+</span></code></pre></div><p>It is then passed to the <code>process</code> function along with a <a href="https://docs.rs/redis/0.20.0/redis/struct.Connection.html">redis::Connection</a>.</p>
+<div class="highlight"><pre class="chroma"><code class="language-rust" data-lang="rust"><span class="kd">let</span><span class="w"> </span><span class="n">conn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">connect_redis</span><span class="p">();</span><span class="w">
+</span><span class="w"></span><span class="kd">let</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Arc</span>::<span class="n">new</span><span class="p">(</span><span class="n">Mutex</span>::<span class="n">new</span><span class="p">(</span><span class="n">conn</span><span class="p">));</span><span class="w">
+</span><span class="w"></span><span class="p">...</span><span class="w">
+</span><span class="w"></span><span class="k">fn</span> <span class="nf">process</span><span class="p">(</span><span class="n">msg</span>: <span class="nc">model</span>::<span class="n">StreamMessage</span><span class="p">,</span><span class="w"> </span><span class="n">conn</span>: <span class="nc">Arc</span><span class="o">&lt;</span><span class="n">Mutex</span><span class="o">&lt;</span><span class="n">redis</span>::<span class="n">Connection</span><span class="o">&gt;&gt;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span><span class="w">    </span><span class="c1">//omitted
+</span><span class="c1"></span><span class="p">}</span><span class="w">
+</span></code></pre></div><p>But why wrap it within an <a href="https://doc.rust-lang.org/std/sync/struct.Arc.html">Arc</a> of <a href="https://doc.rust-lang.org/std/sync/struct.Mutex.html">Mutex</a>?</p>
+<p>That&rsquo;s because we need to pass the <code>redis::Connection</code> to a <code>FnMut</code> closure. It <a href="https://doc.rust-lang.org/book/ch04-01-what-is-ownership.html">moves</a> the connection, thus we need to use a shared reference, which <code>Arc</code> provides. But <code>Arc</code> is not enough since we are not allowed to mutate the data. Thus, we use to use a <code>Mutex</code> to lock the connection object - the Rust compiler can be confident that only one thread can access it at a time (preserve immutability)</p>
+<p>The processing part is relatively simple. It&rsquo;s all about using the <a href="https://docs.rs/redis/0.20.0/redis/trait.Commands.html#method.xadd_map">xadd_map</a> function to add the tweet to a Redis Stream. It accepts a <a href="https://doc.rust-lang.org/std/collections/struct.BTreeMap.html">BTreeMap</a>, which we create from info in <code>model::StreamMessage</code> - the tweet text, twitter user (screen) name, ID, location and hashtags (if any). Ultimately, the goal is to be able to index these in <code>RediSearch</code> and query them flexibly.</p>
+<div class="highlight"><pre class="chroma"><code class="language-rust" data-lang="rust"><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">stream_entry</span>: <span class="nc">BTreeMap</span><span class="o">&lt;</span><span class="nb">String</span><span class="p">,</span><span class="w"> </span><span class="nb">String</span><span class="o">&gt;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BTreeMap</span>::<span class="n">new</span><span class="p">();</span><span class="w">
+</span><span class="w">                </span><span class="n">stream_entry</span><span class="p">.</span><span class="n">insert</span><span class="p">(</span><span class="s">&#34;id&#34;</span><span class="p">.</span><span class="n">to_string</span><span class="p">(),</span><span class="w"> </span><span class="n">tweet</span><span class="p">.</span><span class="n">id</span><span class="p">.</span><span class="n">to_string</span><span class="p">());</span><span class="w">
+</span><span class="w">                </span><span class="n">stream_entry</span><span class="p">.</span><span class="n">insert</span><span class="p">(</span><span class="s">&#34;user&#34;</span><span class="p">.</span><span class="n">to_string</span><span class="p">(),</span><span class="w"> </span><span class="n">tweet</span><span class="p">.</span><span class="n">user</span><span class="p">.</span><span class="n">screen_name</span><span class="p">);</span><span class="w">
+</span><span class="w">                </span><span class="n">stream_entry</span><span class="p">.</span><span class="n">insert</span><span class="p">(</span><span class="s">&#34;text&#34;</span><span class="p">.</span><span class="n">to_string</span><span class="p">(),</span><span class="w"> </span><span class="n">tweet</span><span class="p">.</span><span class="n">text</span><span class="p">);</span><span class="w">
+</span><span class="w">                </span><span class="n">stream_entry</span><span class="p">.</span><span class="n">insert</span><span class="p">(</span><span class="s">&#34;location&#34;</span><span class="p">.</span><span class="n">to_string</span><span class="p">(),</span><span class="w"> </span><span class="n">tweet</span><span class="p">.</span><span class="n">user</span><span class="p">.</span><span class="n">location</span><span class="p">);</span><span class="w">
+</span></code></pre></div><p>That&rsquo;s all for this part.</p>
+<h2 id="moving-on-to-the-next-one">Moving on to the next one&hellip;</h2>
+<p>We&rsquo;re just getting started! This was the first component in our service that lays the foundation for processing the tweets and making them queryable via <code>RediSearch</code>. In the upcoming blog, we will dive into how to consume and process tweets from Redis Streams using a Java based application. Stay tuned!</p>
+
+
+        
+          <div class="blog-tags">
+            
+              <a href="https://abhirockzz.github.io//tags/redis/">redis</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/rust/">rust</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/go/">go</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/java/">java</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/azure/">azure</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/cloud/">cloud</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/docker/">docker</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/serverless/">serverless</a>&nbsp;
+            
+          </div>
+        
+
+        
+
+        
+      </article>
+
+      
+        <ul class="pager blog-pager">
+          
+            <li class="previous">
+              <a href="https://abhirockzz.github.io/posts/redis-streams-in-action-part1/" data-toggle="tooltip" data-placement="top" title="Redis Streams in Action: Part 1 (Intro and overview)">&larr; Previous Post</a>
+            </li>
+          
+          
+            <li class="next">
+              <a href="https://abhirockzz.github.io/posts/redis-streams-in-action-part3/" data-toggle="tooltip" data-placement="top" title="Redis Streams in Action - Part 3 (Java app to process tweets with Redis Streams)">Next Post &rarr;</a>
+            </li>
+          
+        </ul>
+      
+
+
+      
+
+    </div>
+  </div>
+</div>
+
+      
+<footer>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+        <ul class="list-inline text-center footer-links">
+          
+              <li>
+                <a href="https://github.com/abhirockzz" title="GitHub">
+                  <span class="fa-stack fa-lg">
+                    <i class="fas fa-circle fa-stack-2x"></i>
+                    <i class="fab fa-github fa-stack-1x fa-inverse"></i>
+                  </span>
+                </a>
+              </li>
+              <li>
+                <a href="https://twitter.com/abhi_tweeter" title="Twitter">
+                  <span class="fa-stack fa-lg">
+                    <i class="fas fa-circle fa-stack-2x"></i>
+                    <i class="fab fa-twitter fa-stack-1x fa-inverse"></i>
+                  </span>
+                </a>
+              </li>
+              <li>
+                <a href="https://linkedin.com/in/abhirockzz" title="LinkedIn">
+                  <span class="fa-stack fa-lg">
+                    <i class="fas fa-circle fa-stack-2x"></i>
+                    <i class="fab fa-linkedin fa-stack-1x fa-inverse"></i>
+                  </span>
+                </a>
+              </li>
+          
+          <li>
+            <a href="" title="RSS">
+              <span class="fa-stack fa-lg">
+                <i class="fas fa-circle fa-stack-2x"></i>
+                <i class="fas fa-rss fa-stack-1x fa-inverse"></i>
+              </span>
+            </a>
+          </li>
+          
+        </ul>
+        <p class="credits copyright text-muted">
+          
+            
+              <a href="https://abhirockzz.github.io">Abhishek Gupta</a>
+            
+          
+
+          &nbsp;&bull;&nbsp;&copy;
+          
+            2021
+          
+
+          
+            &nbsp;&bull;&nbsp;
+            <a href="https://abhirockzz.github.io/">Abhishek&#39;s blog</a>
+          
+        </p>
+        
+        <p class="credits theme-by text-muted">
+          <a href="https://gohugo.io">Hugo v0.80.0</a> powered &nbsp;&bull;&nbsp; Theme <a href="https://github.com/halogenica/beautifulhugo">Beautiful Hugo</a> adapted from <a href="https://deanattali.com/beautiful-jekyll/">Beautiful Jekyll</a>
+          
+        </p>
+      </div>
+    </div>
+  </div>
+</footer><script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.js" integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/contrib/auto-render.min.js" integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
+<script src="https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+<script src="https://abhirockzz.github.io/js/main.js"></script><script> renderMathInElement(document.body); </script><script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.js" integrity="sha384-QELNnmcmU8IR9ZAykt67vGr9/rZJdHbiWi64V88fCPaOohUlHCqUD/unNN0BXSqy" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe-ui-default.min.js" integrity="sha384-m67o7SkQ1ALzKZIFh4CiTA8tmadaujiTa9Vu+nqPSwDOqHrDmxLezTdFln8077+q" crossorigin="anonymous"></script><script src="https://abhirockzz.github.io/js/load-photoswipe.js"></script>
+
+
+
+
+
+
+
+
+
+    
+  </body>
+</html>
+
