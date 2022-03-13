@@ -92,7 +92,7 @@
   <meta name="twitter:site" content="@abhi_tweeter" />
   <meta name="twitter:creator" content="@abhi_tweeter" />
   <link href='https://abhirockzz.github.io/icons/myicon.png' rel='icon' type='image/x-icon'/>
-  <meta name="generator" content="Hugo 0.89.2" />
+  <meta name="generator" content="Hugo 0.94.2" />
   <link rel="alternate" href="https://abhirockzz.github.io/index.xml" type="application/rss+xml" title="Abhishek&#39;s blog"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css" integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
   <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.5.0/css/all.css" integrity="sha384-B4dIYHKNBt8Bc12p+WXckhzcICo0wtJAoU8YZTY5qE0Id1GSseTk6S+L3BlXeVIU" crossorigin="anonymous">
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous"><link rel="stylesheet" href="https://abhirockzz.github.io/css/main.css" /><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic" />
@@ -303,69 +303,69 @@ if (!doNotTrack) {
 </blockquote>
 <p>Here is a breakdown of the components and their service definitions - you can refer to the complete <code>docker-compose</code> file <a href="https://github.com/abhirockzz/kafka-adx-postgres-cdc-demo/blob/master/docker-compose.yaml">in the GitHub repo</a></p>
 <h3 id="docker-compose-services">Docker Compose services</h3>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="w">  </span><span class="nt">zookeeper</span><span class="p">:</span><span class="w">
-</span><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l">debezium/zookeeper:1.2</span><span class="w">
-</span><span class="w">    </span><span class="nt">ports</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span>- <span class="m">2181</span><span class="p">:</span><span class="m">2181</span><span class="w">
-</span><span class="w">  </span><span class="nt">kafka</span><span class="p">:</span><span class="w">
-</span><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l">debezium/kafka:1.2</span><span class="w">
-</span><span class="w">    </span><span class="nt">ports</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span>- <span class="m">9092</span><span class="p">:</span><span class="m">9092</span><span class="w">
-</span><span class="w">    </span><span class="nt">links</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span>- <span class="l">zookeeper</span><span class="w">
-</span><span class="w">    </span><span class="nt">depends_on</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span>- <span class="l">zookeeper</span><span class="w">
-</span><span class="w">    </span><span class="nt">environment</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span>- <span class="l">ZOOKEEPER_CONNECT=zookeeper:2181</span><span class="w">
-</span><span class="w">      </span>- <span class="l">KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092</span><span class="w">
-</span></code></pre></div><p>The Kafka and Zookeeper run using the <a href="https://hub.docker.com/r/debezium/kafka/">debezium</a> images - they just work and are great for iterative development with quick feedback loop, demos etc.</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="nt">dataexplorer-connector</span><span class="p">:</span><span class="w">
-</span><span class="w">    </span><span class="nt">build</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span><span class="nt">context</span><span class="p">:</span><span class="w"> </span><span class="l">./connector</span><span class="w">
-</span><span class="w">      </span><span class="nt">args</span><span class="p">:</span><span class="w">
-</span><span class="w">        </span><span class="nt">KUSTO_KAFKA_SINK_VERSION</span><span class="p">:</span><span class="w"> </span><span class="m">1.0.1</span><span class="w">
-</span><span class="w">    </span><span class="nt">ports</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span>- <span class="m">8080</span><span class="p">:</span><span class="m">8083</span><span class="w">
-</span><span class="w">    </span><span class="nt">links</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span>- <span class="l">kafka</span><span class="w">
-</span><span class="w">    </span><span class="nt">depends_on</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span>- <span class="l">kafka</span><span class="w">
-</span><span class="w">    </span><span class="nt">environment</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span>- <span class="l">BOOTSTRAP_SERVERS=kafka:9092</span><span class="w">
-</span><span class="w">      </span>- <span class="l">GROUP_ID=adx</span><span class="w">
-</span><span class="w">      </span>- <span class="l">CONFIG_STORAGE_TOPIC=adx_connect_configs</span><span class="w">
-</span><span class="w">      </span>- <span class="l">OFFSET_STORAGE_TOPIC=adx_connect_offsets</span><span class="w">
-</span><span class="w">      </span>- <span class="l">STATUS_STORAGE_TOPIC=adx_connect_statuses</span><span class="w">
-</span><span class="w">  </span><span class="nt">postgres-connector</span><span class="p">:</span><span class="w">
-</span><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l">debezium/connect:1.2</span><span class="w">
-</span><span class="w">    </span><span class="nt">ports</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span>- <span class="m">9090</span><span class="p">:</span><span class="m">8083</span><span class="w">
-</span><span class="w">    </span><span class="nt">links</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span>- <span class="l">kafka</span><span class="w">
-</span><span class="w">    </span><span class="nt">depends_on</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span>- <span class="l">kafka</span><span class="w">
-</span><span class="w">    </span><span class="nt">environment</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span>- <span class="l">BOOTSTRAP_SERVERS=kafka:9092</span><span class="w">
-</span><span class="w">      </span>- <span class="l">GROUP_ID=pg</span><span class="w">
-</span><span class="w">      </span>- <span class="l">CONFIG_STORAGE_TOPIC=pg_connect_configs</span><span class="w">
-</span><span class="w">      </span>- <span class="l">OFFSET_STORAGE_TOPIC=pg_connect_offsets</span><span class="w">
-</span><span class="w">      </span>- <span class="l">STATUS_STORAGE_TOPIC=pg_connect_statuses</span><span class="w">
-</span></code></pre></div><p>The Kafka Connect source and sink connectors run as separate containers, just to make it easier for you to understand and reason about them - it is possible to run both the connectors in a single container as well.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="w">  </span><span class="nt">zookeeper</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l">debezium/zookeeper:1.2</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">ports</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="m">2181</span><span class="p">:</span><span class="m">2181</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">kafka</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l">debezium/kafka:1.2</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">ports</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="m">9092</span><span class="p">:</span><span class="m">9092</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">links</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="l">zookeeper</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">depends_on</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="l">zookeeper</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">environment</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="l">ZOOKEEPER_CONNECT=zookeeper:2181</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="l">KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092</span><span class="w">
+</span></span></span></code></pre></div><p>The Kafka and Zookeeper run using the <a href="https://hub.docker.com/r/debezium/kafka/">debezium</a> images - they just work and are great for iterative development with quick feedback loop, demos etc.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">dataexplorer-connector</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">build</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">context</span><span class="p">:</span><span class="w"> </span><span class="l">./connector</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">args</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">KUSTO_KAFKA_SINK_VERSION</span><span class="p">:</span><span class="w"> </span><span class="m">1.0.1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">ports</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="m">8080</span><span class="p">:</span><span class="m">8083</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">links</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="l">kafka</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">depends_on</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="l">kafka</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">environment</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="l">BOOTSTRAP_SERVERS=kafka:9092</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="l">GROUP_ID=adx</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="l">CONFIG_STORAGE_TOPIC=adx_connect_configs</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="l">OFFSET_STORAGE_TOPIC=adx_connect_offsets</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="l">STATUS_STORAGE_TOPIC=adx_connect_statuses</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">postgres-connector</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l">debezium/connect:1.2</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">ports</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="m">9090</span><span class="p">:</span><span class="m">8083</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">links</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="l">kafka</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">depends_on</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="l">kafka</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">environment</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="l">BOOTSTRAP_SERVERS=kafka:9092</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="l">GROUP_ID=pg</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="l">CONFIG_STORAGE_TOPIC=pg_connect_configs</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="l">OFFSET_STORAGE_TOPIC=pg_connect_offsets</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="l">STATUS_STORAGE_TOPIC=pg_connect_statuses</span><span class="w">
+</span></span></span></code></pre></div><p>The Kafka Connect source and sink connectors run as separate containers, just to make it easier for you to understand and reason about them - it is possible to run both the connectors in a single container as well.</p>
 <p>Notice that, while the PostgreSQL connector is built into <a href="https://hub.docker.com/r/debezium/connect">debezium/connect</a> image, the Azure Data Explorer connector is setup using custom image. The <a href="https://github.com/abhirockzz/kafka-adx-postgres-cdc-demo/blob/master/connector/Dockerfile">Dockerfile</a> is quite compact:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-dockerfile" data-lang="dockerfile"><span class="k">FROM</span><span class="s"> debezium/connect:1.2</span><span class="err">
-</span><span class="err"></span><span class="k">WORKDIR</span><span class="s"> $KAFKA_HOME/connect</span><span class="err">
-</span><span class="err"></span><span class="k">ARG</span> KUSTO_KAFKA_SINK_VERSION<span class="err">
-</span><span class="err"></span><span class="k">RUN</span> curl -L -O https://github.com/Azure/kafka-sink-azure-kusto/releases/download/v<span class="nv">$KUSTO_KAFKA_SINK_VERSION</span>/kafka-sink-azure-kusto-<span class="nv">$KUSTO_KAFKA_SINK_VERSION</span>-jar-with-dependencies.jar<span class="err">
-</span></code></pre></div><p>Finally, the <code>orders-gen</code> service just <a href="https://golang.org/">Go</a> application to seed random orders data into PostgreSQL. You can refer to the Dockerfile in <a href="https://github.com/abhirockzz/kafka-adx-postgres-cdc-demo/blob/master/orders-generator/Dockerfile">the GitHub repo</a></p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="w">  </span><span class="nt">orders-gen</span><span class="p">:</span><span class="w">
-</span><span class="w">    </span><span class="nt">build</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span><span class="nt">context</span><span class="p">:</span><span class="w"> </span><span class="l">./orders-generator</span><span class="w">
-</span><span class="w">    </span><span class="nt">environment</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span>- <span class="l">PG_HOST=&lt;postgres host&gt;</span><span class="w">
-</span><span class="w">      </span>- <span class="l">PG_USER=&lt;postgres username&gt;</span><span class="w">
-</span><span class="w">      </span>- <span class="l">PG_PASSWORD=&lt;postgres password&gt;</span><span class="w">
-</span><span class="w">      </span>- <span class="l">PG_DB=&lt;postgres db name&gt;</span><span class="w">
-</span></code></pre></div><p>Hopefully, by now you have a reasonable understanding of architecture and the components involved. Before diving into the practical aspects, you need take care of a few things.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-dockerfile" data-lang="dockerfile"><span class="line"><span class="cl"><span class="k">FROM</span><span class="s"> debezium/connect:1.2</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">WORKDIR</span><span class="s"> $KAFKA_HOME/connect</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">ARG</span> KUSTO_KAFKA_SINK_VERSION<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">RUN</span> curl -L -O https://github.com/Azure/kafka-sink-azure-kusto/releases/download/v<span class="nv">$KUSTO_KAFKA_SINK_VERSION</span>/kafka-sink-azure-kusto-<span class="nv">$KUSTO_KAFKA_SINK_VERSION</span>-jar-with-dependencies.jar<span class="err">
+</span></span></span></code></pre></div><p>Finally, the <code>orders-gen</code> service just <a href="https://golang.org/">Go</a> application to seed random orders data into PostgreSQL. You can refer to the Dockerfile in <a href="https://github.com/abhirockzz/kafka-adx-postgres-cdc-demo/blob/master/orders-generator/Dockerfile">the GitHub repo</a></p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="w">  </span><span class="nt">orders-gen</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">build</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">context</span><span class="p">:</span><span class="w"> </span><span class="l">./orders-generator</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">environment</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="l">PG_HOST=&lt;postgres host&gt;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="l">PG_USER=&lt;postgres username&gt;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="l">PG_PASSWORD=&lt;postgres password&gt;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="l">PG_DB=&lt;postgres db name&gt;</span><span class="w">
+</span></span></span></code></pre></div><p>Hopefully, by now you have a reasonable understanding of architecture and the components involved. Before diving into the practical aspects, you need take care of a few things.</p>
 <h2 id="pre-requisites">Pre-requisites</h2>
 <ul>
 <li>You will need a <a href="https://docs.microsoft.com/azure/?product=featured&amp;WT.mc_id=devto-blog-abhishgu">Microsoft Azure account</a>. Don&rsquo;t worry, you can get it <a href="https://azure.microsoft.com/free/?WT.mc_id=devto-blog-abhishgu">for free</a> if you don&rsquo;t have one already!</li>
@@ -373,9 +373,9 @@ if (!doNotTrack) {
 <li>Install <a href="https://docs.docker.com/get-docker/">Docker</a> and <a href="https://docs.docker.com/compose/install">Docker Compose</a></li>
 </ul>
 <p>Finally, clone this GitHub repo:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-shell" data-lang="shell">git clone https://github.com/abhirockzz/kafka-adx-postgres-cdc-demo
-<span class="nb">cd</span> kafka-adx-postgres-cdc-demo
-</code></pre></div><p>To begin with, let&rsquo;s make sure you have setup and configured Azure Data Explorer and PostgreSQL database.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-shell" data-lang="shell"><span class="line"><span class="cl">git clone https://github.com/abhirockzz/kafka-adx-postgres-cdc-demo
+</span></span><span class="line"><span class="cl"><span class="nb">cd</span> kafka-adx-postgres-cdc-demo
+</span></span></code></pre></div><p>To begin with, let&rsquo;s make sure you have setup and configured Azure Data Explorer and PostgreSQL database.</p>
 <h2 id="setup-and-configure-azure-data-explorer">Setup and configure Azure Data Explorer</h2>
 <ol>
 <li>
@@ -385,37 +385,37 @@ if (!doNotTrack) {
 <p>Create a table (<code>Orders</code>) and the mapping (<code>OrdersEventMapping</code>) using the <a href="https://docs.microsoft.com/azure/data-explorer/kql-quick-reference?WT.mc_id=devto-blog-abhishgu">KQL</a> queries below:</p>
 </li>
 </ol>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">.create table Orders (orderid: string, custid: string, city: string, amount: int, purchase_time: datetime)
-
-.create table Orders ingestion json mapping &#39;OrdersEventMapping&#39; &#39;[{&#34;column&#34;:&#34;orderid&#34;,&#34;Properties&#34;:{&#34;path&#34;:&#34;$.orderid&#34;}},{&#34;column&#34;:&#34;custid&#34;,&#34;Properties&#34;:{&#34;path&#34;:&#34;$.custid&#34;}},{&#34;column&#34;:&#34;city&#34;,&#34;Properties&#34;:{&#34;path&#34;:&#34;$.city&#34;}},{&#34;column&#34;:&#34;amount&#34;,&#34;Properties&#34;:{&#34;path&#34;:&#34;$.amount&#34;}},{&#34;column&#34;:&#34;purchase_time&#34;,&#34;Properties&#34;:{&#34;path&#34;:&#34;$.purchase_time&#34;}}]&#39;
-</code></pre></div><p>During the ingestion process, Azure Data Explorer attempts to optimize for throughput by batching small ingress data chunks together as they await ingestion - the <a href="https://docs.microsoft.com/azure/data-explorer/kusto/management/batchingpolicy?WT.mc_id=devto-blog-abhishgu">IngestionBatching policy</a> can be used to fine tune this process. Optionally, for the purposes of this demo, you can update the policy as such:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">.alter table Orders policy ingestionbatching @&#39;{&#34;MaximumBatchingTimeSpan&#34;:&#34;00:00:30&#34;, &#34;MaximumNumberOfItems&#34;: 500, &#34;MaximumRawDataSizeMB&#34;: 1024}&#39;
-
-.show table &lt;enter database name&gt;.Orders policy ingestionbatching
-</code></pre></div><blockquote>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">.create table Orders (orderid: string, custid: string, city: string, amount: int, purchase_time: datetime)
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">.create table Orders ingestion json mapping &#39;OrdersEventMapping&#39; &#39;[{&#34;column&#34;:&#34;orderid&#34;,&#34;Properties&#34;:{&#34;path&#34;:&#34;$.orderid&#34;}},{&#34;column&#34;:&#34;custid&#34;,&#34;Properties&#34;:{&#34;path&#34;:&#34;$.custid&#34;}},{&#34;column&#34;:&#34;city&#34;,&#34;Properties&#34;:{&#34;path&#34;:&#34;$.city&#34;}},{&#34;column&#34;:&#34;amount&#34;,&#34;Properties&#34;:{&#34;path&#34;:&#34;$.amount&#34;}},{&#34;column&#34;:&#34;purchase_time&#34;,&#34;Properties&#34;:{&#34;path&#34;:&#34;$.purchase_time&#34;}}]&#39;
+</span></span></code></pre></div><p>During the ingestion process, Azure Data Explorer attempts to optimize for throughput by batching small ingress data chunks together as they await ingestion - the <a href="https://docs.microsoft.com/azure/data-explorer/kusto/management/batchingpolicy?WT.mc_id=devto-blog-abhishgu">IngestionBatching policy</a> can be used to fine tune this process. Optionally, for the purposes of this demo, you can update the policy as such:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">.alter table Orders policy ingestionbatching @&#39;{&#34;MaximumBatchingTimeSpan&#34;:&#34;00:00:30&#34;, &#34;MaximumNumberOfItems&#34;: 500, &#34;MaximumRawDataSizeMB&#34;: 1024}&#39;
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">.show table &lt;enter database name&gt;.Orders policy ingestionbatching
+</span></span></code></pre></div><blockquote>
 <p>Refer to the <a href="https://docs.microsoft.com/azure/data-explorer/kusto/management/batching-policy?WT.mc_id=devto-blog-abhishgu">IngestionBatching policy command reference</a> for details</p>
 </blockquote>
 <ol start="3">
 <li>Create a Service Principal in order for the connector to authenticate and connect to Azure Data Explorer service. If you want to use the Azure Portal to do this, please refer to <a href="https://docs.microsoft.com/azure/active-directory/develop/howto-create-service-principal-portal?WT.mc_id=devto-blog-abhishgu">How to: Use the portal to create an Azure AD application and service principal that can access resources</a>. The below example makes use of Azure CLI <a href="https://docs.microsoft.com/cli/azure/ad/sp?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az_ad_sp_create_for_rbac">az ad sp create-for-rbac</a> command. For example, to create a service principal with the name <code>adx-sp</code>:</li>
 </ol>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">az ad sp create-for-rbac -n &#34;adx-sp&#34;
-</code></pre></div><p>You will get a JSON response:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="p">{</span>
-  <span class="nt">&#34;appId&#34;</span><span class="p">:</span> <span class="s2">&#34;fe7280c7-5705-4789-b17f-71a472340429&#34;</span><span class="p">,</span>
-  <span class="nt">&#34;displayName&#34;</span><span class="p">:</span> <span class="s2">&#34;kusto-sp&#34;</span><span class="p">,</span>
-  <span class="nt">&#34;name&#34;</span><span class="p">:</span> <span class="s2">&#34;http://kusto-sp&#34;</span><span class="p">,</span>
-  <span class="nt">&#34;password&#34;</span><span class="p">:</span> <span class="s2">&#34;29c719dd-f2b3-46de-b71c-4004fb6116ee&#34;</span><span class="p">,</span>
-  <span class="nt">&#34;tenant&#34;</span><span class="p">:</span> <span class="s2">&#34;42f988bf-86f1-42af-91ab-2d7cd011db42&#34;</span>
-<span class="p">}</span>
-</code></pre></div><blockquote>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">az ad sp create-for-rbac -n &#34;adx-sp&#34;
+</span></span></code></pre></div><p>You will get a JSON response:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;appId&#34;</span><span class="p">:</span> <span class="s2">&#34;fe7280c7-5705-4789-b17f-71a472340429&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;displayName&#34;</span><span class="p">:</span> <span class="s2">&#34;kusto-sp&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;name&#34;</span><span class="p">:</span> <span class="s2">&#34;http://kusto-sp&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;password&#34;</span><span class="p">:</span> <span class="s2">&#34;29c719dd-f2b3-46de-b71c-4004fb6116ee&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;tenant&#34;</span><span class="p">:</span> <span class="s2">&#34;42f988bf-86f1-42af-91ab-2d7cd011db42&#34;</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><blockquote>
 <p>Please note down the <code>appId</code>, <code>password</code> and <code>tenant</code> as you will be using them in subsequent steps</p>
 </blockquote>
 <ol start="4">
 <li>Add permissions to your database</li>
 </ol>
 <p>Provide appropriate role to the Service principal you just created. To assign the <code>admin</code> role, <a href="https://docs.microsoft.com/azure/data-explorer/manage-database-permissions?WT.mc_id=devto-blog-abhishgu#manage-permissions-in-the-azure-portal">follow this guide</a> to use the Azure portal or use the following command in your Data Explorer cluster</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">.add database &lt;enter database name&gt; admins  (&#39;aadapp=&lt;enter service principal appId&gt;;&lt;enter service principal tenant&gt;&#39;) &#39;AAD App&#39;
-</code></pre></div><h2 id="setup-and-configure-azure-postgresql-db">Setup and configure Azure PostgreSQL DB</h2>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">.add database &lt;enter database name&gt; admins  (&#39;aadapp=&lt;enter service principal appId&gt;;&lt;enter service principal tenant&gt;&#39;) &#39;AAD App&#39;
+</span></span></code></pre></div><h2 id="setup-and-configure-azure-postgresql-db">Setup and configure Azure PostgreSQL DB</h2>
 <p>You can setup PostgreSQL on Azure using a variety of options including, the <a href="https://docs.microsoft.com/azure/postgresql/quickstart-create-server-database-portal?WT.mc_id=devto-blog-abhishgu">Azure Portal</a>, <a href="https://docs.microsoft.com/azure/postgresql/quickstart-create-server-database-azure-cli?WT.mc_id=devto-blog-abhishgu">Azure CLI</a>, <a href="https://docs.microsoft.com/azure/postgresql/quickstart-create-postgresql-server-database-using-azure-powershell?WT.mc_id=devto-blog-abhishgu">Azure PowerShell</a>, <a href="https://docs.microsoft.com/azure/postgresql/quickstart-create-postgresql-server-database-using-arm-template?tabs=azure-portal&amp;WT.mc_id=devto-blog-abhishgu">ARM template</a>. Once you&rsquo;ve done that, you can easily connect to the database using you favourite programming language such as <a href="https://docs.microsoft.com/azure/postgresql/connect-java?WT.mc_id=devto-blog-abhishgu">Java</a>, <a href="https://docs.microsoft.com/azure/postgresql/connect-csharp?WT.mc_id=devto-blog-abhishgu">.NET</a>, <a href="https://docs.microsoft.com/azure/postgresql/connect-nodejs?WT.mc_id=devto-blog-abhishgu">Node.js</a>, <a href="https://docs.microsoft.com/azure/postgresql/connect-python?WT.mc_id=devto-blog-abhishgu">Python</a>, <a href="https://docs.microsoft.com/azure/postgresql/connect-go?WT.mc_id=devto-blog-abhishgu">Go</a> etc.</p>
 <blockquote>
 <p>Although the above references are for Single Server deployment mode, please note that <a href="https://docs.microsoft.com/azure/postgresql/overview?WT.mc_id=devto-blog-abhishgu#azure-database-for-postgresql---hyperscale-citus">Hyperscale (Citus) is another deployment mode you can use</a> for &ldquo;workloads that are approaching &ndash; or already exceed &ndash; 100 GB of data.&rdquo;</p>
@@ -430,172 +430,172 @@ if (!doNotTrack) {
 <p>If you&rsquo;re using Azure DB for PostgreSQL, create a firewall rule using <a href="https://docs.microsoft.com/azure/postgresql/howto-manage-firewall-using-cli?WT.mc_id=devto-blog-abhishgu#create-firewall-rule">az postgres server firewall-rule create</a> command to whitelist your host. Since we&rsquo;re running Kafka Connect in Docker locally, simply navigate to the Azure portal (<strong>Connection security</strong> section of my PostrgreSQL instance) and choose <strong>Add current client IP address</strong> to make sure that your local IP is added to the firewall rule as such:</p>
 <p><img src="https://dev-to-uploads.s3.amazonaws.com/i/j0pocc5xlf82eaxfmzhg.png" alt=""></p>
 <p>To change the replication mode for Azure DB for PostgreSQL, you can use the <a href="https://docs.microsoft.com/cli/azure/postgres/server/configuration?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az-postgres-server-configuration-set">az postgres server configuration</a> command:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">az postgres server configuration set --resource-group &lt;name of resource group&gt; --server-name &lt;name of server&gt; --name azure.replication_support --value logical
-</code></pre></div><p>.. or use the <strong>Replication</strong> menu of your PostgreSQL instance in the Azure Portal:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">az postgres server configuration set --resource-group &lt;name of resource group&gt; --server-name &lt;name of server&gt; --name azure.replication_support --value logical
+</span></span></code></pre></div><p>.. or use the <strong>Replication</strong> menu of your PostgreSQL instance in the Azure Portal:</p>
 <p><img src="https://dev-to-uploads.s3.amazonaws.com/i/nasgv52afr15hqzqzyyc.png" alt=""></p>
 <p>After updating the configuration, you will need to re-start the server which you can do using the CLI (<a href="https://docs.microsoft.com/cli/azure/postgres/server?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az-postgres-server-restart">az postgres server restart</a>) or the portal.</p>
 <p>Once the database is up and running, create the table. I have used <code>psql</code> CLI in this example, but feel free to use any other tool. For example, to connect to your PostgreSQL database on Azure over SSL (you will be prompted for the password):</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">psql -h &lt;POSTGRESQL_INSTANCE_NAME&gt;.postgres.database.azure.com -p <span class="m">5432</span> -U &lt;POSTGRES_USER_NAME&gt; -W -d &lt;POSTGRES_DB_NAME&gt; --set<span class="o">=</span><span class="nv">sslmode</span><span class="o">=</span>require
-
-//example
-psql -h my-pgsql.postgres.database.azure.com -p <span class="m">5432</span> -U foo@my-pgsql -W -d postgres --set<span class="o">=</span><span class="nv">sslmode</span><span class="o">=</span>require
-</code></pre></div><p>Use the below SQL to create the table:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-sql" data-lang="sql"><span class="k">CREATE</span><span class="w"> </span><span class="k">SCHEMA</span><span class="w"> </span><span class="n">retail</span><span class="p">;</span><span class="w">
-</span><span class="w">
-</span><span class="w"></span><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">retail</span><span class="p">.</span><span class="n">orders_info</span><span class="w"> </span><span class="p">(</span><span class="w">
-</span><span class="w">	</span><span class="n">orderid</span><span class="w"> </span><span class="nb">SERIAL</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="p">,</span><span class="w">
-</span><span class="w">	</span><span class="n">custid</span><span class="w"> </span><span class="nb">INTEGER</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span><span class="w">
-</span><span class="w">	</span><span class="n">amount</span><span class="w"> </span><span class="nb">INTEGER</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span><span class="w">
-</span><span class="w">	</span><span class="n">city</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">255</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span><span class="w">
-</span><span class="w">	</span><span class="n">purchase_time</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">20</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w">
-</span><span class="w"></span><span class="p">);</span><span class="w">
-</span></code></pre></div><blockquote>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">psql -h &lt;POSTGRESQL_INSTANCE_NAME&gt;.postgres.database.azure.com -p <span class="m">5432</span> -U &lt;POSTGRES_USER_NAME&gt; -W -d &lt;POSTGRES_DB_NAME&gt; --set<span class="o">=</span><span class="nv">sslmode</span><span class="o">=</span>require
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">//example
+</span></span><span class="line"><span class="cl">psql -h my-pgsql.postgres.database.azure.com -p <span class="m">5432</span> -U foo@my-pgsql -W -d postgres --set<span class="o">=</span><span class="nv">sslmode</span><span class="o">=</span>require
+</span></span></code></pre></div><p>Use the below SQL to create the table:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-sql" data-lang="sql"><span class="line"><span class="cl"><span class="k">CREATE</span><span class="w"> </span><span class="k">SCHEMA</span><span class="w"> </span><span class="n">retail</span><span class="p">;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">retail</span><span class="p">.</span><span class="n">orders_info</span><span class="w"> </span><span class="p">(</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">	</span><span class="n">orderid</span><span class="w"> </span><span class="nb">SERIAL</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">	</span><span class="n">custid</span><span class="w"> </span><span class="nb">INTEGER</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">	</span><span class="n">amount</span><span class="w"> </span><span class="nb">INTEGER</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">	</span><span class="n">city</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">255</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">	</span><span class="n">purchase_time</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">20</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">);</span><span class="w">
+</span></span></span></code></pre></div><blockquote>
 <p>The <code>purchase_time</code> captures the time when the purchase was executed, but it uses <code>VARCHAR</code> instead of a <code>TIMESTAMP</code> type (ideally) to reduce the overall complexity. This is because of the way <a href="https://debezium.io/documentation/reference/1.2/connectors/postgresql.html#postgresql-timestamp-type">Debezium Postgres connector treats TIMESTAMP data type</a> (and rightly so!)</p>
 </blockquote>
 <p>Over the course of the next few sections, you will setup the source (PostgreSQL), sink (Azure Data Explorer) connectors and validate the end to end pipeline.</p>
 <h2 id="start-docker-containers">Start Docker containers</h2>
 <p>Starting up our local environment is very easy, thanks to Docker Compose - all we need is a single command:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-shell" data-lang="shell">docker-compose --project-name adx-kafka-cdc up --build
-</code></pre></div><p>This will build (and start) the order generator application container along with Kafka, Zookeeper and Kafka Connect workers.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-shell" data-lang="shell"><span class="line"><span class="cl">docker-compose --project-name adx-kafka-cdc up --build
+</span></span></code></pre></div><p>This will build (and start) the order generator application container along with Kafka, Zookeeper and Kafka Connect workers.</p>
 <blockquote>
 <p>It might take a while to download and start the containers: this is just a one time process.</p>
 </blockquote>
 <p>To confirm whether all the containers have started:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-shell" data-lang="shell">docker-compose -p adx-kafka-cdc ps
-
-
-//output
-
-                 Name                              Command             State                      Ports                   
---------------------------------------------------------------------------------------------------------------------------
-adx-kafka-cdc_dataexplorer-connector_1   /docker-entrypoint.sh start   Up      0.0.0.0:8080-&gt;8083/tcp, 8778/tcp, 9092/tcp,
-                                                                               9779/tcp                                   
-adx-kafka-cdc_kafka_1                    /docker-entrypoint.sh start   Up      8778/tcp, 0.0.0.0:9092-&gt;9092/tcp, 9779/tcp 
-adx-kafka-cdc_orders-gen_1               /orders-gen                   Up                                                 
-adx-kafka-cdc_postgres-connector_1       /docker-entrypoint.sh start   Up      0.0.0.0:9090-&gt;8083/tcp, 8778/tcp, 9092/tcp,
-                                                                               9779/tcp                                   
-adx-kafka-cdc_zookeeper_1                /docker-entrypoint.sh start   Up      0.0.0.0:2181-&gt;2181/tcp, 2888/tcp, 3888/tcp,
-                                                                               8778/tcp, 9779/tcp
-</code></pre></div><p>The orders generator app will start inserting random order events to the <code>orders_info</code> table in PostgreSQL. At this point you can also do quick sanity check to confirm that the order information is being persisted - I have used <a href="https://www.postgresql.org/docs/13/app-psql.html">psql</a> in the example below:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-sql" data-lang="sql"><span class="n">psql</span><span class="w"> </span><span class="o">-</span><span class="n">h</span><span class="w"> </span><span class="o">&lt;</span><span class="n">POSTGRESQL_INSTANCE_NAME</span><span class="o">&gt;</span><span class="p">.</span><span class="n">postgres</span><span class="p">.</span><span class="k">database</span><span class="p">.</span><span class="n">azure</span><span class="p">.</span><span class="n">com</span><span class="w"> </span><span class="o">-</span><span class="n">p</span><span class="w"> </span><span class="mi">5432</span><span class="w"> </span><span class="o">-</span><span class="n">U</span><span class="w"> </span><span class="o">&lt;</span><span class="n">POSTGRES_USER_NAME</span><span class="o">&gt;</span><span class="w"> </span><span class="o">-</span><span class="n">W</span><span class="w"> </span><span class="o">-</span><span class="n">d</span><span class="w"> </span><span class="o">&lt;</span><span class="n">POSTGRES_DB_NAME</span><span class="o">&gt;</span><span class="w"> </span><span class="c1">--set=sslmode=require
-</span><span class="c1"></span><span class="w">
-</span><span class="w"></span><span class="k">select</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">from</span><span class="w"> </span><span class="n">retail</span><span class="p">.</span><span class="n">orders_info</span><span class="w"> </span><span class="k">order</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">orderid</span><span class="w"> </span><span class="k">desc</span><span class="w"> </span><span class="k">limit</span><span class="w"> </span><span class="mi">5</span><span class="p">;</span><span class="w">
-</span></code></pre></div><p>This will give you the five most recent orders:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-sql" data-lang="sql"><span class="w"> </span><span class="n">orderid</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">custid</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">amount</span><span class="w"> </span><span class="o">|</span><span class="w">   </span><span class="n">city</span><span class="w">    </span><span class="o">|</span><span class="w">    </span><span class="n">purchase_time</span><span class="w">    
-</span><span class="w"></span><span class="c1">---------+--------+--------+-----------+---------------------
-</span><span class="c1"></span><span class="w">      </span><span class="mi">10</span><span class="w"> </span><span class="o">|</span><span class="w">     </span><span class="mi">77</span><span class="w"> </span><span class="o">|</span><span class="w">    </span><span class="mi">140</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Seattle</span><span class="w">   </span><span class="o">|</span><span class="w"> </span><span class="mi">2020</span><span class="o">-</span><span class="mi">10</span><span class="o">-</span><span class="mi">09</span><span class="w"> </span><span class="mi">07</span><span class="p">:</span><span class="mi">10</span><span class="p">:</span><span class="mi">49</span><span class="w">
-</span><span class="w">      </span><span class="mi">9</span><span class="w">  </span><span class="o">|</span><span class="w">    </span><span class="mi">541</span><span class="w"> </span><span class="o">|</span><span class="w">    </span><span class="mi">186</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Cleveland</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="mi">2020</span><span class="o">-</span><span class="mi">10</span><span class="o">-</span><span class="mi">09</span><span class="w"> </span><span class="mi">07</span><span class="p">:</span><span class="mi">10</span><span class="p">:</span><span class="mi">46</span><span class="w">
-</span><span class="w">      </span><span class="mi">8</span><span class="w">  </span><span class="o">|</span><span class="w">    </span><span class="mi">533</span><span class="w"> </span><span class="o">|</span><span class="w">    </span><span class="mi">116</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Cleveland</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="mi">2020</span><span class="o">-</span><span class="mi">10</span><span class="o">-</span><span class="mi">09</span><span class="w"> </span><span class="mi">07</span><span class="p">:</span><span class="mi">10</span><span class="p">:</span><span class="mi">42</span><span class="w">
-</span><span class="w">      </span><span class="mi">7</span><span class="w">  </span><span class="o">|</span><span class="w">    </span><span class="mi">225</span><span class="w"> </span><span class="o">|</span><span class="w">    </span><span class="mi">147</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Chicago</span><span class="w">   </span><span class="o">|</span><span class="w"> </span><span class="mi">2020</span><span class="o">-</span><span class="mi">10</span><span class="o">-</span><span class="mi">09</span><span class="w"> </span><span class="mi">07</span><span class="p">:</span><span class="mi">10</span><span class="p">:</span><span class="mi">39</span><span class="w">
-</span><span class="w">      </span><span class="mi">6</span><span class="w">  </span><span class="o">|</span><span class="w">    </span><span class="mi">819</span><span class="w"> </span><span class="o">|</span><span class="w">    </span><span class="mi">184</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Austin</span><span class="w">    </span><span class="o">|</span><span class="w"> </span><span class="mi">2020</span><span class="o">-</span><span class="mi">10</span><span class="o">-</span><span class="mi">09</span><span class="w"> </span><span class="mi">07</span><span class="p">:</span><span class="mi">10</span><span class="p">:</span><span class="mi">36</span><span class="w">
-</span><span class="w"></span><span class="p">(</span><span class="mi">5</span><span class="w"> </span><span class="k">rows</span><span class="p">)</span><span class="w">
-</span></code></pre></div><p>To stream the <code>orders</code> data to Kafka, we need to configure and start an instance of the Debezium PostgreSQL source connector.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-shell" data-lang="shell"><span class="line"><span class="cl">docker-compose -p adx-kafka-cdc ps
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">//output
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">                 Name                              Command             State                      Ports                   
+</span></span><span class="line"><span class="cl">--------------------------------------------------------------------------------------------------------------------------
+</span></span><span class="line"><span class="cl">adx-kafka-cdc_dataexplorer-connector_1   /docker-entrypoint.sh start   Up      0.0.0.0:8080-&gt;8083/tcp, 8778/tcp, 9092/tcp,
+</span></span><span class="line"><span class="cl">                                                                               9779/tcp                                   
+</span></span><span class="line"><span class="cl">adx-kafka-cdc_kafka_1                    /docker-entrypoint.sh start   Up      8778/tcp, 0.0.0.0:9092-&gt;9092/tcp, 9779/tcp 
+</span></span><span class="line"><span class="cl">adx-kafka-cdc_orders-gen_1               /orders-gen                   Up                                                 
+</span></span><span class="line"><span class="cl">adx-kafka-cdc_postgres-connector_1       /docker-entrypoint.sh start   Up      0.0.0.0:9090-&gt;8083/tcp, 8778/tcp, 9092/tcp,
+</span></span><span class="line"><span class="cl">                                                                               9779/tcp                                   
+</span></span><span class="line"><span class="cl">adx-kafka-cdc_zookeeper_1                /docker-entrypoint.sh start   Up      0.0.0.0:2181-&gt;2181/tcp, 2888/tcp, 3888/tcp,
+</span></span><span class="line"><span class="cl">                                                                               8778/tcp, 9779/tcp
+</span></span></code></pre></div><p>The orders generator app will start inserting random order events to the <code>orders_info</code> table in PostgreSQL. At this point you can also do quick sanity check to confirm that the order information is being persisted - I have used <a href="https://www.postgresql.org/docs/13/app-psql.html">psql</a> in the example below:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-sql" data-lang="sql"><span class="line"><span class="cl"><span class="n">psql</span><span class="w"> </span><span class="o">-</span><span class="n">h</span><span class="w"> </span><span class="o">&lt;</span><span class="n">POSTGRESQL_INSTANCE_NAME</span><span class="o">&gt;</span><span class="p">.</span><span class="n">postgres</span><span class="p">.</span><span class="k">database</span><span class="p">.</span><span class="n">azure</span><span class="p">.</span><span class="n">com</span><span class="w"> </span><span class="o">-</span><span class="n">p</span><span class="w"> </span><span class="mi">5432</span><span class="w"> </span><span class="o">-</span><span class="n">U</span><span class="w"> </span><span class="o">&lt;</span><span class="n">POSTGRES_USER_NAME</span><span class="o">&gt;</span><span class="w"> </span><span class="o">-</span><span class="n">W</span><span class="w"> </span><span class="o">-</span><span class="n">d</span><span class="w"> </span><span class="o">&lt;</span><span class="n">POSTGRES_DB_NAME</span><span class="o">&gt;</span><span class="w"> </span><span class="c1">--set=sslmode=require
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="k">select</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">from</span><span class="w"> </span><span class="n">retail</span><span class="p">.</span><span class="n">orders_info</span><span class="w"> </span><span class="k">order</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">orderid</span><span class="w"> </span><span class="k">desc</span><span class="w"> </span><span class="k">limit</span><span class="w"> </span><span class="mi">5</span><span class="p">;</span><span class="w">
+</span></span></span></code></pre></div><p>This will give you the five most recent orders:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-sql" data-lang="sql"><span class="line"><span class="cl"><span class="w"> </span><span class="n">orderid</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">custid</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">amount</span><span class="w"> </span><span class="o">|</span><span class="w">   </span><span class="n">city</span><span class="w">    </span><span class="o">|</span><span class="w">    </span><span class="n">purchase_time</span><span class="w">    
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="c1">---------+--------+--------+-----------+---------------------
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="w">      </span><span class="mi">10</span><span class="w"> </span><span class="o">|</span><span class="w">     </span><span class="mi">77</span><span class="w"> </span><span class="o">|</span><span class="w">    </span><span class="mi">140</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Seattle</span><span class="w">   </span><span class="o">|</span><span class="w"> </span><span class="mi">2020</span><span class="o">-</span><span class="mi">10</span><span class="o">-</span><span class="mi">09</span><span class="w"> </span><span class="mi">07</span><span class="p">:</span><span class="mi">10</span><span class="p">:</span><span class="mi">49</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="mi">9</span><span class="w">  </span><span class="o">|</span><span class="w">    </span><span class="mi">541</span><span class="w"> </span><span class="o">|</span><span class="w">    </span><span class="mi">186</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Cleveland</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="mi">2020</span><span class="o">-</span><span class="mi">10</span><span class="o">-</span><span class="mi">09</span><span class="w"> </span><span class="mi">07</span><span class="p">:</span><span class="mi">10</span><span class="p">:</span><span class="mi">46</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="mi">8</span><span class="w">  </span><span class="o">|</span><span class="w">    </span><span class="mi">533</span><span class="w"> </span><span class="o">|</span><span class="w">    </span><span class="mi">116</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Cleveland</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="mi">2020</span><span class="o">-</span><span class="mi">10</span><span class="o">-</span><span class="mi">09</span><span class="w"> </span><span class="mi">07</span><span class="p">:</span><span class="mi">10</span><span class="p">:</span><span class="mi">42</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="mi">7</span><span class="w">  </span><span class="o">|</span><span class="w">    </span><span class="mi">225</span><span class="w"> </span><span class="o">|</span><span class="w">    </span><span class="mi">147</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Chicago</span><span class="w">   </span><span class="o">|</span><span class="w"> </span><span class="mi">2020</span><span class="o">-</span><span class="mi">10</span><span class="o">-</span><span class="mi">09</span><span class="w"> </span><span class="mi">07</span><span class="p">:</span><span class="mi">10</span><span class="p">:</span><span class="mi">39</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="mi">6</span><span class="w">  </span><span class="o">|</span><span class="w">    </span><span class="mi">819</span><span class="w"> </span><span class="o">|</span><span class="w">    </span><span class="mi">184</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Austin</span><span class="w">    </span><span class="o">|</span><span class="w"> </span><span class="mi">2020</span><span class="o">-</span><span class="mi">10</span><span class="o">-</span><span class="mi">09</span><span class="w"> </span><span class="mi">07</span><span class="p">:</span><span class="mi">10</span><span class="p">:</span><span class="mi">36</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">(</span><span class="mi">5</span><span class="w"> </span><span class="k">rows</span><span class="p">)</span><span class="w">
+</span></span></span></code></pre></div><p>To stream the <code>orders</code> data to Kafka, we need to configure and start an instance of the Debezium PostgreSQL source connector.</p>
 <h2 id="debezium-postgresql-source-connector-setup">Debezium PostgreSQL source connector setup</h2>
 <p>Copy the JSON contents below to a file (you can name it <code>pg-source-config.json</code>). Please ensure that you update the following attributes with the values corresponding to your PostgreSQL instance: <code>database.hostname</code>, <code>database.user</code>, <code>database.password</code>.</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="p">{</span>
-    <span class="nt">&#34;name&#34;</span><span class="p">:</span> <span class="s2">&#34;pg-orders-source&#34;</span><span class="p">,</span>
-    <span class="nt">&#34;config&#34;</span><span class="p">:</span> <span class="p">{</span>
-        <span class="nt">&#34;connector.class&#34;</span><span class="p">:</span> <span class="s2">&#34;io.debezium.connector.postgresql.PostgresConnector&#34;</span><span class="p">,</span>
-        <span class="nt">&#34;database.hostname&#34;</span><span class="p">:</span> <span class="s2">&#34;&lt;enter database name&gt;.postgres.database.azure.com&#34;</span><span class="p">,</span>
-        <span class="nt">&#34;database.port&#34;</span><span class="p">:</span> <span class="s2">&#34;5432&#34;</span><span class="p">,</span>
-        <span class="nt">&#34;database.user&#34;</span><span class="p">:</span> <span class="s2">&#34;&lt;enter admin username&gt;@&lt;enter database name&gt;&#34;</span><span class="p">,</span>
-        <span class="nt">&#34;database.password&#34;</span><span class="p">:</span> <span class="s2">&#34;&lt;enter admin password&gt;&#34;</span><span class="p">,</span>
-        <span class="nt">&#34;database.dbname&#34;</span><span class="p">:</span> <span class="s2">&#34;postgres&#34;</span><span class="p">,</span>
-        <span class="nt">&#34;database.server.name&#34;</span><span class="p">:</span> <span class="s2">&#34;myserver&#34;</span><span class="p">,</span>
-        <span class="nt">&#34;plugin.name&#34;</span><span class="p">:</span> <span class="s2">&#34;wal2json&#34;</span><span class="p">,</span>
-        <span class="nt">&#34;table.whitelist&#34;</span><span class="p">:</span> <span class="s2">&#34;retail.orders_info&#34;</span><span class="p">,</span>
-        <span class="nt">&#34;value.converter&#34;</span><span class="p">:</span> <span class="s2">&#34;org.apache.kafka.connect.json.JsonConverter&#34;</span>
-    <span class="p">}</span>
-<span class="p">}</span>
-</code></pre></div><p>At the time of writing, Debezium supports the following plugins: <code>decoderbufs</code>, <code>wal2json</code>, <code>wal2json_rds</code>, <code>wal2json_streaming</code>, <code>wal2json_rds_streaming</code> and <code>pgoutput</code>. I have used <code>wal2json</code> in this example, and it&rsquo;s <a href="https://docs.microsoft.com/azure/postgresql/concepts-logical?WT.mc_id=devto-blog-abhishgu">supported on Azure as well</a>.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;name&#34;</span><span class="p">:</span> <span class="s2">&#34;pg-orders-source&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;config&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;connector.class&#34;</span><span class="p">:</span> <span class="s2">&#34;io.debezium.connector.postgresql.PostgresConnector&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;database.hostname&#34;</span><span class="p">:</span> <span class="s2">&#34;&lt;enter database name&gt;.postgres.database.azure.com&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;database.port&#34;</span><span class="p">:</span> <span class="s2">&#34;5432&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;database.user&#34;</span><span class="p">:</span> <span class="s2">&#34;&lt;enter admin username&gt;@&lt;enter database name&gt;&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;database.password&#34;</span><span class="p">:</span> <span class="s2">&#34;&lt;enter admin password&gt;&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;database.dbname&#34;</span><span class="p">:</span> <span class="s2">&#34;postgres&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;database.server.name&#34;</span><span class="p">:</span> <span class="s2">&#34;myserver&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;plugin.name&#34;</span><span class="p">:</span> <span class="s2">&#34;wal2json&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;table.whitelist&#34;</span><span class="p">:</span> <span class="s2">&#34;retail.orders_info&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;value.converter&#34;</span><span class="p">:</span> <span class="s2">&#34;org.apache.kafka.connect.json.JsonConverter&#34;</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>At the time of writing, Debezium supports the following plugins: <code>decoderbufs</code>, <code>wal2json</code>, <code>wal2json_rds</code>, <code>wal2json_streaming</code>, <code>wal2json_rds_streaming</code> and <code>pgoutput</code>. I have used <code>wal2json</code> in this example, and it&rsquo;s <a href="https://docs.microsoft.com/azure/postgresql/concepts-logical?WT.mc_id=devto-blog-abhishgu">supported on Azure as well</a>.</p>
 <p>To start the connector, simply use the Kafka Connect REST endpoint to submit the configuration.</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-shell" data-lang="shell">curl -X POST -H <span class="s2">&#34;Content-Type: application/json&#34;</span> --data @pg-source-config.json http://localhost:9090/connectors
-
-<span class="c1"># to confirm</span>
-curl http://localhost:9090/connectors/pg-orders-source
-</code></pre></div><blockquote>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-shell" data-lang="shell"><span class="line"><span class="cl">curl -X POST -H <span class="s2">&#34;Content-Type: application/json&#34;</span> --data @pg-source-config.json http://localhost:9090/connectors
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># to confirm</span>
+</span></span><span class="line"><span class="cl">curl http://localhost:9090/connectors/pg-orders-source
+</span></span></code></pre></div><blockquote>
 <p>Notice that port for the REST endpoint is <code>9090</code> - this is per service port mapping defined in <code>docker-compose.yaml</code></p>
 </blockquote>
 <p>Let&rsquo;s peek into the Kafka topic and take a look at the change data capture events produced by the source connector.</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-shell" data-lang="shell">docker <span class="nb">exec</span> -it adx-kafka-cdc_kafka_1 bash
-</code></pre></div><p>You will be dropped into a shell (inside the container). Execute the below command to consume the change data events from Kafka:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">cd bin &amp;&amp; ./kafka-console-consumer.sh --topic myserver.retail.orders_info --bootstrap-server kafka:9092 --from-beginning
-</code></pre></div><blockquote>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-shell" data-lang="shell"><span class="line"><span class="cl">docker <span class="nb">exec</span> -it adx-kafka-cdc_kafka_1 bash
+</span></span></code></pre></div><p>You will be dropped into a shell (inside the container). Execute the below command to consume the change data events from Kafka:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">cd bin &amp;&amp; ./kafka-console-consumer.sh --topic myserver.retail.orders_info --bootstrap-server kafka:9092 --from-beginning
+</span></span></code></pre></div><blockquote>
 <p>Note that the topic name <code>myserver.retail.orders_info</code> is as a result of the convention used by the Debezium connector</p>
 </blockquote>
 <p>Each event in topic is corresponding to a specific order. It is in a JSON format that looks like what&rsquo;s depicted below. Please note that the payload also contains the entire <code>schema</code> which has been removed for brevity.</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="p">{</span>
-    <span class="nt">&#34;schema&#34;</span><span class="p">:</span> <span class="p">{</span><span class="err">....</span><span class="p">},</span>
-    <span class="nt">&#34;payload&#34;</span><span class="p">:</span> <span class="p">{</span>
-        <span class="nt">&#34;before&#34;</span><span class="p">:</span> <span class="kc">null</span><span class="p">,</span>
-        <span class="nt">&#34;after&#34;</span><span class="p">:</span> <span class="p">{</span>
-            <span class="nt">&#34;orderid&#34;</span><span class="p">:</span> <span class="mi">51</span><span class="p">,</span>
-            <span class="nt">&#34;custid&#34;</span><span class="p">:</span> <span class="mi">306</span><span class="p">,</span>
-            <span class="nt">&#34;amount&#34;</span><span class="p">:</span> <span class="mi">183</span><span class="p">,</span>
-            <span class="nt">&#34;city&#34;</span><span class="p">:</span> <span class="s2">&#34;Austin&#34;</span><span class="p">,</span>
-            <span class="nt">&#34;purchase_time&#34;</span><span class="p">:</span><span class="s2">&#34;2020-10-09 07:23:10&#34;</span>
-        <span class="p">},</span>
-        <span class="nt">&#34;source&#34;</span><span class="p">:</span> <span class="p">{</span>
-            <span class="nt">&#34;version&#34;</span><span class="p">:</span> <span class="s2">&#34;1.2.1.Final&#34;</span><span class="p">,</span>
-            <span class="nt">&#34;connector&#34;</span><span class="p">:</span> <span class="s2">&#34;postgresql&#34;</span><span class="p">,</span>
-            <span class="nt">&#34;name&#34;</span><span class="p">:</span> <span class="s2">&#34;myserver&#34;</span><span class="p">,</span>
-            <span class="nt">&#34;ts_ms&#34;</span><span class="p">:</span> <span class="mi">1602057392691</span><span class="p">,</span>
-            <span class="nt">&#34;snapshot&#34;</span><span class="p">:</span> <span class="s2">&#34;false&#34;</span><span class="p">,</span>
-            <span class="nt">&#34;db&#34;</span><span class="p">:</span> <span class="s2">&#34;postgres&#34;</span><span class="p">,</span>
-            <span class="nt">&#34;schema&#34;</span><span class="p">:</span> <span class="s2">&#34;retail&#34;</span><span class="p">,</span>
-            <span class="nt">&#34;table&#34;</span><span class="p">:</span> <span class="s2">&#34;orders_info&#34;</span><span class="p">,</span>
-            <span class="nt">&#34;txId&#34;</span><span class="p">:</span> <span class="mi">653</span><span class="p">,</span>
-            <span class="nt">&#34;lsn&#34;</span><span class="p">:</span> <span class="mi">34220200</span><span class="p">,</span>
-            <span class="nt">&#34;xmin&#34;</span><span class="p">:</span> <span class="kc">null</span>
-        <span class="p">},</span>
-        <span class="nt">&#34;op&#34;</span><span class="p">:</span> <span class="s2">&#34;c&#34;</span><span class="p">,</span>
-        <span class="nt">&#34;ts_ms&#34;</span><span class="p">:</span> <span class="mi">1602057392818</span><span class="p">,</span>
-        <span class="nt">&#34;transaction&#34;</span><span class="p">:</span> <span class="kc">null</span>
-    <span class="p">}</span>
-<span class="p">}</span>
-</code></pre></div><p>So far, we have the first half of our pipeline. Let&rsquo;s work on the second part!</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;schema&#34;</span><span class="p">:</span> <span class="p">{</span><span class="err">....</span><span class="p">},</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;payload&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;before&#34;</span><span class="p">:</span> <span class="kc">null</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;after&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">            <span class="nt">&#34;orderid&#34;</span><span class="p">:</span> <span class="mi">51</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">            <span class="nt">&#34;custid&#34;</span><span class="p">:</span> <span class="mi">306</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">            <span class="nt">&#34;amount&#34;</span><span class="p">:</span> <span class="mi">183</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">            <span class="nt">&#34;city&#34;</span><span class="p">:</span> <span class="s2">&#34;Austin&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">            <span class="nt">&#34;purchase_time&#34;</span><span class="p">:</span><span class="s2">&#34;2020-10-09 07:23:10&#34;</span>
+</span></span><span class="line"><span class="cl">        <span class="p">},</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;source&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">            <span class="nt">&#34;version&#34;</span><span class="p">:</span> <span class="s2">&#34;1.2.1.Final&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">            <span class="nt">&#34;connector&#34;</span><span class="p">:</span> <span class="s2">&#34;postgresql&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">            <span class="nt">&#34;name&#34;</span><span class="p">:</span> <span class="s2">&#34;myserver&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">            <span class="nt">&#34;ts_ms&#34;</span><span class="p">:</span> <span class="mi">1602057392691</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">            <span class="nt">&#34;snapshot&#34;</span><span class="p">:</span> <span class="s2">&#34;false&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">            <span class="nt">&#34;db&#34;</span><span class="p">:</span> <span class="s2">&#34;postgres&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">            <span class="nt">&#34;schema&#34;</span><span class="p">:</span> <span class="s2">&#34;retail&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">            <span class="nt">&#34;table&#34;</span><span class="p">:</span> <span class="s2">&#34;orders_info&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">            <span class="nt">&#34;txId&#34;</span><span class="p">:</span> <span class="mi">653</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">            <span class="nt">&#34;lsn&#34;</span><span class="p">:</span> <span class="mi">34220200</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">            <span class="nt">&#34;xmin&#34;</span><span class="p">:</span> <span class="kc">null</span>
+</span></span><span class="line"><span class="cl">        <span class="p">},</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;op&#34;</span><span class="p">:</span> <span class="s2">&#34;c&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;ts_ms&#34;</span><span class="p">:</span> <span class="mi">1602057392818</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;transaction&#34;</span><span class="p">:</span> <span class="kc">null</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>So far, we have the first half of our pipeline. Let&rsquo;s work on the second part!</p>
 <h2 id="azure-data-explorer-sink-connector-setup">Azure Data Explorer sink connector setup</h2>
 <p>Copy the JSON contents below to a file (you can name it <code>adx-sink-config.json</code>). Replace the values for the following attributes as per your Azure Data Explorer setup - <code>aad.auth.authority</code>, <code>aad.auth.appid</code>, <code>aad.auth.appkey</code>, <code>kusto.tables.topics.mapping</code> (the database name) and <code>kusto.url</code></p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="p">{</span>
-    <span class="nt">&#34;name&#34;</span><span class="p">:</span> <span class="s2">&#34;adx-orders-sink&#34;</span><span class="p">,</span>
-    <span class="nt">&#34;config&#34;</span><span class="p">:</span> <span class="p">{</span>
-        <span class="nt">&#34;connector.class&#34;</span><span class="p">:</span> <span class="s2">&#34;com.microsoft.azure.kusto.kafka.connect.sink.KustoSinkConnector&#34;</span><span class="p">,</span>
-        <span class="nt">&#34;flush.size.bytes&#34;</span><span class="p">:</span> <span class="mi">10000</span><span class="p">,</span>
-        <span class="nt">&#34;flush.interval.ms&#34;</span><span class="p">:</span> <span class="mi">30000</span><span class="p">,</span>
-        <span class="nt">&#34;tasks.max&#34;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
-        <span class="nt">&#34;topics&#34;</span><span class="p">:</span> <span class="s2">&#34;myserver.retail.orders_info&#34;</span><span class="p">,</span>
-        <span class="nt">&#34;kusto.tables.topics.mapping&#34;</span><span class="p">:</span> <span class="s2">&#34;[{&#39;topic&#39;: &#39;myserver.retail.orders_info&#39;,&#39;db&#39;: &#39;&lt;enter database name&gt;&#39;, &#39;table&#39;: &#39;Orders&#39;,&#39;format&#39;: &#39;json&#39;, &#39;mapping&#39;:&#39;OrdersEventMapping&#39;}]&#34;</span><span class="p">,</span>
-        <span class="nt">&#34;aad.auth.authority&#34;</span><span class="p">:</span> <span class="s2">&#34;&lt;enter tenant ID from service principal info&gt;&#34;</span><span class="p">,</span>
-        <span class="nt">&#34;kusto.url&#34;</span><span class="p">:</span> <span class="s2">&#34;https://ingest-&lt;enter cluster name&gt;.&lt;enter region&gt;.kusto.windows.net&#34;</span><span class="p">,</span>
-        <span class="nt">&#34;aad.auth.appid&#34;</span><span class="p">:</span> <span class="s2">&#34;&lt;enter app ID from service principal info&gt;&#34;</span><span class="p">,</span>
-        <span class="nt">&#34;aad.auth.appkey&#34;</span><span class="p">:</span> <span class="s2">&#34;&lt;enter password from service principal info&gt;&#34;</span><span class="p">,</span>
-        <span class="nt">&#34;key.converter&#34;</span><span class="p">:</span> <span class="s2">&#34;org.apache.kafka.connect.storage.StringConverter&#34;</span><span class="p">,</span>
-        <span class="nt">&#34;transforms&#34;</span><span class="p">:</span> <span class="s2">&#34;unwrap&#34;</span><span class="p">,</span>
-        <span class="nt">&#34;transforms.unwrap.type&#34;</span><span class="p">:</span> <span class="s2">&#34;io.debezium.transforms.ExtractNewRecordState&#34;</span>
-    <span class="p">}</span>
-<span class="p">}</span>
-</code></pre></div><p>Notice that Kafka Connect <a href="https://kafka.apache.org/documentation/#connect_transforms">Single Message Transformation</a> (SMT) have been used here - this is the <code>ExtractNewRecordState</code> transformation that Debezium provides. You can read up on it <a href="https://debezium.io/documentation/reference/1.2/configuration/event-flattening.html">in the documentation</a></p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="s2">&#34;transforms&#34;</span><span class="err">:</span> <span class="s2">&#34;unwrap&#34;</span><span class="err">,</span>
-<span class="s2">&#34;transforms.unwrap.type&#34;</span><span class="err">:</span> <span class="s2">&#34;io.debezium.transforms.ExtractNewRecordState&#34;</span>
-</code></pre></div><p>It removes the <code>schema</code> and other parts from the JSON payload and keeps it down to only what&rsquo;s required. In this case, all we are looking for the order info from the <code>after</code> attribute (in the payload). For e.g.</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="p">{</span>
-    <span class="nt">&#34;orderid&#34;</span><span class="p">:</span> <span class="mi">51</span><span class="p">,</span>
-    <span class="nt">&#34;custid&#34;</span><span class="p">:</span> <span class="mi">306</span><span class="p">,</span>
-    <span class="nt">&#34;amount&#34;</span><span class="p">:</span> <span class="mi">183</span><span class="p">,</span>
-    <span class="nt">&#34;city&#34;</span><span class="p">:</span> <span class="s2">&#34;Austin&#34;</span><span class="p">,</span>
-    <span class="nt">&#34;purchase_time&#34;</span><span class="p">:</span><span class="s2">&#34;2020-10-09 07:23:10&#34;</span>
-<span class="p">}</span>
-</code></pre></div><p>You could model this differently of course (apply transformation in the source connector itself), but there are a couple of benefits to this approach:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;name&#34;</span><span class="p">:</span> <span class="s2">&#34;adx-orders-sink&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;config&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;connector.class&#34;</span><span class="p">:</span> <span class="s2">&#34;com.microsoft.azure.kusto.kafka.connect.sink.KustoSinkConnector&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;flush.size.bytes&#34;</span><span class="p">:</span> <span class="mi">10000</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;flush.interval.ms&#34;</span><span class="p">:</span> <span class="mi">30000</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;tasks.max&#34;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;topics&#34;</span><span class="p">:</span> <span class="s2">&#34;myserver.retail.orders_info&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;kusto.tables.topics.mapping&#34;</span><span class="p">:</span> <span class="s2">&#34;[{&#39;topic&#39;: &#39;myserver.retail.orders_info&#39;,&#39;db&#39;: &#39;&lt;enter database name&gt;&#39;, &#39;table&#39;: &#39;Orders&#39;,&#39;format&#39;: &#39;json&#39;, &#39;mapping&#39;:&#39;OrdersEventMapping&#39;}]&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;aad.auth.authority&#34;</span><span class="p">:</span> <span class="s2">&#34;&lt;enter tenant ID from service principal info&gt;&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;kusto.url&#34;</span><span class="p">:</span> <span class="s2">&#34;https://ingest-&lt;enter cluster name&gt;.&lt;enter region&gt;.kusto.windows.net&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;aad.auth.appid&#34;</span><span class="p">:</span> <span class="s2">&#34;&lt;enter app ID from service principal info&gt;&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;aad.auth.appkey&#34;</span><span class="p">:</span> <span class="s2">&#34;&lt;enter password from service principal info&gt;&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;key.converter&#34;</span><span class="p">:</span> <span class="s2">&#34;org.apache.kafka.connect.storage.StringConverter&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;transforms&#34;</span><span class="p">:</span> <span class="s2">&#34;unwrap&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;transforms.unwrap.type&#34;</span><span class="p">:</span> <span class="s2">&#34;io.debezium.transforms.ExtractNewRecordState&#34;</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>Notice that Kafka Connect <a href="https://kafka.apache.org/documentation/#connect_transforms">Single Message Transformation</a> (SMT) have been used here - this is the <code>ExtractNewRecordState</code> transformation that Debezium provides. You can read up on it <a href="https://debezium.io/documentation/reference/1.2/configuration/event-flattening.html">in the documentation</a></p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="line"><span class="cl"><span class="s2">&#34;transforms&#34;</span><span class="err">:</span> <span class="s2">&#34;unwrap&#34;</span><span class="err">,</span>
+</span></span><span class="line"><span class="cl"><span class="s2">&#34;transforms.unwrap.type&#34;</span><span class="err">:</span> <span class="s2">&#34;io.debezium.transforms.ExtractNewRecordState&#34;</span>
+</span></span></code></pre></div><p>It removes the <code>schema</code> and other parts from the JSON payload and keeps it down to only what&rsquo;s required. In this case, all we are looking for the order info from the <code>after</code> attribute (in the payload). For e.g.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;orderid&#34;</span><span class="p">:</span> <span class="mi">51</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;custid&#34;</span><span class="p">:</span> <span class="mi">306</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;amount&#34;</span><span class="p">:</span> <span class="mi">183</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;city&#34;</span><span class="p">:</span> <span class="s2">&#34;Austin&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;purchase_time&#34;</span><span class="p">:</span><span class="s2">&#34;2020-10-09 07:23:10&#34;</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>You could model this differently of course (apply transformation in the source connector itself), but there are a couple of benefits to this approach:</p>
 <ol>
 <li>Only the relevant data sent to Azure Data Explorer</li>
 <li>The Kafka topic contains the <em>entire</em> change data event (along with the schema) which can be leveraged by any downstream service</li>
 </ol>
 <p>To install the connector, just use the Kafka Connect REST endpoint like before:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-shell" data-lang="shell">curl -X POST -H <span class="s2">&#34;Content-Type: application/json&#34;</span> --data @adx-sink-config.json http://localhost:8080/connectors
-
-<span class="c1"># check status</span>
-curl http://localhost:8080/connectors/adx-orders-sink/status
-</code></pre></div><blockquote>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-shell" data-lang="shell"><span class="line"><span class="cl">curl -X POST -H <span class="s2">&#34;Content-Type: application/json&#34;</span> --data @adx-sink-config.json http://localhost:8080/connectors
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># check status</span>
+</span></span><span class="line"><span class="cl">curl http://localhost:8080/connectors/adx-orders-sink/status
+</span></span></code></pre></div><blockquote>
 <p>Notice that port for the REST endpoint is <code>8080</code> - this is per service port mapping defined in <code>docker-compose.yaml</code></p>
 </blockquote>
 <p>The connector should spin into action, authenticate to Azure Data Explorer and start batching ingestion processes.</p>
@@ -606,46 +606,46 @@ curl http://localhost:8080/connectors/adx-orders-sink/status
 <h2 id="query-data-explorer">Query Data Explorer</h2>
 <p>You can query the Orders table in Data Explorer to slice and dice the data. Here are a few simple queries to start with.</p>
 <p>Get details for orders from New York city;</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">Orders
-| where city == &#39;New York&#39;
-</code></pre></div><p><img src="https://dev-to-uploads.s3.amazonaws.com/i/bbeogxflc7l139h264kz.png" alt=""></p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">Orders
+</span></span><span class="line"><span class="cl">| where city == &#39;New York&#39;
+</span></span></code></pre></div><p><img src="https://dev-to-uploads.s3.amazonaws.com/i/bbeogxflc7l139h264kz.png" alt=""></p>
 <p>Get only the purchase amount and time for orders from New York city sorted by amount</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">Orders
-| where city == &#39;New York&#39;
-| project amount, purchase_time
-| sort by amount
-</code></pre></div><p><img src="https://dev-to-uploads.s3.amazonaws.com/i/1tdj9trofkq5gf4qpgee.png" alt=""></p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">Orders
+</span></span><span class="line"><span class="cl">| where city == &#39;New York&#39;
+</span></span><span class="line"><span class="cl">| project amount, purchase_time
+</span></span><span class="line"><span class="cl">| sort by amount
+</span></span></code></pre></div><p><img src="https://dev-to-uploads.s3.amazonaws.com/i/1tdj9trofkq5gf4qpgee.png" alt=""></p>
 <p>Find out the average sales per city and represent that as a column chart:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">Orders
-| summarize avg_sales = avg(amount) by city 
-| render columnchart
-</code></pre></div><p><img src="https://dev-to-uploads.s3.amazonaws.com/i/g7ktf2qc06xj043vpvt0.png" alt=""></p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">Orders
+</span></span><span class="line"><span class="cl">| summarize avg_sales = avg(amount) by city 
+</span></span><span class="line"><span class="cl">| render columnchart
+</span></span></code></pre></div><p><img src="https://dev-to-uploads.s3.amazonaws.com/i/g7ktf2qc06xj043vpvt0.png" alt=""></p>
 <p>The total purchase amount per city, represented as a pie chart:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">Orders 
-| summarize total = sum(amount) by city 
-| sort by total
-| render piechart 
-</code></pre></div><p><img src="https://dev-to-uploads.s3.amazonaws.com/i/pnwqqoaj7gaucw430bjb.png" alt=""></p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">Orders 
+</span></span><span class="line"><span class="cl">| summarize total = sum(amount) by city 
+</span></span><span class="line"><span class="cl">| sort by total
+</span></span><span class="line"><span class="cl">| render piechart 
+</span></span></code></pre></div><p><img src="https://dev-to-uploads.s3.amazonaws.com/i/pnwqqoaj7gaucw430bjb.png" alt=""></p>
 <p>Number of orders per city, represented as a line chart:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">Orders
-| summarize orders = count() by city
-| sort by orders
-| render linechart   
-</code></pre></div><p><img src="https://dev-to-uploads.s3.amazonaws.com/i/26w5grliaubh5zopjlfx.png" alt=""></p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">Orders
+</span></span><span class="line"><span class="cl">| summarize orders = count() by city
+</span></span><span class="line"><span class="cl">| sort by orders
+</span></span><span class="line"><span class="cl">| render linechart   
+</span></span></code></pre></div><p><img src="https://dev-to-uploads.s3.amazonaws.com/i/26w5grliaubh5zopjlfx.png" alt=""></p>
 <p>How do purchases vary over a day?</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">Orders
-| extend hour = floor(purchase_time % 1d , 10m)
-| summarize event_count=count() by hour
-| sort by hour asc
-| render timechart
-</code></pre></div><p><img src="https://dev-to-uploads.s3.amazonaws.com/i/dsiuyo44alyla8f58bw9.png" alt=""></p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">Orders
+</span></span><span class="line"><span class="cl">| extend hour = floor(purchase_time % 1d , 10m)
+</span></span><span class="line"><span class="cl">| summarize event_count=count() by hour
+</span></span><span class="line"><span class="cl">| sort by hour asc
+</span></span><span class="line"><span class="cl">| render timechart
+</span></span></code></pre></div><p><img src="https://dev-to-uploads.s3.amazonaws.com/i/dsiuyo44alyla8f58bw9.png" alt=""></p>
 <p>How does it vary over a day across different cities?</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">Orders
-| extend hour= floor( purchase_time % 1d , 10m)
-| where city in (&#34;New Delhi&#34;, &#34;Seattle&#34;, &#34;New York&#34;, &#34;Austin&#34;, &#34;Chicago&#34;, &#34;Cleveland&#34;)
-| summarize event_count=count() by hour, city
-| render columnchart
-</code></pre></div><p><img src="https://dev-to-uploads.s3.amazonaws.com/i/eg3rrbot4n6kguwpwssx.png" alt=""></p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">Orders
+</span></span><span class="line"><span class="cl">| extend hour= floor( purchase_time % 1d , 10m)
+</span></span><span class="line"><span class="cl">| where city in (&#34;New Delhi&#34;, &#34;Seattle&#34;, &#34;New York&#34;, &#34;Austin&#34;, &#34;Chicago&#34;, &#34;Cleveland&#34;)
+</span></span><span class="line"><span class="cl">| summarize event_count=count() by hour, city
+</span></span><span class="line"><span class="cl">| render columnchart
+</span></span></code></pre></div><p><img src="https://dev-to-uploads.s3.amazonaws.com/i/eg3rrbot4n6kguwpwssx.png" alt=""></p>
 <h3 id="azure-data-explorer-dashboards">Azure Data Explorer Dashboards</h3>
 <ul>
 <li>Learn how to <a href="https://docs.microsoft.com/en-us/azure/data-explorer/azure-data-explorer-dashboards">visualize data with Azure Data Explorer dashboards</a></li>
@@ -653,12 +653,12 @@ curl http://localhost:8080/connectors/adx-orders-sink/status
 <p><img src="https://dev-to-uploads.s3.amazonaws.com/i/q8xymgrw1wx76wzgptt3.png" alt=""></p>
 <h2 id="clean-up">Clean up</h2>
 <p>To stop the containers, you can:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-shell" data-lang="shell">docker-compose -p adx-kafka-cdc down -v
-</code></pre></div><p>To delete the Azure Data Explorer cluster/database, use <a href="https://docs.microsoft.com/cli/azure/kusto/cluster?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az-kusto-cluster-delete">az cluster delete</a> or <a href="https://docs.microsoft.com/cli/azure/kusto/database?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az-kusto-database-delete">az kusto database delete</a>. For PostgreSQL, simply use <a href="https://docs.microsoft.com/cli/azure/postgres/server?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az_postgres_server_delete">az postgres server delete</a></p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">az postgres server delete -g &lt;resource group name&gt; -n &lt;server name&gt;
-az kusto cluster delete -n &lt;cluster name&gt; -g &lt;resource group name&gt;
-az kusto database delete -n &lt;database name&gt; --cluster-name &lt;cluster name&gt; -g &lt;resource group name&gt;
-</code></pre></div><h2 id="conclusion">Conclusion</h2>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-shell" data-lang="shell"><span class="line"><span class="cl">docker-compose -p adx-kafka-cdc down -v
+</span></span></code></pre></div><p>To delete the Azure Data Explorer cluster/database, use <a href="https://docs.microsoft.com/cli/azure/kusto/cluster?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az-kusto-cluster-delete">az cluster delete</a> or <a href="https://docs.microsoft.com/cli/azure/kusto/database?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az-kusto-database-delete">az kusto database delete</a>. For PostgreSQL, simply use <a href="https://docs.microsoft.com/cli/azure/postgres/server?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az_postgres_server_delete">az postgres server delete</a></p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">az postgres server delete -g &lt;resource group name&gt; -n &lt;server name&gt;
+</span></span><span class="line"><span class="cl">az kusto cluster delete -n &lt;cluster name&gt; -g &lt;resource group name&gt;
+</span></span><span class="line"><span class="cl">az kusto database delete -n &lt;database name&gt; --cluster-name &lt;cluster name&gt; -g &lt;resource group name&gt;
+</span></span></code></pre></div><h2 id="conclusion">Conclusion</h2>
 <p>Kafka Connect helps you build scalable data pipelines without having to write custom plumbing code. You mostly need to setup, configure and of course operator the connectors. Remember that Kafka Connect worker instances are just JVM processes and depending on your scale and requirements you can use choose to operate them using <a href="https://docs.microsoft.com/azure/aks/?WT.mc_id=devto-blog-abhishgu">Azure Kubernetes Service</a>. Since Kafka Connect instances are stateless entities, you&rsquo;ve a lot of freedom in terms of the topology and sizing of your cluster workloads!</p>
 <h2 id="additional-resources">Additional resources</h2>
 <p>If you want to explore further, I would recommend</p>
@@ -762,7 +762,7 @@ az kusto database delete -n &lt;database name&gt; --cluster-name &lt;cluster nam
         </p>
         
         <p class="credits theme-by text-muted">
-          <a href="https://gohugo.io">Hugo v0.89.2</a> powered &nbsp;&bull;&nbsp; Theme <a href="https://github.com/halogenica/beautifulhugo">Beautiful Hugo</a> adapted from <a href="https://deanattali.com/beautiful-jekyll/">Beautiful Jekyll</a>
+          <a href="https://gohugo.io">Hugo v0.94.2</a> powered &nbsp;&bull;&nbsp; Theme <a href="https://github.com/halogenica/beautifulhugo">Beautiful Hugo</a> adapted from <a href="https://deanattali.com/beautiful-jekyll/">Beautiful Jekyll</a>
           
         </p>
       </div>

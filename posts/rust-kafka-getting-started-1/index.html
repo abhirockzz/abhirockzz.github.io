@@ -92,7 +92,7 @@
   <meta name="twitter:site" content="@abhi_tweeter" />
   <meta name="twitter:creator" content="@abhi_tweeter" />
   <link href='https://abhirockzz.github.io/icons/myicon.png' rel='icon' type='image/x-icon'/>
-  <meta name="generator" content="Hugo 0.89.2" />
+  <meta name="generator" content="Hugo 0.94.2" />
   <link rel="alternate" href="https://abhirockzz.github.io/index.xml" type="application/rss+xml" title="Abhishek&#39;s blog"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css" integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
   <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.5.0/css/all.css" integrity="sha384-B4dIYHKNBt8Bc12p+WXckhzcICo0wtJAoU8YZTY5qE0Id1GSseTk6S+L3BlXeVIU" crossorigin="anonymous">
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous"><link rel="stylesheet" href="https://abhirockzz.github.io/css/main.css" /><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic" />
@@ -281,14 +281,14 @@ if (!doNotTrack) {
 <h2 id="initial-setup">Initial setup</h2>
 <p>Make sure you <a href="https://kafka.apache.org/downloads">install a Kafka broker</a> - a local setup should suffice. Of course you will need to have <a href="https://www.rust-lang.org/tools/install">Rust installed</a> as well - you will need <a href="https://github.com/fede1024/rust-rdkafka#minimum-supported-rust-version-msrv">version 1.45 or above</a></p>
 <p>Before you begin, clone the GitHub repo:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">git clone https://github.com/abhirockzz/rust-kafka-101
-<span class="nb">cd</span> part1
-</code></pre></div><p>Check the <code>Cargo.toml</code> file:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-toml" data-lang="toml"><span class="p">...</span>
-<span class="p">[</span><span class="nx">dependencies</span><span class="p">]</span>
-<span class="nx">rdkafka</span> <span class="p">=</span> <span class="p">{</span> <span class="nx">version</span> <span class="p">=</span> <span class="s2">&#34;0.25&#34;</span><span class="p">,</span> <span class="nx">features</span> <span class="p">=</span> <span class="p">[</span><span class="s2">&#34;cmake-build&#34;</span><span class="p">,</span><span class="s2">&#34;ssl&#34;</span><span class="p">]</span> <span class="p">}</span>
-<span class="p">...</span>
-</code></pre></div><p><strong>Note on the <code>cmake-build</code> feature</strong></p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">git clone https://github.com/abhirockzz/rust-kafka-101
+</span></span><span class="line"><span class="cl"><span class="nb">cd</span> part1
+</span></span></code></pre></div><p>Check the <code>Cargo.toml</code> file:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-toml" data-lang="toml"><span class="line"><span class="cl"><span class="p">...</span>
+</span></span><span class="line"><span class="cl"><span class="p">[</span><span class="nx">dependencies</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl"><span class="nx">rdkafka</span> <span class="p">=</span> <span class="p">{</span> <span class="nx">version</span> <span class="p">=</span> <span class="s2">&#34;0.25&#34;</span><span class="p">,</span> <span class="nx">features</span> <span class="p">=</span> <span class="p">[</span><span class="s2">&#34;cmake-build&#34;</span><span class="p">,</span><span class="s2">&#34;ssl&#34;</span><span class="p">]</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">...</span>
+</span></span></code></pre></div><p><strong>Note on the <code>cmake-build</code> feature</strong></p>
 <p><code>rust-rdkafka</code> provides a couple of ways to resolve the <code>librdkafka</code> dependency. I chose <code>static</code> linking, wherein <code>librdkafka</code> was compiled. You could opt for <code>dynamic</code> linking to refer to a locally installed version though.</p>
 <blockquote>
 <p>For more, please <a href="https://github.com/fede1024/rust-rdkafka/blob/master/rdkafka-sys/README.md#features">refer to this link</a></p>
@@ -296,27 +296,27 @@ if (!doNotTrack) {
 <p>Ok, let&rsquo;s start off with the basics.</p>
 <h2 id="simple-producer">Simple producer</h2>
 <p>Here is a simple producer based on <a href="https://docs.rs/rdkafka/0.26.0/rdkafka/producer/struct.BaseProducer.html">BaseProducer</a>:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-rust" data-lang="rust"><span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">producer</span>: <span class="nc">BaseProducer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ClientConfig</span>::<span class="n">new</span><span class="p">()</span><span class="w">
-</span><span class="w">        </span><span class="p">.</span><span class="n">set</span><span class="p">(</span><span class="s">&#34;bootstrap.servers&#34;</span><span class="p">,</span><span class="w"> </span><span class="s">&#34;localhost:9092&#34;</span><span class="p">)</span><span class="w">
-</span><span class="w">        </span><span class="p">.</span><span class="n">set</span><span class="p">(</span><span class="s">&#34;security.protocol&#34;</span><span class="p">,</span><span class="w"> </span><span class="s">&#34;SASL_SSL&#34;</span><span class="p">)</span><span class="w">
-</span><span class="w">        </span><span class="p">.</span><span class="n">set</span><span class="p">(</span><span class="s">&#34;sasl.mechanisms&#34;</span><span class="p">,</span><span class="w"> </span><span class="s">&#34;PLAIN&#34;</span><span class="p">)</span><span class="w">
-</span><span class="w">        </span><span class="p">.</span><span class="n">set</span><span class="p">(</span><span class="s">&#34;sasl.username&#34;</span><span class="p">,</span><span class="w"> </span><span class="s">&#34;&lt;update&gt;&#34;</span><span class="p">)</span><span class="w">
-</span><span class="w">        </span><span class="p">.</span><span class="n">set</span><span class="p">(</span><span class="s">&#34;sasl.password&#34;</span><span class="p">,</span><span class="w"> </span><span class="s">&#34;&lt;update&gt;&#34;</span><span class="p">)</span><span class="w">
-</span><span class="w">        </span><span class="p">.</span><span class="n">create</span><span class="p">()</span><span class="w">
-</span><span class="w">        </span><span class="p">.</span><span class="n">expect</span><span class="p">(</span><span class="s">&#34;invalid producer config&#34;</span><span class="p">);</span><span class="w">
-</span></code></pre></div><p>The <code>send</code> method to start producing messages - it&rsquo;s done in tight <code>loop</code> with a <code>thread::sleep</code> in between (<em>not</em> something you would do in production) to make it easier to track/follow the results. The key, value (<code>payload</code>) and the destination Kafka topic is represented in the form of a <a href="https://docs.rs/rdkafka/0.26.0/rdkafka/producer/struct.BaseRecord.html">BaseRecord</a></p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-rust" data-lang="rust"><span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="mi">1</span><span class="o">..</span><span class="mi">100</span><span class="w"> </span><span class="p">{</span><span class="w">
-</span><span class="w">        </span><span class="fm">println!</span><span class="p">(</span><span class="s">&#34;sending message&#34;</span><span class="p">);</span><span class="w">
-</span><span class="w">        </span><span class="n">producer</span><span class="w">
-</span><span class="w">            </span><span class="p">.</span><span class="n">send</span><span class="p">(</span><span class="w">
-</span><span class="w">                </span><span class="n">BaseRecord</span>::<span class="n">to</span><span class="p">(</span><span class="s">&#34;rust&#34;</span><span class="p">)</span><span class="w">
-</span><span class="w">                    </span><span class="p">.</span><span class="n">key</span><span class="p">(</span><span class="o">&amp;</span><span class="fm">format!</span><span class="p">(</span><span class="s">&#34;key-{}&#34;</span><span class="p">,</span><span class="w"> </span><span class="n">i</span><span class="p">))</span><span class="w">
-</span><span class="w">                    </span><span class="p">.</span><span class="n">payload</span><span class="p">(</span><span class="o">&amp;</span><span class="fm">format!</span><span class="p">(</span><span class="s">&#34;value-{}&#34;</span><span class="p">,</span><span class="w"> </span><span class="n">i</span><span class="p">)),</span><span class="w">
-</span><span class="w">            </span><span class="p">)</span><span class="w">
-</span><span class="w">            </span><span class="p">.</span><span class="n">expect</span><span class="p">(</span><span class="s">&#34;failed to send message&#34;</span><span class="p">);</span><span class="w">
-</span><span class="w">        </span><span class="n">thread</span>::<span class="n">sleep</span><span class="p">(</span><span class="n">Duration</span>::<span class="n">from_secs</span><span class="p">(</span><span class="mi">3</span><span class="p">));</span><span class="w">
-</span><span class="w">    </span><span class="p">}</span><span class="w">
-</span></code></pre></div><blockquote>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-rust" data-lang="rust"><span class="line"><span class="cl"><span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">producer</span>: <span class="nc">BaseProducer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ClientConfig</span>::<span class="n">new</span><span class="p">()</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="p">.</span><span class="n">set</span><span class="p">(</span><span class="s">&#34;bootstrap.servers&#34;</span><span class="p">,</span><span class="w"> </span><span class="s">&#34;localhost:9092&#34;</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="p">.</span><span class="n">set</span><span class="p">(</span><span class="s">&#34;security.protocol&#34;</span><span class="p">,</span><span class="w"> </span><span class="s">&#34;SASL_SSL&#34;</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="p">.</span><span class="n">set</span><span class="p">(</span><span class="s">&#34;sasl.mechanisms&#34;</span><span class="p">,</span><span class="w"> </span><span class="s">&#34;PLAIN&#34;</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="p">.</span><span class="n">set</span><span class="p">(</span><span class="s">&#34;sasl.username&#34;</span><span class="p">,</span><span class="w"> </span><span class="s">&#34;&lt;update&gt;&#34;</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="p">.</span><span class="n">set</span><span class="p">(</span><span class="s">&#34;sasl.password&#34;</span><span class="p">,</span><span class="w"> </span><span class="s">&#34;&lt;update&gt;&#34;</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="p">.</span><span class="n">create</span><span class="p">()</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="p">.</span><span class="n">expect</span><span class="p">(</span><span class="s">&#34;invalid producer config&#34;</span><span class="p">);</span><span class="w">
+</span></span></span></code></pre></div><p>The <code>send</code> method to start producing messages - it&rsquo;s done in tight <code>loop</code> with a <code>thread::sleep</code> in between (<em>not</em> something you would do in production) to make it easier to track/follow the results. The key, value (<code>payload</code>) and the destination Kafka topic is represented in the form of a <a href="https://docs.rs/rdkafka/0.26.0/rdkafka/producer/struct.BaseRecord.html">BaseRecord</a></p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-rust" data-lang="rust"><span class="line"><span class="cl"><span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="mi">1</span><span class="o">..</span><span class="mi">100</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="fm">println!</span><span class="p">(</span><span class="s">&#34;sending message&#34;</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="n">producer</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="p">.</span><span class="n">send</span><span class="p">(</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                </span><span class="n">BaseRecord</span>::<span class="n">to</span><span class="p">(</span><span class="s">&#34;rust&#34;</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                    </span><span class="p">.</span><span class="n">key</span><span class="p">(</span><span class="o">&amp;</span><span class="fm">format!</span><span class="p">(</span><span class="s">&#34;key-{}&#34;</span><span class="p">,</span><span class="w"> </span><span class="n">i</span><span class="p">))</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                    </span><span class="p">.</span><span class="n">payload</span><span class="p">(</span><span class="o">&amp;</span><span class="fm">format!</span><span class="p">(</span><span class="s">&#34;value-{}&#34;</span><span class="p">,</span><span class="w"> </span><span class="n">i</span><span class="p">)),</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="p">.</span><span class="n">expect</span><span class="p">(</span><span class="s">&#34;failed to send message&#34;</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="n">thread</span>::<span class="n">sleep</span><span class="p">(</span><span class="n">Duration</span>::<span class="n">from_secs</span><span class="p">(</span><span class="mi">3</span><span class="p">));</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="p">}</span><span class="w">
+</span></span></span></code></pre></div><blockquote>
 <p>You can check the entire code in the file <code>src/1_producer_simple.rs</code></p>
 </blockquote>
 <h3 id="to-test-if-the-producer-is-working-">To test if the producer is working &hellip;</h3>
@@ -326,88 +326,88 @@ if (!doNotTrack) {
 <li>execute <code>cargo run</code></li>
 </ul>
 <p>You should see this output:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">sending message
-sending message
-sending message
-...
-</code></pre></div><p><strong>What&rsquo;s going on?</strong> To figure it out - connect to your Kafka topic (I have used <code>rust</code> as the name of the Kafka topic in the above example) using the Kafka CLI consumer (or any other consumer client e.g. <code>kafkacat</code>). You should see the messages flowing in.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">sending message
+</span></span><span class="line"><span class="cl">sending message
+</span></span><span class="line"><span class="cl">sending message
+</span></span><span class="line"><span class="cl">...
+</span></span></code></pre></div><p><strong>What&rsquo;s going on?</strong> To figure it out - connect to your Kafka topic (I have used <code>rust</code> as the name of the Kafka topic in the above example) using the Kafka CLI consumer (or any other consumer client e.g. <code>kafkacat</code>). You should see the messages flowing in.</p>
 <p>For example:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="p">&amp;</span>KAFKA_HOME/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic rust --from-beginning
-</code></pre></div><h2 id="producer-callback">Producer callback</h2>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="p">&amp;</span>KAFKA_HOME/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic rust --from-beginning
+</span></span></code></pre></div><h2 id="producer-callback">Producer callback</h2>
 <p>We are flying blind right now! Unless we explicitly create a consumer to look at our messages, we have no clue whether they are being sent to Kafka. Let&rsquo;s fix that by implementing a <a href="https://docs.rs/rdkafka/0.26.0/rdkafka/producer/trait.ProducerContext.html">ProducerContext</a> (trait) to hook into the produce event - it&rsquo;s like a callback.</p>
 <p>Start by creating a <code>struct</code> and an empty implementation for the <a href="https://docs.rs/rdkafka/0.26.0/rdkafka/client/trait.ClientContext.html">ClientContext</a> trait (this is mandatory).</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-rust" data-lang="rust"><span class="k">struct</span> <span class="nc">ProducerCallbackLogger</span><span class="p">;</span><span class="w">
-</span><span class="w">
-</span><span class="w"></span><span class="k">impl</span><span class="w"> </span><span class="n">ClientContext</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">ProducerCallbackLogger</span><span class="w"> </span><span class="p">{}</span><span class="w">
-</span></code></pre></div><p>Now comes the main part where we implement the <code>delivery</code> function in the <code>ProducerContext</code> trait.</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-rust" data-lang="rust"><span class="k">impl</span><span class="w"> </span><span class="n">ProducerContext</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">ProduceCallbackLogger</span><span class="w"> </span><span class="p">{</span><span class="w">
-</span><span class="w">    </span><span class="k">type</span> <span class="nc">DeliveryOpaque</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">();</span><span class="w">
-</span><span class="w">
-</span><span class="w">    </span><span class="k">fn</span> <span class="nf">delivery</span><span class="p">(</span><span class="w">
-</span><span class="w">        </span><span class="o">&amp;</span><span class="bp">self</span><span class="p">,</span><span class="w">
-</span><span class="w">        </span><span class="n">delivery_result</span>: <span class="kp">&amp;</span><span class="nc">rdkafka</span>::<span class="n">producer</span>::<span class="n">DeliveryResult</span><span class="o">&lt;&#39;</span><span class="nb">_</span><span class="o">&gt;</span><span class="p">,</span><span class="w">
-</span><span class="w">        </span><span class="n">_delivery_opaque</span>: <span class="nc">Self</span>::<span class="n">DeliveryOpaque</span><span class="p">,</span><span class="w">
-</span><span class="w">    </span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
-</span><span class="w">        </span><span class="kd">let</span><span class="w"> </span><span class="n">dr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">delivery_result</span><span class="p">.</span><span class="n">as_ref</span><span class="p">();</span><span class="w">
-</span><span class="w">        </span><span class="k">match</span><span class="w"> </span><span class="n">dr</span><span class="w"> </span><span class="p">{</span><span class="w">
-</span><span class="w">            </span><span class="nb">Ok</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">{</span><span class="w">
-</span><span class="w">                </span><span class="kd">let</span><span class="w"> </span><span class="n">key</span>: <span class="kp">&amp;</span><span class="kt">str</span> <span class="o">=</span><span class="w"> </span><span class="n">msg</span><span class="p">.</span><span class="n">key_view</span><span class="p">().</span><span class="n">unwrap</span><span class="p">().</span><span class="n">unwrap</span><span class="p">();</span><span class="w">
-</span><span class="w">                </span><span class="fm">println!</span><span class="p">(</span><span class="w">
-</span><span class="w">                    </span><span class="s">&#34;produced message with key {} in offset {} of partition {}&#34;</span><span class="p">,</span><span class="w">
-</span><span class="w">                    </span><span class="n">key</span><span class="p">,</span><span class="w">
-</span><span class="w">                    </span><span class="n">msg</span><span class="p">.</span><span class="n">offset</span><span class="p">(),</span><span class="w">
-</span><span class="w">                    </span><span class="n">msg</span><span class="p">.</span><span class="n">partition</span><span class="p">()</span><span class="w">
-</span><span class="w">                </span><span class="p">)</span><span class="w">
-</span><span class="w">            </span><span class="p">}</span><span class="w">
-</span><span class="w">            </span><span class="nb">Err</span><span class="p">(</span><span class="n">producer_err</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">{</span><span class="w">
-</span><span class="w">                </span><span class="kd">let</span><span class="w"> </span><span class="n">key</span>: <span class="kp">&amp;</span><span class="kt">str</span> <span class="o">=</span><span class="w"> </span><span class="n">producer_err</span><span class="p">.</span><span class="mf">1.</span><span class="n">key_view</span><span class="p">().</span><span class="n">unwrap</span><span class="p">().</span><span class="n">unwrap</span><span class="p">();</span><span class="w">
-</span><span class="w">
-</span><span class="w">                </span><span class="fm">println!</span><span class="p">(</span><span class="w">
-</span><span class="w">                    </span><span class="s">&#34;failed to produce message with key {} - {}&#34;</span><span class="p">,</span><span class="w">
-</span><span class="w">                    </span><span class="n">key</span><span class="p">,</span><span class="w"> </span><span class="n">producer_err</span><span class="p">.</span><span class="mi">0</span><span class="p">,</span><span class="w">
-</span><span class="w">                </span><span class="p">)</span><span class="w">
-</span><span class="w">            </span><span class="p">}</span><span class="w">
-</span><span class="w">        </span><span class="p">}</span><span class="w">
-</span><span class="w">    </span><span class="p">}</span><span class="w">
-</span><span class="w"></span><span class="p">}</span><span class="w">
-</span></code></pre></div><p>We match against the <a href="https://docs.rs/rdkafka/0.26.0/rdkafka/producer/type.DeliveryResult.html">DeliveryResult</a> (which is a <code>Result</code> after all) to account for success (<code>Ok</code>) and failure (<code>Err</code>) scenarios. All we do is simply log the message in both cases, since this is just an example. You could do pretty much anything you wanted to here (don&rsquo;t go crazy though!)</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-rust" data-lang="rust"><span class="line"><span class="cl"><span class="k">struct</span> <span class="nc">ProducerCallbackLogger</span><span class="p">;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="k">impl</span><span class="w"> </span><span class="n">ClientContext</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">ProducerCallbackLogger</span><span class="w"> </span><span class="p">{}</span><span class="w">
+</span></span></span></code></pre></div><p>Now comes the main part where we implement the <code>delivery</code> function in the <code>ProducerContext</code> trait.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-rust" data-lang="rust"><span class="line"><span class="cl"><span class="k">impl</span><span class="w"> </span><span class="n">ProducerContext</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">ProduceCallbackLogger</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">type</span> <span class="nc">DeliveryOpaque</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">();</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">fn</span> <span class="nf">delivery</span><span class="p">(</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="o">&amp;</span><span class="bp">self</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="n">delivery_result</span>: <span class="kp">&amp;</span><span class="nc">rdkafka</span>::<span class="n">producer</span>::<span class="n">DeliveryResult</span><span class="o">&lt;&#39;</span><span class="nb">_</span><span class="o">&gt;</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="n">_delivery_opaque</span>: <span class="nc">Self</span>::<span class="n">DeliveryOpaque</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="kd">let</span><span class="w"> </span><span class="n">dr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">delivery_result</span><span class="p">.</span><span class="n">as_ref</span><span class="p">();</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="k">match</span><span class="w"> </span><span class="n">dr</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nb">Ok</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                </span><span class="kd">let</span><span class="w"> </span><span class="n">key</span>: <span class="kp">&amp;</span><span class="kt">str</span> <span class="o">=</span><span class="w"> </span><span class="n">msg</span><span class="p">.</span><span class="n">key_view</span><span class="p">().</span><span class="n">unwrap</span><span class="p">().</span><span class="n">unwrap</span><span class="p">();</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                </span><span class="fm">println!</span><span class="p">(</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                    </span><span class="s">&#34;produced message with key {} in offset {} of partition {}&#34;</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                    </span><span class="n">key</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                    </span><span class="n">msg</span><span class="p">.</span><span class="n">offset</span><span class="p">(),</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                    </span><span class="n">msg</span><span class="p">.</span><span class="n">partition</span><span class="p">()</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                </span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nb">Err</span><span class="p">(</span><span class="n">producer_err</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                </span><span class="kd">let</span><span class="w"> </span><span class="n">key</span>: <span class="kp">&amp;</span><span class="kt">str</span> <span class="o">=</span><span class="w"> </span><span class="n">producer_err</span><span class="p">.</span><span class="mf">1.</span><span class="n">key_view</span><span class="p">().</span><span class="n">unwrap</span><span class="p">().</span><span class="n">unwrap</span><span class="p">();</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                </span><span class="fm">println!</span><span class="p">(</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                    </span><span class="s">&#34;failed to produce message with key {} - {}&#34;</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                    </span><span class="n">key</span><span class="p">,</span><span class="w"> </span><span class="n">producer_err</span><span class="p">.</span><span class="mi">0</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                </span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span><span class="w">
+</span></span></span></code></pre></div><p>We match against the <a href="https://docs.rs/rdkafka/0.26.0/rdkafka/producer/type.DeliveryResult.html">DeliveryResult</a> (which is a <code>Result</code> after all) to account for success (<code>Ok</code>) and failure (<code>Err</code>) scenarios. All we do is simply log the message in both cases, since this is just an example. You could do pretty much anything you wanted to here (don&rsquo;t go crazy though!)</p>
 <blockquote>
 <p>We&rsquo;ve ignored <a href="https://docs.rs/rdkafka/0.26.0/rdkafka/producer/trait.ProducerContext.html#associatedtype.DeliveryOpaque">DeliveryOpaque</a> which is an associated type of the <code>ProducerContext</code> trait</p>
 </blockquote>
 <p>We need to make sure that we plug in our <code>ProducerContext</code> implementation. We do this by using the <a href="https://docs.rs/rdkafka/0.26.0/rdkafka/config/struct.ClientConfig.html#method.create_with_context">create_with_context</a> method (instead of <a href="https://docs.rs/rdkafka/0.26.0/rdkafka/config/struct.ClientConfig.html#method.create">create</a>) and make sure by providing the correct type for <code>BaseProducer</code> as well.</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-rust" data-lang="rust"><span class="kd">let</span><span class="w"> </span><span class="n">producer</span>: <span class="nc">BaseProducer</span><span class="o">&lt;</span><span class="n">ProduceCallbackLogger</span><span class="o">&gt;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ClientConfig</span>::<span class="n">new</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="o">....</span><span class="p">)</span><span class="w">
-</span><span class="w"></span><span class="o">..</span><span class="p">.</span><span class="w">
-</span><span class="w"></span><span class="p">.</span><span class="n">create_with_context</span><span class="p">(</span><span class="n">ProduceCallbackLogger</span><span class="w"> </span><span class="p">{})</span><span class="w">
-</span><span class="w"></span><span class="o">..</span><span class="p">.</span><span class="w">
-</span></code></pre></div><h3 id="how-does-the-callback-get-called">How does the &ldquo;callback get called&rdquo;?</h3>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-rust" data-lang="rust"><span class="line"><span class="cl"><span class="kd">let</span><span class="w"> </span><span class="n">producer</span>: <span class="nc">BaseProducer</span><span class="o">&lt;</span><span class="n">ProduceCallbackLogger</span><span class="o">&gt;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ClientConfig</span>::<span class="n">new</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="o">....</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="o">..</span><span class="p">.</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">.</span><span class="n">create_with_context</span><span class="p">(</span><span class="n">ProduceCallbackLogger</span><span class="w"> </span><span class="p">{})</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="o">..</span><span class="p">.</span><span class="w">
+</span></span></span></code></pre></div><h3 id="how-does-the-callback-get-called">How does the &ldquo;callback get called&rdquo;?</h3>
 <p>Ok, we have the implementation, but we need a way to <em>trigger</em> it! One of the ways is to call <a href="https://docs.rs/rdkafka/0.26.0/rdkafka/producer/struct.BaseProducer.html#method.flush">flush</a> on the producer. So, we could write our producer as such:</p>
 <ul>
 <li>add <code>producer.flush(Duration::from_secs(3));</code>, and</li>
 <li>comment the <code>sleep</code> (just for now)</li>
 </ul>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-rust" data-lang="rust"><span class="w">        </span><span class="n">producer</span><span class="w">
-</span><span class="w">            </span><span class="p">.</span><span class="n">send</span><span class="p">(</span><span class="w">
-</span><span class="w">                </span><span class="n">BaseRecord</span>::<span class="n">to</span><span class="p">(</span><span class="s">&#34;rust&#34;</span><span class="p">)</span><span class="w">
-</span><span class="w">                    </span><span class="p">.</span><span class="n">key</span><span class="p">(</span><span class="o">&amp;</span><span class="fm">format!</span><span class="p">(</span><span class="s">&#34;key-{}&#34;</span><span class="p">,</span><span class="w"> </span><span class="n">i</span><span class="p">))</span><span class="w">
-</span><span class="w">                    </span><span class="p">.</span><span class="n">payload</span><span class="p">(</span><span class="o">&amp;</span><span class="fm">format!</span><span class="p">(</span><span class="s">&#34;value-{}&#34;</span><span class="p">,</span><span class="w"> </span><span class="n">i</span><span class="p">)),</span><span class="w">
-</span><span class="w">            </span><span class="p">)</span><span class="w">
-</span><span class="w">            </span><span class="p">.</span><span class="n">expect</span><span class="p">(</span><span class="s">&#34;failed to send message&#34;</span><span class="p">);</span><span class="w">
-</span><span class="w">
-</span><span class="w">        </span><span class="n">producer</span><span class="p">.</span><span class="n">flush</span><span class="p">(</span><span class="n">Duration</span>::<span class="n">from_secs</span><span class="p">(</span><span class="mi">3</span><span class="p">));</span><span class="w">
-</span><span class="w">        </span><span class="fm">println!</span><span class="p">(</span><span class="s">&#34;flushed message&#34;</span><span class="p">);</span><span class="w">
-</span><span class="w">        </span><span class="c1">//thread::sleep(Duration::from_secs(3));
-</span></code></pre></div><h3 id="hold-on-we-can-do-better">Hold on, we can do better!</h3>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-rust" data-lang="rust"><span class="line"><span class="cl"><span class="w">        </span><span class="n">producer</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="p">.</span><span class="n">send</span><span class="p">(</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                </span><span class="n">BaseRecord</span>::<span class="n">to</span><span class="p">(</span><span class="s">&#34;rust&#34;</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                    </span><span class="p">.</span><span class="n">key</span><span class="p">(</span><span class="o">&amp;</span><span class="fm">format!</span><span class="p">(</span><span class="s">&#34;key-{}&#34;</span><span class="p">,</span><span class="w"> </span><span class="n">i</span><span class="p">))</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                    </span><span class="p">.</span><span class="n">payload</span><span class="p">(</span><span class="o">&amp;</span><span class="fm">format!</span><span class="p">(</span><span class="s">&#34;value-{}&#34;</span><span class="p">,</span><span class="w"> </span><span class="n">i</span><span class="p">)),</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="p">.</span><span class="n">expect</span><span class="p">(</span><span class="s">&#34;failed to send message&#34;</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="n">producer</span><span class="p">.</span><span class="n">flush</span><span class="p">(</span><span class="n">Duration</span>::<span class="n">from_secs</span><span class="p">(</span><span class="mi">3</span><span class="p">));</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="fm">println!</span><span class="p">(</span><span class="s">&#34;flushed message&#34;</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="c1">//thread::sleep(Duration::from_secs(3));
+</span></span></span></code></pre></div><h3 id="hold-on-we-can-do-better">Hold on, we can do better!</h3>
 <p>The <code>send</code> method is non-blocking (be default) but by calling <code>flush</code> after each <code>send</code>, we have now converted this into a synchronous invocation - <em>not</em> recommended from a performance perspective.</p>
 <p>We can improve the situation by using a <a href="https://docs.rs/rdkafka/0.26.0/rdkafka/producer/struct.ThreadedProducer.html">ThreadedProducer</a>. It takes care of invoking the <a href="https://docs.rs/rdkafka/0.26.0/rdkafka/producer/base_producer/struct.BaseProducer.html#method.poll">poll</a> method in a background thread to ensure that the delivery callback notifications are delivered. Doing this is very simple - just change the type from <code>BaseProducer</code> to <code>ThreadedProducer</code>!</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="c1"># before: BaseProducer&lt;ProduceCallbackLogger&gt;</span>
-<span class="c1"># after: ThreadedProducer&lt;ProduceCallbackLogger&gt;</span>
-</code></pre></div><p>Also, we don&rsquo;t need the call to <code>flush</code> anymore.</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-rust" data-lang="rust"><span class="o">..</span><span class="p">.</span><span class="w">
-</span><span class="w"></span><span class="c1">//producer.flush(Duration::from_secs(3));
-</span><span class="c1">//println!(&#34;flushed message&#34;);
-</span><span class="c1"></span><span class="n">thread</span>::<span class="n">sleep</span><span class="p">(</span><span class="n">Duration</span>::<span class="n">from_secs</span><span class="p">(</span><span class="mi">3</span><span class="p">));</span><span class="w">
-</span><span class="w"></span><span class="o">..</span><span class="p">.</span><span class="w">
-</span></code></pre></div><blockquote>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="c1"># before: BaseProducer&lt;ProduceCallbackLogger&gt;</span>
+</span></span><span class="line"><span class="cl"><span class="c1"># after: ThreadedProducer&lt;ProduceCallbackLogger&gt;</span>
+</span></span></code></pre></div><p>Also, we don&rsquo;t need the call to <code>flush</code> anymore.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-rust" data-lang="rust"><span class="line"><span class="cl"><span class="o">..</span><span class="p">.</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="c1">//producer.flush(Duration::from_secs(3));
+</span></span></span><span class="line"><span class="cl"><span class="c1">//println!(&#34;flushed message&#34;);
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="n">thread</span>::<span class="n">sleep</span><span class="p">(</span><span class="n">Duration</span>::<span class="n">from_secs</span><span class="p">(</span><span class="mi">3</span><span class="p">));</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="o">..</span><span class="p">.</span><span class="w">
+</span></span></span></code></pre></div><blockquote>
 <p>The code is available in <code>src/2_threaded_producer.rs</code></p>
 </blockquote>
 <h3 id="run-the-program-again">Run the program again</h3>
@@ -416,51 +416,51 @@ sending message
 <li>execute <code>cargo run</code></li>
 </ul>
 <p>Output:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">sending message
-sending message
-produced message with key key-1 in offset <span class="m">6</span> of partition <span class="m">2</span>
-produced message with key key-2 in offset <span class="m">3</span> of partition <span class="m">0</span>
-sending message
-produced message with key key-3 in offset <span class="m">7</span> of partition <span class="m">2</span>
-</code></pre></div><p>As expected, you should be able to see the producer event callback, denoting that the messages were indeed sent to the Kafka topic. Of course, you can connect to the topic directly and double-check, just like before:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="p">&amp;</span>KAFKA_HOME/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic rust --from-beginning
-</code></pre></div><blockquote>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">sending message
+</span></span><span class="line"><span class="cl">sending message
+</span></span><span class="line"><span class="cl">produced message with key key-1 in offset <span class="m">6</span> of partition <span class="m">2</span>
+</span></span><span class="line"><span class="cl">produced message with key key-2 in offset <span class="m">3</span> of partition <span class="m">0</span>
+</span></span><span class="line"><span class="cl">sending message
+</span></span><span class="line"><span class="cl">produced message with key key-3 in offset <span class="m">7</span> of partition <span class="m">2</span>
+</span></span></code></pre></div><p>As expected, you should be able to see the producer event callback, denoting that the messages were indeed sent to the Kafka topic. Of course, you can connect to the topic directly and double-check, just like before:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="p">&amp;</span>KAFKA_HOME/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic rust --from-beginning
+</span></span></code></pre></div><blockquote>
 <p>To try a failure scenario, try using an incorrect topic name and notice how the <code>Err</code> variant of the <code>delivery</code> implementation gets invoked.</p>
 </blockquote>
 <h2 id="sending-json-messages">Sending JSON messages</h2>
 <p>So far, we were just sending <code>String</code>s as key and values. JSON is a commonly used message format, let&rsquo;s see how to use that.</p>
 <p>Assume we want to send <code>User</code> info which will be represented using this <code>struct</code>:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-rust" data-lang="rust"><span class="k">struct</span> <span class="nc">User</span><span class="w"> </span><span class="p">{</span><span class="w">
-</span><span class="w">    </span><span class="n">id</span>: <span class="kt">i32</span><span class="p">,</span><span class="w">
-</span><span class="w">    </span><span class="n">email</span>: <span class="nb">String</span><span class="p">,</span><span class="w">
-</span><span class="w"></span><span class="p">}</span><span class="w">
-</span></code></pre></div><p>We can then use <a href="https://docs.serde.rs/serde_json/">serde_json</a> library to  serialize this as JSON. All we need is to use the <a href="https://serde.rs/derive.html">custom derives in serde</a> - <code>Deserialize</code> and <code>Serialize</code></p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-rust" data-lang="rust"><span class="k">use</span><span class="w"> </span><span class="n">serde</span>::<span class="p">{</span><span class="n">Deserialize</span><span class="p">,</span><span class="w"> </span><span class="n">Serialize</span><span class="p">};</span><span class="w">
-</span><span class="w">
-</span><span class="w"></span><span class="cp">#[derive(Serialize, Deserialize, Debug)]</span><span class="w">
-</span><span class="w"></span><span class="k">struct</span> <span class="nc">User</span><span class="w"> </span><span class="p">{</span><span class="w">
-</span><span class="w">    </span><span class="n">id</span>: <span class="kt">i32</span><span class="p">,</span><span class="w">
-</span><span class="w">    </span><span class="n">email</span>: <span class="nb">String</span><span class="p">,</span><span class="w">
-</span><span class="w"></span><span class="p">}</span><span class="w">
-</span></code></pre></div><p>Change the producer loop:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-rust" data-lang="rust"><span class="line"><span class="cl"><span class="k">struct</span> <span class="nc">User</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">id</span>: <span class="kt">i32</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">email</span>: <span class="nb">String</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span><span class="w">
+</span></span></span></code></pre></div><p>We can then use <a href="https://docs.serde.rs/serde_json/">serde_json</a> library to  serialize this as JSON. All we need is to use the <a href="https://serde.rs/derive.html">custom derives in serde</a> - <code>Deserialize</code> and <code>Serialize</code></p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-rust" data-lang="rust"><span class="line"><span class="cl"><span class="k">use</span><span class="w"> </span><span class="n">serde</span>::<span class="p">{</span><span class="n">Deserialize</span><span class="p">,</span><span class="w"> </span><span class="n">Serialize</span><span class="p">};</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="cp">#[derive(Serialize, Deserialize, Debug)]</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="k">struct</span> <span class="nc">User</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">id</span>: <span class="kt">i32</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">email</span>: <span class="nb">String</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span><span class="w">
+</span></span></span></code></pre></div><p>Change the producer loop:</p>
 <ul>
 <li>Create a <code>User</code> instance</li>
 <li>Serialize it to a JSON string using <a href="https://docs.serde.rs/serde_json/fn.to_string_pretty.html">to_string_pretty</a></li>
 <li>Include that in the payload</li>
 </ul>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-rust" data-lang="rust"><span class="o">..</span><span class="p">.</span><span class="w">
-</span><span class="w">
-</span><span class="w"></span><span class="kd">let</span><span class="w"> </span><span class="n">user_json</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">serde_json</span>::<span class="n">to_string_pretty</span><span class="p">(</span><span class="o">&amp;</span><span class="n">user</span><span class="p">).</span><span class="n">expect</span><span class="p">(</span><span class="s">&#34;json serialization failed&#34;</span><span class="p">);</span><span class="w">
-</span><span class="w">
-</span><span class="w">        </span><span class="n">producer</span><span class="w">
-</span><span class="w">            </span><span class="p">.</span><span class="n">send</span><span class="p">(</span><span class="w">
-</span><span class="w">                </span><span class="n">BaseRecord</span>::<span class="n">to</span><span class="p">(</span><span class="s">&#34;rust&#34;</span><span class="p">)</span><span class="w">
-</span><span class="w">                    </span><span class="p">.</span><span class="n">key</span><span class="p">(</span><span class="o">&amp;</span><span class="fm">format!</span><span class="p">(</span><span class="s">&#34;user-{}&#34;</span><span class="p">,</span><span class="w"> </span><span class="n">i</span><span class="p">))</span><span class="w">
-</span><span class="w">                    </span><span class="p">.</span><span class="n">payload</span><span class="p">(</span><span class="o">&amp;</span><span class="n">user_json</span><span class="p">),</span><span class="w">
-</span><span class="w">            </span><span class="p">)</span><span class="w">
-</span><span class="w">            </span><span class="p">.</span><span class="n">expect</span><span class="p">(</span><span class="s">&#34;failed to send message&#34;</span><span class="p">);</span><span class="w">
-</span><span class="w"></span><span class="o">..</span><span class="p">.</span><span class="w">
-</span></code></pre></div><blockquote>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-rust" data-lang="rust"><span class="line"><span class="cl"><span class="o">..</span><span class="p">.</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="kd">let</span><span class="w"> </span><span class="n">user_json</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">serde_json</span>::<span class="n">to_string_pretty</span><span class="p">(</span><span class="o">&amp;</span><span class="n">user</span><span class="p">).</span><span class="n">expect</span><span class="p">(</span><span class="s">&#34;json serialization failed&#34;</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="n">producer</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="p">.</span><span class="n">send</span><span class="p">(</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                </span><span class="n">BaseRecord</span>::<span class="n">to</span><span class="p">(</span><span class="s">&#34;rust&#34;</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                    </span><span class="p">.</span><span class="n">key</span><span class="p">(</span><span class="o">&amp;</span><span class="fm">format!</span><span class="p">(</span><span class="s">&#34;user-{}&#34;</span><span class="p">,</span><span class="w"> </span><span class="n">i</span><span class="p">))</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                    </span><span class="p">.</span><span class="n">payload</span><span class="p">(</span><span class="o">&amp;</span><span class="n">user_json</span><span class="p">),</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="p">.</span><span class="n">expect</span><span class="p">(</span><span class="s">&#34;failed to send message&#34;</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="o">..</span><span class="p">.</span><span class="w">
+</span></span></span></code></pre></div><blockquote>
 <p>you can also use <a href="https://docs.serde.rs/serde_json/fn.to_vec.html">to_vec</a> (instead of <code>to_string()</code>) to convert it into a <code>Vec</code> of bytes (<code>Vec&lt;u8&gt;</code>)</p>
 </blockquote>
 <h3 id="to-run-the-program">To run the program&hellip;</h3>
@@ -469,45 +469,45 @@ produced message with key key-3 in offset <span class="m">7</span> of partition 
 <li>execute <code>cargo run</code></li>
 </ul>
 <p>Consume from the topic:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="p">&amp;</span>KAFKA_HOME/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic rust --from-beginning
-</code></pre></div><p>You should see messages with a <code>String</code> key (e.g. <code>user-34</code>) and JSON value:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="p">{</span>
-  <span class="nt">&#34;id&#34;</span><span class="p">:</span> <span class="mi">34</span><span class="p">,</span>
-  <span class="nt">&#34;email&#34;</span><span class="p">:</span> <span class="s2">&#34;user-34@foobar.com&#34;</span>
-<span class="p">}</span>
-</code></pre></div><h2 id="is-there-a-better-way">Is there a better way?</h2>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="p">&amp;</span>KAFKA_HOME/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic rust --from-beginning
+</span></span></code></pre></div><p>You should see messages with a <code>String</code> key (e.g. <code>user-34</code>) and JSON value:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;id&#34;</span><span class="p">:</span> <span class="mi">34</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;email&#34;</span><span class="p">:</span> <span class="s2">&#34;user-34@foobar.com&#34;</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><h2 id="is-there-a-better-way">Is there a better way?</h2>
 <p>Yes! If you are used to the declarative serialization/de-serialization approach in the Kafka Java client (and probably others as well), you may not like this &ldquo;explicit&rdquo; approach. Just to put things in perspective, this is how you&rsquo;d do it in Java:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="n">Properties</span> <span class="n">props</span> <span class="o">=</span> <span class="k">new</span> <span class="n">Properties</span><span class="o">();</span>
-<span class="n">props</span><span class="o">.</span><span class="na">put</span><span class="o">(</span><span class="n">ProducerConfig</span><span class="o">.</span><span class="na">BOOTSTRAP_SERVERS_CONFIG</span><span class="o">,</span> <span class="s">&#34;localhost:9092&#34;</span><span class="o">);</span>
-<span class="n">props</span><span class="o">.</span><span class="na">put</span><span class="o">(</span><span class="n">ProducerConfig</span><span class="o">.</span><span class="na">KEY_SERIALIZER_CLASS_CONFIG</span><span class="o">,</span>
-  <span class="s">&#34;org.apache.kafka.common.serialization.StringSerializer&#34;</span><span class="o">);</span>
-<span class="n">props</span><span class="o">.</span><span class="na">put</span><span class="o">(</span><span class="n">ProducerConfig</span><span class="o">.</span><span class="na">VALUE_SERIALIZER_CLASS_CONFIG</span><span class="o">,</span>
-  <span class="s">&#34;io.confluent.kafka.serializers.json.KafkaJsonSchemaSerializer&#34;</span><span class="o">);</span>
-
-<span class="o">....</span>
-
-<span class="n">ProducerRecord</span><span class="o">&lt;</span><span class="n">String</span><span class="o">,</span> <span class="n">User</span><span class="o">&gt;</span> <span class="n">record</span> <span class="o">=</span> <span class="k">new</span> <span class="n">ProducerRecord</span><span class="o">&lt;</span><span class="n">String</span><span class="o">,</span> <span class="n">User</span><span class="o">&gt;(</span><span class="n">topic</span><span class="o">,</span> <span class="n">key</span><span class="o">,</span> <span class="n">user</span><span class="o">);</span>
-<span class="n">producer</span><span class="o">.</span><span class="na">send</span><span class="o">(</span><span class="n">record</span><span class="o">);</span>
-</code></pre></div><blockquote>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-java" data-lang="java"><span class="line"><span class="cl"><span class="n">Properties</span> <span class="n">props</span> <span class="o">=</span> <span class="k">new</span> <span class="n">Properties</span><span class="o">();</span>
+</span></span><span class="line"><span class="cl"><span class="n">props</span><span class="o">.</span><span class="na">put</span><span class="o">(</span><span class="n">ProducerConfig</span><span class="o">.</span><span class="na">BOOTSTRAP_SERVERS_CONFIG</span><span class="o">,</span> <span class="s">&#34;localhost:9092&#34;</span><span class="o">);</span>
+</span></span><span class="line"><span class="cl"><span class="n">props</span><span class="o">.</span><span class="na">put</span><span class="o">(</span><span class="n">ProducerConfig</span><span class="o">.</span><span class="na">KEY_SERIALIZER_CLASS_CONFIG</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">  <span class="s">&#34;org.apache.kafka.common.serialization.StringSerializer&#34;</span><span class="o">);</span>
+</span></span><span class="line"><span class="cl"><span class="n">props</span><span class="o">.</span><span class="na">put</span><span class="o">(</span><span class="n">ProducerConfig</span><span class="o">.</span><span class="na">VALUE_SERIALIZER_CLASS_CONFIG</span><span class="o">,</span>
+</span></span><span class="line"><span class="cl">  <span class="s">&#34;io.confluent.kafka.serializers.json.KafkaJsonSchemaSerializer&#34;</span><span class="o">);</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="o">....</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">ProducerRecord</span><span class="o">&lt;</span><span class="n">String</span><span class="o">,</span> <span class="n">User</span><span class="o">&gt;</span> <span class="n">record</span> <span class="o">=</span> <span class="k">new</span> <span class="n">ProducerRecord</span><span class="o">&lt;</span><span class="n">String</span><span class="o">,</span> <span class="n">User</span><span class="o">&gt;(</span><span class="n">topic</span><span class="o">,</span> <span class="n">key</span><span class="o">,</span> <span class="n">user</span><span class="o">);</span>
+</span></span><span class="line"><span class="cl"><span class="n">producer</span><span class="o">.</span><span class="na">send</span><span class="o">(</span><span class="n">record</span><span class="o">);</span>
+</span></span></code></pre></div><blockquote>
 <p>Notice that you simply configure the <code>Producer</code> to use <code>KafkaJsonSchemaSerializer</code> and the <code>User</code> class is serialized to JSON</p>
 </blockquote>
 <p><code>rust-rdkafka</code> provides something similar with the <a href="https://docs.rs/rdkafka/0.26.0/rdkafka/message/trait.ToBytes.html">ToBytes</a> trait. Here is what it looks like:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-rust" data-lang="rust"><span class="k">pub</span><span class="w"> </span><span class="k">trait</span><span class="w"> </span><span class="n">ToBytes</span><span class="w"> </span><span class="p">{</span><span class="w">
-</span><span class="w">    </span><span class="sd">/// Converts the provided data to bytes.
-</span><span class="sd"></span><span class="w">    </span><span class="k">fn</span> <span class="nf">to_bytes</span><span class="p">(</span><span class="o">&amp;</span><span class="bp">self</span><span class="p">)</span><span class="w"> </span>-&gt; <span class="kp">&amp;</span><span class="p">[</span><span class="kt">u8</span><span class="p">];</span><span class="w">
-</span><span class="w"></span><span class="p">}</span><span class="w">
-</span></code></pre></div><p>Self-explanatory, right? There are existing implementations for <code>String</code>, <code>Vec&lt;u8&gt;</code> etc. So you can use these types as key or value without any additional work - this is exactly what we just did. But the problem is the <em>way</em> we did it was &ldquo;explicit&rdquo; i.e. we converted the <code>User</code> struct into a JSON String and passed it on.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-rust" data-lang="rust"><span class="line"><span class="cl"><span class="k">pub</span><span class="w"> </span><span class="k">trait</span><span class="w"> </span><span class="n">ToBytes</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="sd">/// Converts the provided data to bytes.
+</span></span></span><span class="line"><span class="cl"><span class="sd"></span><span class="w">    </span><span class="k">fn</span> <span class="nf">to_bytes</span><span class="p">(</span><span class="o">&amp;</span><span class="bp">self</span><span class="p">)</span><span class="w"> </span>-&gt; <span class="kp">&amp;</span><span class="p">[</span><span class="kt">u8</span><span class="p">];</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span><span class="w">
+</span></span></span></code></pre></div><p>Self-explanatory, right? There are existing implementations for <code>String</code>, <code>Vec&lt;u8&gt;</code> etc. So you can use these types as key or value without any additional work - this is exactly what we just did. But the problem is the <em>way</em> we did it was &ldquo;explicit&rdquo; i.e. we converted the <code>User</code> struct into a JSON String and passed it on.</p>
 <p><strong>What if we could implement <code>ToBytes</code> for <code>User</code>?</strong></p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-rust" data-lang="rust"><span class="k">impl</span><span class="w"> </span><span class="n">ToBytes</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">User</span><span class="w"> </span><span class="p">{</span><span class="w">
-</span><span class="w">    </span><span class="k">fn</span> <span class="nf">to_bytes</span><span class="p">(</span><span class="o">&amp;</span><span class="bp">self</span><span class="p">)</span><span class="w"> </span>-&gt; <span class="kp">&amp;</span><span class="p">[</span><span class="kt">u8</span><span class="p">]</span><span class="w"> </span><span class="p">{</span><span class="w">
-</span><span class="w">        </span><span class="kd">let</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">serde_json</span>::<span class="n">to_vec_pretty</span><span class="p">(</span><span class="o">&amp;</span><span class="bp">self</span><span class="p">).</span><span class="n">expect</span><span class="p">(</span><span class="s">&#34;json serialization failed&#34;</span><span class="p">);</span><span class="w">
-</span><span class="w">        </span><span class="n">b</span><span class="p">.</span><span class="n">as_slice</span><span class="p">()</span><span class="w">
-</span><span class="w">    </span><span class="p">}</span><span class="w">
-</span><span class="w"></span><span class="p">}</span><span class="w">
-</span></code></pre></div><p>You will see a compiler error:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">cannot <span class="k">return</span> value referencing <span class="nb">local</span> variable <span class="sb">`</span>b<span class="sb">`</span>
-returns a value referencing data owned by the current <span class="k">function</span>
-</code></pre></div><blockquote>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-rust" data-lang="rust"><span class="line"><span class="cl"><span class="k">impl</span><span class="w"> </span><span class="n">ToBytes</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">User</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">fn</span> <span class="nf">to_bytes</span><span class="p">(</span><span class="o">&amp;</span><span class="bp">self</span><span class="p">)</span><span class="w"> </span>-&gt; <span class="kp">&amp;</span><span class="p">[</span><span class="kt">u8</span><span class="p">]</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="kd">let</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">serde_json</span>::<span class="n">to_vec_pretty</span><span class="p">(</span><span class="o">&amp;</span><span class="bp">self</span><span class="p">).</span><span class="n">expect</span><span class="p">(</span><span class="s">&#34;json serialization failed&#34;</span><span class="p">);</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="n">b</span><span class="p">.</span><span class="n">as_slice</span><span class="p">()</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span><span class="w">
+</span></span></span></code></pre></div><p>You will see a compiler error:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">cannot <span class="k">return</span> value referencing <span class="nb">local</span> variable <span class="sb">`</span>b<span class="sb">`</span>
+</span></span><span class="line"><span class="cl">returns a value referencing data owned by the current <span class="k">function</span>
+</span></span></code></pre></div><blockquote>
 <p>For additional background, please refer to this [GitHub issue] (<a href="https://github.com/fede1024/rust-rdkafka/issues/128)">https://github.com/fede1024/rust-rdkafka/issues/128)</a>. I would happy to see an example other which can work with <code>ToBytes</code> - please drop in a note if you&rsquo;ve inputs on this!</p>
 </blockquote>
 <p>TL;DR is that it&rsquo;s best to stick to the &ldquo;explicit&rdquo; way of doing things unless you have a <code>ToBytes</code> implementation that &ldquo;does not involve an allocation and cannot fail&rdquo;.</p>
@@ -615,7 +615,7 @@ returns a value referencing data owned by the current <span class="k">function</
         </p>
         
         <p class="credits theme-by text-muted">
-          <a href="https://gohugo.io">Hugo v0.89.2</a> powered &nbsp;&bull;&nbsp; Theme <a href="https://github.com/halogenica/beautifulhugo">Beautiful Hugo</a> adapted from <a href="https://deanattali.com/beautiful-jekyll/">Beautiful Jekyll</a>
+          <a href="https://gohugo.io">Hugo v0.94.2</a> powered &nbsp;&bull;&nbsp; Theme <a href="https://github.com/halogenica/beautifulhugo">Beautiful Hugo</a> adapted from <a href="https://deanattali.com/beautiful-jekyll/">Beautiful Jekyll</a>
           
         </p>
       </div>

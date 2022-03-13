@@ -92,7 +92,7 @@
   <meta name="twitter:site" content="@abhi_tweeter" />
   <meta name="twitter:creator" content="@abhi_tweeter" />
   <link href='https://abhirockzz.github.io/icons/myicon.png' rel='icon' type='image/x-icon'/>
-  <meta name="generator" content="Hugo 0.89.2" />
+  <meta name="generator" content="Hugo 0.94.2" />
   <link rel="alternate" href="https://abhirockzz.github.io/index.xml" type="application/rss+xml" title="Abhishek&#39;s blog"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css" integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
   <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.5.0/css/all.css" integrity="sha384-B4dIYHKNBt8Bc12p+WXckhzcICo0wtJAoU8YZTY5qE0Id1GSseTk6S+L3BlXeVIU" crossorigin="anonymous">
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous"><link rel="stylesheet" href="https://abhirockzz.github.io/css/main.css" /><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic" />
@@ -300,8 +300,8 @@ if (!doNotTrack) {
 <li><a href="https://docs.microsoft.com/azure/aks/kubernetes-walkthrough-rm-template?WT.mc_id=devto-blog-abhishgu">ARM template</a></li>
 </ul>
 <p>Once you setup the cluster, you can easily <a href="https://docs.microsoft.com/azure/aks/kubernetes-walkthrough?WT.mc_id=devto-blog-abhishgu#connect-to-the-cluster">configure <code>kubectl</code> to point to it</a></p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">az aks get-credentials --resource-group &lt;CLUSTER_RESOURCE_GROUP&gt; --name &lt;CLUSTER_NAME&gt;
-</code></pre></div><h2 id="wait-what-is-strimzi">Wait, what is <code>Strimzi</code>?</h2>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">az aks get-credentials --resource-group &lt;CLUSTER_RESOURCE_GROUP&gt; --name &lt;CLUSTER_NAME&gt;
+</span></span></code></pre></div><h2 id="wait-what-is-strimzi">Wait, what is <code>Strimzi</code>?</h2>
 <p><img src="https://media.giphy.com/media/US0y4X7FONHaM/giphy.gif" alt=""></p>
 <p><em>from the Strimzi documentation</em></p>
 <p><code>Strimzi</code> simplifies the process of running Apache Kafka in a Kubernetes cluster. Strimzi provides container images and Operators for running Kafka on Kubernetes. It is a <a href="https://strimzi.io/blog/2019/09/06/cncf/">part of the <code>Cloud Native Computing Foundation</code></a> as a <a href="https://www.cncf.io/sandbox-projects/"><code>Sandbox</code> project</a> (at the time of writing)</p>
@@ -310,12 +310,12 @@ if (!doNotTrack) {
 <p><img src="https://strimzi.io/docs/overview/latest/images/operators.png" alt=""></p>
 <h2 id="install-strimzi">Install Strimzi</h2>
 <p>Installing <code>Strimzi</code> using <code>Helm</code> is pretty easy:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">//add helm chart repo for Strimzi
-helm repo add strimzi https://strimzi.io/charts/
-
-//install it! (I have used strimzi-kafka as the release name)
-helm install strimzi-kafka strimzi/strimzi-kafka-operator
-</code></pre></div><p>This will install the <code>Strimzi</code> Operator (which is nothing but a <code>Deployment</code>), Custom Resource Definitions and other Kubernetes components such as <code>Cluster Roles</code>, <code>Cluster Role Bindings</code> and <code>Service Accounts</code></p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">//add helm chart repo for Strimzi
+</span></span><span class="line"><span class="cl">helm repo add strimzi https://strimzi.io/charts/
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">//install it! (I have used strimzi-kafka as the release name)
+</span></span><span class="line"><span class="cl">helm install strimzi-kafka strimzi/strimzi-kafka-operator
+</span></span></code></pre></div><p>This will install the <code>Strimzi</code> Operator (which is nothing but a <code>Deployment</code>), Custom Resource Definitions and other Kubernetes components such as <code>Cluster Roles</code>, <code>Cluster Role Bindings</code> and <code>Service Accounts</code></p>
 <blockquote>
 <p>For more details, <a href="https://github.com/strimzi/strimzi-kafka-operator/tree/master/helm-charts/strimzi-kafka-operator">check out this link</a></p>
 </blockquote>
@@ -323,23 +323,23 @@ helm install strimzi-kafka strimzi/strimzi-kafka-operator
 <p>To delete, simply <code>helm uninstall strimzi-kafka</code></p>
 </blockquote>
 <p>To confirm that the Strimzi Operator had been deployed, check it&rsquo;s <code>Pod</code> (it should transition to <code>Running</code> status after a while)</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">kubectl get pods -l=name=strimzi-cluster-operator
-
-NAME                                        READY   STATUS    RESTARTS   AGE
-strimzi-cluster-operator-5c66f679d5-69rgk   1/1     Running   0          43s
-</code></pre></div><p>Check the Custom Resource Definitions as well:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">kubectl get crd | grep strimzi
-
-kafkabridges.kafka.strimzi.io           2020-04-13T16:49:36Z
-kafkaconnectors.kafka.strimzi.io        2020-04-13T16:49:33Z
-kafkaconnects.kafka.strimzi.io          2020-04-13T16:49:36Z
-kafkaconnects2is.kafka.strimzi.io       2020-04-13T16:49:38Z
-kafkamirrormaker2s.kafka.strimzi.io     2020-04-13T16:49:37Z
-kafkamirrormakers.kafka.strimzi.io      2020-04-13T16:49:39Z
-kafkas.kafka.strimzi.io                 2020-04-13T16:49:40Z
-kafkatopics.kafka.strimzi.io            2020-04-13T16:49:34Z
-kafkausers.kafka.strimzi.io             2020-04-13T16:49:33Z
-</code></pre></div><blockquote>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">kubectl get pods -l=name=strimzi-cluster-operator
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">NAME                                        READY   STATUS    RESTARTS   AGE
+</span></span><span class="line"><span class="cl">strimzi-cluster-operator-5c66f679d5-69rgk   1/1     Running   0          43s
+</span></span></code></pre></div><p>Check the Custom Resource Definitions as well:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">kubectl get crd | grep strimzi
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">kafkabridges.kafka.strimzi.io           2020-04-13T16:49:36Z
+</span></span><span class="line"><span class="cl">kafkaconnectors.kafka.strimzi.io        2020-04-13T16:49:33Z
+</span></span><span class="line"><span class="cl">kafkaconnects.kafka.strimzi.io          2020-04-13T16:49:36Z
+</span></span><span class="line"><span class="cl">kafkaconnects2is.kafka.strimzi.io       2020-04-13T16:49:38Z
+</span></span><span class="line"><span class="cl">kafkamirrormaker2s.kafka.strimzi.io     2020-04-13T16:49:37Z
+</span></span><span class="line"><span class="cl">kafkamirrormakers.kafka.strimzi.io      2020-04-13T16:49:39Z
+</span></span><span class="line"><span class="cl">kafkas.kafka.strimzi.io                 2020-04-13T16:49:40Z
+</span></span><span class="line"><span class="cl">kafkatopics.kafka.strimzi.io            2020-04-13T16:49:34Z
+</span></span><span class="line"><span class="cl">kafkausers.kafka.strimzi.io             2020-04-13T16:49:33Z
+</span></span></code></pre></div><blockquote>
 <p><code>kafkas.kafka.strimzi.io</code> CRD represents Kafka clusters in Kubernetes</p>
 </blockquote>
 <p>Now that we have the &ldquo;brain&rdquo; (the Strimzi Operator) wired up, let&rsquo;s use it!</p>
@@ -352,28 +352,28 @@ kafkausers.kafka.strimzi.io             2020-04-13T16:49:33Z
 <li>No persistence (uses <code>emptyDir</code> volume)</li>
 </ul>
 <p>To deploy a Kafka cluster all we need to do is create a Strimzi <code>Kafka</code> resource. This is what it looks like:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">kafka.strimzi.io/v1beta1</span><span class="w">
-</span><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">Kafka</span><span class="w">
-</span><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
-</span><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">my-kafka-cluster</span><span class="w">
-</span><span class="w"></span><span class="nt">spec</span><span class="p">:</span><span class="w">
-</span><span class="w">  </span><span class="nt">kafka</span><span class="p">:</span><span class="w">
-</span><span class="w">    </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="m">2.4.0</span><span class="w">
-</span><span class="w">    </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="m">1</span><span class="w">
-</span><span class="w">    </span><span class="nt">listeners</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span><span class="nt">plain</span><span class="p">:</span><span class="w"> </span>{}<span class="w">
-</span><span class="w">    </span><span class="nt">config</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span><span class="nt">offsets.topic.replication.factor</span><span class="p">:</span><span class="w"> </span><span class="m">1</span><span class="w">
-</span><span class="w">      </span><span class="nt">transaction.state.log.replication.factor</span><span class="p">:</span><span class="w"> </span><span class="m">1</span><span class="w">
-</span><span class="w">      </span><span class="nt">transaction.state.log.min.isr</span><span class="p">:</span><span class="w"> </span><span class="m">1</span><span class="w">
-</span><span class="w">      </span><span class="nt">log.message.format.version</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;2.4&#34;</span><span class="w">
-</span><span class="w">    </span><span class="nt">storage</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l">ephemeral</span><span class="w">
-</span><span class="w">  </span><span class="nt">zookeeper</span><span class="p">:</span><span class="w">
-</span><span class="w">    </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="m">1</span><span class="w">
-</span><span class="w">    </span><span class="nt">storage</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l">ephemeral</span><span class="w">
-</span></code></pre></div><blockquote>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">kafka.strimzi.io/v1beta1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">Kafka</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">my-kafka-cluster</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">kafka</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="m">2.4.0</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="m">1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">listeners</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">plain</span><span class="p">:</span><span class="w"> </span>{}<span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">config</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">offsets.topic.replication.factor</span><span class="p">:</span><span class="w"> </span><span class="m">1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">transaction.state.log.replication.factor</span><span class="p">:</span><span class="w"> </span><span class="m">1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">transaction.state.log.min.isr</span><span class="p">:</span><span class="w"> </span><span class="m">1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">log.message.format.version</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;2.4&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">storage</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l">ephemeral</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">zookeeper</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="m">1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">storage</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l">ephemeral</span><span class="w">
+</span></span></span></code></pre></div><blockquote>
 <p>For a detailed <code>Kafka</code> CRD reference, please check out the documentation - <a href="https://strimzi.io/docs/operators/master/using.html#type-Kafka-reference">https://strimzi.io/docs/operators/master/using.html#type-Kafka-reference</a></p>
 </blockquote>
 <p>We define the name (<code>my-kafka-cluster</code>) of cluster in <code>metadata.name</code>. Here is a summary of attributes in <code>spec.kafka</code>:</p>
@@ -386,8 +386,8 @@ kafkausers.kafka.strimzi.io             2020-04-13T16:49:33Z
 </ul>
 <p>Zookeeper cluster details (<code>spec.zookeeper</code>) are similar to that of Kafka. In this case we just configuring the no. of <code>replicas</code> and <code>storage</code> type. Refer to <a href="https://strimzi.io/docs/operators/master/using.html#type-ZookeeperClusterSpec-reference">https://strimzi.io/docs/operators/master/using.html#type-ZookeeperClusterSpec-reference</a> for details</p>
 <p>To create the Kafka cluster:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">kubectl apply -f https://raw.githubusercontent.com/abhirockzz/kafka-kubernetes-strimzi/master/part-1/kafka.yaml
-</code></pre></div><h2 id="whats-next">What&rsquo;s next?</h2>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl apply -f https://raw.githubusercontent.com/abhirockzz/kafka-kubernetes-strimzi/master/part-1/kafka.yaml
+</span></span></code></pre></div><h2 id="whats-next">What&rsquo;s next?</h2>
 <p><img src="https://media.giphy.com/media/TvZRJdKk49cKQ/giphy.gif" alt=""></p>
 <p>The Strimzi operator spins into action and creates many Kubernetes resources in response to the <code>Kafka</code> CRD instance we just created.</p>
 <p>The following resources are created:</p>
@@ -398,97 +398,97 @@ kafkausers.kafka.strimzi.io             2020-04-13T16:49:33Z
 <li><code>Secret</code> - Kubernetes <code>Secret</code>s to store private keys and certificates for Kafka cluster components and clients. These are used for TLS encryption and authentication (covered in subsequent blog posts)</li>
 </ul>
 <h3 id="kafka-custom-resource">Kafka Custom Resource</h3>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">kubectl get kafka
-
-NAME               DESIRED KAFKA REPLICAS   DESIRED ZK REPLICAS
-my-kafka-cluster   <span class="m">1</span>                        <span class="m">1</span>
-</code></pre></div><h3 id="statefulset-and-pod"><code>StatefulSet</code> and <code>Pod</code></h3>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl get kafka
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">NAME               DESIRED KAFKA REPLICAS   DESIRED ZK REPLICAS
+</span></span><span class="line"><span class="cl">my-kafka-cluster   <span class="m">1</span>                        <span class="m">1</span>
+</span></span></code></pre></div><h3 id="statefulset-and-pod"><code>StatefulSet</code> and <code>Pod</code></h3>
 <p>Check Kafka and Zookeeper <code>StatefulSet</code>s using:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">kubectl get statefulset/my-kafka-cluster-zookeeper
-kubectl get statefulset/my-kafka-cluster-kafka
-</code></pre></div><p>Kafka and Zookeeper <code>Pod</code>s</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">kubectl get pod/my-kafka-cluster-zookeeper-0
-kubectl get pod/my-kafka-cluster-kafka-0
-</code></pre></div><h3 id="configmap"><code>ConfigMap</code></h3>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl get statefulset/my-kafka-cluster-zookeeper
+</span></span><span class="line"><span class="cl">kubectl get statefulset/my-kafka-cluster-kafka
+</span></span></code></pre></div><p>Kafka and Zookeeper <code>Pod</code>s</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl get pod/my-kafka-cluster-zookeeper-0
+</span></span><span class="line"><span class="cl">kubectl get pod/my-kafka-cluster-kafka-0
+</span></span></code></pre></div><h3 id="configmap"><code>ConfigMap</code></h3>
 <p>Individual <code>ConfigMap</code>s are created to store <code>Kafka</code> and <code>Zookeeper</code> configurations</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">kubectl get configmap
-
-my-kafka-cluster-kafka-config         <span class="m">4</span>      19m
-my-kafka-cluster-zookeeper-config     <span class="m">2</span>      20m
-</code></pre></div><p>Let&rsquo;s peek into the Kafka configuration</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">kubectl get configmap/my-kafka-cluster-kafka-config -o yaml
-</code></pre></div><p>The output is quite lengthy but I will highlight the important bits. As part of the data section, there are two config properties for the Kafka broker - <code>log4j.properties</code> and <code>server.config</code>.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl get configmap
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">my-kafka-cluster-kafka-config         <span class="m">4</span>      19m
+</span></span><span class="line"><span class="cl">my-kafka-cluster-zookeeper-config     <span class="m">2</span>      20m
+</span></span></code></pre></div><p>Let&rsquo;s peek into the Kafka configuration</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl get configmap/my-kafka-cluster-kafka-config -o yaml
+</span></span></code></pre></div><p>The output is quite lengthy but I will highlight the important bits. As part of the data section, there are two config properties for the Kafka broker - <code>log4j.properties</code> and <code>server.config</code>.</p>
 <p>Here is a snippet of the <code>server.config</code>. Notice the <code>advertised.listeners</code> (highlights the internal access over port <code>9092</code>) and <code>User provided configuration</code> (the one we specified in the <code>yaml</code> manifest)</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">    <span class="c1">##############################</span>
-    <span class="c1">##############################</span>
-    <span class="c1"># This file is automatically generated by the Strimzi Cluster Operator</span>
-    <span class="c1"># Any changes to this file will be ignored and overwritten!</span>
-    <span class="c1">##############################</span>
-    <span class="c1">##############################</span>
-
-    broker.id<span class="o">=</span><span class="si">${</span><span class="nv">STRIMZI_BROKER_ID</span><span class="si">}</span>
-    log.dirs<span class="o">=</span>/var/lib/kafka/data/kafka-log<span class="si">${</span><span class="nv">STRIMZI_BROKER_ID</span><span class="si">}</span>
-
-    <span class="c1">##########</span>
-    <span class="c1"># Plain listener</span>
-    <span class="c1">##########</span>
-
-    <span class="c1">##########</span>
-    <span class="c1"># Common listener configuration</span>
-    <span class="c1">##########</span>
-    <span class="nv">listeners</span><span class="o">=</span>REPLICATION-9091://0.0.0.0:9091,PLAIN-9092://0.0.0.0:9092
-    advertised.listeners<span class="o">=</span>REPLICATION-9091://my-kafka-cluster-kafka-<span class="si">${</span><span class="nv">STRIMZI_BROKER_ID</span><span class="si">}</span>.my-kafka-cluster-kafka-brokers.default.svc:9091,PLAIN-9092://my-kafka-cluster-kafka-<span class="si">${</span><span class="nv">STRIMZI_BROKER_ID</span><span class="si">}</span>.my-kafka-cluster-kafka-brokers.default.svc:9092
-    listener.security.protocol.map<span class="o">=</span>REPLICATION-9091:SSL,PLAIN-9092:PLAINTEXT
-    inter.broker.listener.name<span class="o">=</span>REPLICATION-9091
-    sasl.enabled.mechanisms<span class="o">=</span>
-    ssl.secure.random.implementation<span class="o">=</span>SHA1PRNG
-    ssl.endpoint.identification.algorithm<span class="o">=</span>HTTPS
-
-    <span class="c1">##########</span>
-    <span class="c1"># User provided configuration</span>
-    <span class="c1">##########</span>
-    log.message.format.version<span class="o">=</span>2.4
-    offsets.topic.replication.factor<span class="o">=</span><span class="m">1</span>
-    transaction.state.log.min.isr<span class="o">=</span><span class="m">1</span>
-    transaction.state.log.replication.factor<span class="o">=</span><span class="m">1</span>
-</code></pre></div><h3 id="service"><code>Service</code></h3>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">    <span class="c1">##############################</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">##############################</span>
+</span></span><span class="line"><span class="cl">    <span class="c1"># This file is automatically generated by the Strimzi Cluster Operator</span>
+</span></span><span class="line"><span class="cl">    <span class="c1"># Any changes to this file will be ignored and overwritten!</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">##############################</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">##############################</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    broker.id<span class="o">=</span><span class="si">${</span><span class="nv">STRIMZI_BROKER_ID</span><span class="si">}</span>
+</span></span><span class="line"><span class="cl">    log.dirs<span class="o">=</span>/var/lib/kafka/data/kafka-log<span class="si">${</span><span class="nv">STRIMZI_BROKER_ID</span><span class="si">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="c1">##########</span>
+</span></span><span class="line"><span class="cl">    <span class="c1"># Plain listener</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">##########</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="c1">##########</span>
+</span></span><span class="line"><span class="cl">    <span class="c1"># Common listener configuration</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">##########</span>
+</span></span><span class="line"><span class="cl">    <span class="nv">listeners</span><span class="o">=</span>REPLICATION-9091://0.0.0.0:9091,PLAIN-9092://0.0.0.0:9092
+</span></span><span class="line"><span class="cl">    advertised.listeners<span class="o">=</span>REPLICATION-9091://my-kafka-cluster-kafka-<span class="si">${</span><span class="nv">STRIMZI_BROKER_ID</span><span class="si">}</span>.my-kafka-cluster-kafka-brokers.default.svc:9091,PLAIN-9092://my-kafka-cluster-kafka-<span class="si">${</span><span class="nv">STRIMZI_BROKER_ID</span><span class="si">}</span>.my-kafka-cluster-kafka-brokers.default.svc:9092
+</span></span><span class="line"><span class="cl">    listener.security.protocol.map<span class="o">=</span>REPLICATION-9091:SSL,PLAIN-9092:PLAINTEXT
+</span></span><span class="line"><span class="cl">    inter.broker.listener.name<span class="o">=</span>REPLICATION-9091
+</span></span><span class="line"><span class="cl">    sasl.enabled.mechanisms<span class="o">=</span>
+</span></span><span class="line"><span class="cl">    ssl.secure.random.implementation<span class="o">=</span>SHA1PRNG
+</span></span><span class="line"><span class="cl">    ssl.endpoint.identification.algorithm<span class="o">=</span>HTTPS
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="c1">##########</span>
+</span></span><span class="line"><span class="cl">    <span class="c1"># User provided configuration</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">##########</span>
+</span></span><span class="line"><span class="cl">    log.message.format.version<span class="o">=</span>2.4
+</span></span><span class="line"><span class="cl">    offsets.topic.replication.factor<span class="o">=</span><span class="m">1</span>
+</span></span><span class="line"><span class="cl">    transaction.state.log.min.isr<span class="o">=</span><span class="m">1</span>
+</span></span><span class="line"><span class="cl">    transaction.state.log.replication.factor<span class="o">=</span><span class="m">1</span>
+</span></span></code></pre></div><h3 id="service"><code>Service</code></h3>
 <p>If you query for <code>Service</code>s, you should see something similar to this:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">kubectl get svc
-
-NAME                                TYPE        CLUSTER-IP     EXTERNAL-IP   PORT<span class="o">(</span>S<span class="o">)</span>
-my-kafka-cluster-kafka-bootstrap    ClusterIP   10.0.240.137   &lt;none&gt;        9091/TCP,9092/TCP
-my-kafka-cluster-kafka-brokers      ClusterIP   None           &lt;none&gt;        9091/TCP,9092/TCP
-my-kafka-cluster-zookeeper-client   ClusterIP   10.0.143.149   &lt;none&gt;        2181/TCP
-my-kafka-cluster-zookeeper-nodes    ClusterIP   None           &lt;none&gt;        2181/TCP,2888/TCP,3888/TCP
-</code></pre></div><p><code>my-kafka-cluster-kafka-bootstrap</code> makes it possible for internal Kubernetes clients to access the Kafka cluster and <code>my-kafka-cluster-kafka-brokers</code> is the <a href="https://kubernetes.io/docs/concepts/services-networking/service/#headless-services"><code>Headless</code> service</a> corresponding to the <code>StatefulSet</code></p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl get svc
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">NAME                                TYPE        CLUSTER-IP     EXTERNAL-IP   PORT<span class="o">(</span>S<span class="o">)</span>
+</span></span><span class="line"><span class="cl">my-kafka-cluster-kafka-bootstrap    ClusterIP   10.0.240.137   &lt;none&gt;        9091/TCP,9092/TCP
+</span></span><span class="line"><span class="cl">my-kafka-cluster-kafka-brokers      ClusterIP   None           &lt;none&gt;        9091/TCP,9092/TCP
+</span></span><span class="line"><span class="cl">my-kafka-cluster-zookeeper-client   ClusterIP   10.0.143.149   &lt;none&gt;        2181/TCP
+</span></span><span class="line"><span class="cl">my-kafka-cluster-zookeeper-nodes    ClusterIP   None           &lt;none&gt;        2181/TCP,2888/TCP,3888/TCP
+</span></span></code></pre></div><p><code>my-kafka-cluster-kafka-bootstrap</code> makes it possible for internal Kubernetes clients to access the Kafka cluster and <code>my-kafka-cluster-kafka-brokers</code> is the <a href="https://kubernetes.io/docs/concepts/services-networking/service/#headless-services"><code>Headless</code> service</a> corresponding to the <code>StatefulSet</code></p>
 <h3 id="secret"><code>Secret</code></h3>
 <p>Although we&rsquo;re not using them, it&rsquo;s helpful to look at the <code>Secret</code>s created by <code>Strimzi</code>:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">kubectl get secret
-
-my-kafka-cluster-clients-ca               Opaque
-my-kafka-cluster-clients-ca-cert          Opaque
-my-kafka-cluster-cluster-ca               Opaque
-my-kafka-cluster-cluster-ca-cert          Opaque
-my-kafka-cluster-cluster-operator-certs   Opaque
-my-kafka-cluster-kafka-brokers            Opaque
-my-kafka-cluster-kafka-token-vb2qt        kubernetes.io/service-account-token
-my-kafka-cluster-zookeeper-nodes          Opaque
-my-kafka-cluster-zookeeper-token-xq8m2    kubernetes.io/service-account-token
-</code></pre></div><ul>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">kubectl get secret
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">my-kafka-cluster-clients-ca               Opaque
+</span></span><span class="line"><span class="cl">my-kafka-cluster-clients-ca-cert          Opaque
+</span></span><span class="line"><span class="cl">my-kafka-cluster-cluster-ca               Opaque
+</span></span><span class="line"><span class="cl">my-kafka-cluster-cluster-ca-cert          Opaque
+</span></span><span class="line"><span class="cl">my-kafka-cluster-cluster-operator-certs   Opaque
+</span></span><span class="line"><span class="cl">my-kafka-cluster-kafka-brokers            Opaque
+</span></span><span class="line"><span class="cl">my-kafka-cluster-kafka-token-vb2qt        kubernetes.io/service-account-token
+</span></span><span class="line"><span class="cl">my-kafka-cluster-zookeeper-nodes          Opaque
+</span></span><span class="line"><span class="cl">my-kafka-cluster-zookeeper-token-xq8m2    kubernetes.io/service-account-token
+</span></span></code></pre></div><ul>
 <li><code>my-kafka-cluster-cluster-ca-cert</code> - Cluster CA certificate to sign Kafka broker certificates, and is used by a connecting client to establish a TLS encrypted connection</li>
 <li><code>my-kafka-cluster-clients-ca-cert</code> - Client CA certificate for a user to sign its own client certificate to allow mutual authentication against the Kafka cluster</li>
 </ul>
 <h2 id="ok-but-does-it-work">Ok, but does it work?</h2>
 <p>Let&rsquo;s take it for a spin!</p>
 <p>Create a producer <code>Pod</code>:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="nb">export</span> <span class="nv">KAFKA_CLUSTER_NAME</span><span class="o">=</span>my-kafka-cluster
-
-kubectl run kafka-producer -ti --image<span class="o">=</span>strimzi/kafka:latest-kafka-2.4.0 --rm<span class="o">=</span><span class="nb">true</span> --restart<span class="o">=</span>Never -- bin/kafka-console-producer.sh --broker-list <span class="nv">$KAFKA_CLUSTER_NAME</span>-kafka-bootstrap:9092 --topic my-topic
-</code></pre></div><p>In another terminal, create a consumer <code>Pod</code>:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="nb">export</span> <span class="nv">KAFKA_CLUSTER_NAME</span><span class="o">=</span>my-kafka-cluster
-
-kubectl run kafka-consumer -ti --image<span class="o">=</span>strimzi/kafka:latest-kafka-2.4.0 --rm<span class="o">=</span><span class="nb">true</span> --restart<span class="o">=</span>Never -- bin/kafka-console-consumer.sh --bootstrap-server <span class="nv">$KAFKA_CLUSTER_NAME</span>-kafka-bootstrap:9092 --topic my-topic --from-beginning
-</code></pre></div><blockquote>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">KAFKA_CLUSTER_NAME</span><span class="o">=</span>my-kafka-cluster
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">kubectl run kafka-producer -ti --image<span class="o">=</span>strimzi/kafka:latest-kafka-2.4.0 --rm<span class="o">=</span><span class="nb">true</span> --restart<span class="o">=</span>Never -- bin/kafka-console-producer.sh --broker-list <span class="nv">$KAFKA_CLUSTER_NAME</span>-kafka-bootstrap:9092 --topic my-topic
+</span></span></code></pre></div><p>In another terminal, create a consumer <code>Pod</code>:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">KAFKA_CLUSTER_NAME</span><span class="o">=</span>my-kafka-cluster
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">kubectl run kafka-consumer -ti --image<span class="o">=</span>strimzi/kafka:latest-kafka-2.4.0 --rm<span class="o">=</span><span class="nb">true</span> --restart<span class="o">=</span>Never -- bin/kafka-console-consumer.sh --bootstrap-server <span class="nv">$KAFKA_CLUSTER_NAME</span>-kafka-bootstrap:9092 --topic my-topic --from-beginning
+</span></span></code></pre></div><blockquote>
 <p>The above demonstration was taken from the Strimzi doc - <a href="https://strimzi.io/docs/operators/master/deploying.html#deploying-example-clients-str">https://strimzi.io/docs/operators/master/deploying.html#deploying-example-clients-str</a></p>
 </blockquote>
 <blockquote>
@@ -599,7 +599,7 @@ kubectl run kafka-consumer -ti --image<span class="o">=</span>strimzi/kafka:late
         </p>
         
         <p class="credits theme-by text-muted">
-          <a href="https://gohugo.io">Hugo v0.89.2</a> powered &nbsp;&bull;&nbsp; Theme <a href="https://github.com/halogenica/beautifulhugo">Beautiful Hugo</a> adapted from <a href="https://deanattali.com/beautiful-jekyll/">Beautiful Jekyll</a>
+          <a href="https://gohugo.io">Hugo v0.94.2</a> powered &nbsp;&bull;&nbsp; Theme <a href="https://github.com/halogenica/beautifulhugo">Beautiful Hugo</a> adapted from <a href="https://deanattali.com/beautiful-jekyll/">Beautiful Jekyll</a>
           
         </p>
       </div>

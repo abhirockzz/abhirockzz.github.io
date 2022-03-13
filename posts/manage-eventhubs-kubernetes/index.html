@@ -92,7 +92,7 @@
   <meta name="twitter:site" content="@abhi_tweeter" />
   <meta name="twitter:creator" content="@abhi_tweeter" />
   <link href='https://abhirockzz.github.io/icons/myicon.png' rel='icon' type='image/x-icon'/>
-  <meta name="generator" content="Hugo 0.89.2" />
+  <meta name="generator" content="Hugo 0.94.2" />
   <link rel="alternate" href="https://abhirockzz.github.io/index.xml" type="application/rss+xml" title="Abhishek&#39;s blog"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css" integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
   <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.5.0/css/all.css" integrity="sha384-B4dIYHKNBt8Bc12p+WXckhzcICo0wtJAoU8YZTY5qE0Id1GSseTk6S+L3BlXeVIU" crossorigin="anonymous">
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous"><link rel="stylesheet" href="https://abhirockzz.github.io/css/main.css" /><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic" />
@@ -297,129 +297,129 @@ if (!doNotTrack) {
 <h3 id="pre-requisites">Pre-requisites</h3>
 <p>Start by getting an Azure account if you don&rsquo;t have one already - you can <a href="https://azure.microsoft.com/free/?WT.mc_id=devto-blog-abhishgu">get for FREE!</a> Please make sure you&rsquo;ve <a href="https://kubernetes.io/docs/tasks/tools/install-kubectl/">kubectl</a> and <a href="https://helm.sh/docs/intro/install/">Helm 3</a> installed as well.</p>
 <p>Although the steps outlined in this blog should work with any Kubernetes cluster (including <code>minikube</code> etc.), I used <a href="https://docs.microsoft.com/azure/aks/intro-kubernetes?WT.mc_id=devto-blog-abhishgu">Azure Kubernetes Service (AKS)</a>. You can setup a cluster using <a href="https://docs.microsoft.com/azure/aks/kubernetes-walkthrough?WT.mc_id=devto-blog-abhishgu">Azure CLI</a>, <a href="https://docs.microsoft.com/azure/aks/kubernetes-walkthrough-portal?WT.mc_id=devto-blog-abhishgu">Azure portal</a> or even an <a href="https://docs.microsoft.com/azure/aks/kubernetes-walkthrough-rm-template?WT.mc_id=devto-blog-abhishgu">ARM template</a>. Once that&rsquo;s done, simply <a href="https://docs.microsoft.com/azure/aks/kubernetes-walkthrough?WT.mc_id=devto-blog-abhishgu#connect-to-the-cluster">configure <code>kubectl</code> to point to it</a></p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">az aks get-credentials --resource-group &lt;CLUSTER_RESOURCE_GROUP&gt; --name &lt;CLUSTER_NAME&gt;
-</code></pre></div><p>Ok, you&rsquo;re now ready to&hellip;</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">az aks get-credentials --resource-group &lt;CLUSTER_RESOURCE_GROUP&gt; --name &lt;CLUSTER_NAME&gt;
+</span></span></code></pre></div><p>Ok, you&rsquo;re now ready to&hellip;</p>
 <h2 id="-install-azure-service-operator">&hellip; Install Azure Service Operator</h2>
 <p><img src="https://media.giphy.com/media/lYZjoIy0UOEJa/giphy.gif" alt=""></p>
 <p>Nothing too fancy about it&hellip; just following the steps to install it using <code>Helm</code></p>
 <p>Start by installing <a href="https://cert-manager.io/docs/installation/kubernetes/">cert-manager</a></p>
 <h3 id="setup-cert-manager">Setup <code>cert-manager</code></h3>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">kubectl create namespace cert-manager
-
-kubectl label namespace cert-manager cert-manager.io/disable-validation<span class="o">=</span><span class="nb">true</span>
-
-kubectl apply --validate<span class="o">=</span><span class="nb">false</span> -f https://github.com/jetstack/cert-manager/releases/download/v0.12.0/cert-manager.yaml
-
-//make sure cert manager is up and running
-kubectl rollout status -n cert-manager deploy/cert-manager-webhook
-</code></pre></div><h3 id="authentication">Authentication&hellip;</h3>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl create namespace cert-manager
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">kubectl label namespace cert-manager cert-manager.io/disable-validation<span class="o">=</span><span class="nb">true</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">kubectl apply --validate<span class="o">=</span><span class="nb">false</span> -f https://github.com/jetstack/cert-manager/releases/download/v0.12.0/cert-manager.yaml
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">//make sure cert manager is up and running
+</span></span><span class="line"><span class="cl">kubectl rollout status -n cert-manager deploy/cert-manager-webhook
+</span></span></code></pre></div><h3 id="authentication">Authentication&hellip;</h3>
 <p>Since the operator will create resource on Azure, we need to authorize it to do so by providing the appropriate credentials. Currently, you can use <a href="https://docs.microsoft.com/azure/active-directory/managed-identities-azure-resources/overview?WT.mc_id=devto-blog-abhishgu">Managed Identity</a> or <a href="https://docs.microsoft.com/azure/active-directory/develop/app-objects-and-service-principals?WT.mc_id=devto-blog-abhishgu#service-principal-object">Service Principal</a></p>
 <p>I will be using a Service Principal, so let&rsquo;s start by creating one (with <a href="https://docs.microsoft.com/cli/azure/install-azure-cli?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu">Azure CLI</a>) using the <a href="https://docs.microsoft.com/cli/azure/ad/sp?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az-ad-sp-create-for-rbac">az ad sp create-for-rbac</a> command</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">az ad sp create-for-rbac -n &#34;aso-rbac-sp&#34;
-
-//JSON output
-{
-  &#34;appId&#34;: &#34;eb4280db-4242-4ed0-a7d2-42424242f0d0&#34;,
-  &#34;displayName&#34;: &#34;aso-rbac-sp&#34;,
-  &#34;name&#34;: &#34;http://aso-rbac-sp&#34;,
-  &#34;password&#34;: &#34;7d69a422-428d-42d4-a242-cd1d425424b2&#34;,
-  &#34;tenant&#34;: &#34;42f988bf-42f1-42af-42ab-2d7cd421db42&#34;
-}
-</code></pre></div><h3 id="install">Install</h3>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">az ad sp create-for-rbac -n &#34;aso-rbac-sp&#34;
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">//JSON output
+</span></span><span class="line"><span class="cl">{
+</span></span><span class="line"><span class="cl">  &#34;appId&#34;: &#34;eb4280db-4242-4ed0-a7d2-42424242f0d0&#34;,
+</span></span><span class="line"><span class="cl">  &#34;displayName&#34;: &#34;aso-rbac-sp&#34;,
+</span></span><span class="line"><span class="cl">  &#34;name&#34;: &#34;http://aso-rbac-sp&#34;,
+</span></span><span class="line"><span class="cl">  &#34;password&#34;: &#34;7d69a422-428d-42d4-a242-cd1d425424b2&#34;,
+</span></span><span class="line"><span class="cl">  &#34;tenant&#34;: &#34;42f988bf-42f1-42af-42ab-2d7cd421db42&#34;
+</span></span><span class="line"><span class="cl">}
+</span></span></code></pre></div><h3 id="install">Install</h3>
 <p>Setup required environment variables:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="nb">export</span> <span class="nv">AZURE_SUBSCRIPTION_ID</span><span class="o">=</span>&lt;enter Azure subscription ID&gt;
-<span class="nb">export</span> <span class="nv">AZURE_TENANT_ID</span><span class="o">=</span>&lt;enter value from the <span class="s2">&#34;tenant&#34;</span> attribute in the JSON payload above&gt;
-<span class="nb">export</span> <span class="nv">AZURE_CLIENT_ID</span><span class="o">=</span>&lt;enter value from the <span class="s2">&#34;appId&#34;</span> attribute in the JSON payload above&gt;
-<span class="nb">export</span> <span class="nv">AZURE_CLIENT_SECRET</span><span class="o">=</span>&lt;enter value from the <span class="s2">&#34;password&#34;</span> attribute in the JSON payload above&gt;
-<span class="nb">export</span> <span class="nv">AZURE_SERVICE_OPERATOR_NAMESPACE</span><span class="o">=</span>&lt;name of the namespace into which ASO will be installed&gt;
-</code></pre></div><p>Add the repo, create namespace</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">helm repo add azureserviceoperator https://raw.githubusercontent.com/Azure/azure-service-operator/master/charts
-
-kubectl create namespace <span class="nv">$AZURE_SERVICE_OPERATOR_NAMESPACE</span>
-</code></pre></div><p>Use <code>helm upgrade</code> to initiate setup:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">helm upgrade --install aso azureserviceoperator/azure-service-operator <span class="se">\
-</span><span class="se"></span>-n <span class="nv">$AZURE_SERVICE_OPERATOR_NAMESPACE</span> <span class="se">\
-</span><span class="se"></span>--set <span class="nv">azureSubscriptionID</span><span class="o">=</span><span class="nv">$AZURE_SUBSCRIPTION_ID</span> <span class="se">\
-</span><span class="se"></span>--set <span class="nv">azureTenantID</span><span class="o">=</span><span class="nv">$AZURE_TENANT_ID</span> <span class="se">\
-</span><span class="se"></span>--set <span class="nv">azureClientID</span><span class="o">=</span><span class="nv">$AZURE_CLIENT_ID</span> <span class="se">\
-</span><span class="se"></span>--set <span class="nv">azureClientSecret</span><span class="o">=</span><span class="nv">$AZURE_CLIENT_SECRET</span>
-</code></pre></div><p>Before you proceed, wait for the Azure Service Operator <code>Pod</code> to startup</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">kubectl get pods -n <span class="nv">$AZURE_SERVICE_OPERATOR_NAMESPACE</span>
-
-NAME                                              READY   STATUS    RESTARTS   AGE
-azureoperator-controller-manager-68f44fd4-cm6wl   2/2     Running   <span class="m">0</span>          6m
-</code></pre></div><h2 id="setup-azure-event-hubs-components">Setup Azure Event Hubs components&hellip;</h2>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">AZURE_SUBSCRIPTION_ID</span><span class="o">=</span>&lt;enter Azure subscription ID&gt;
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">AZURE_TENANT_ID</span><span class="o">=</span>&lt;enter value from the <span class="s2">&#34;tenant&#34;</span> attribute in the JSON payload above&gt;
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">AZURE_CLIENT_ID</span><span class="o">=</span>&lt;enter value from the <span class="s2">&#34;appId&#34;</span> attribute in the JSON payload above&gt;
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">AZURE_CLIENT_SECRET</span><span class="o">=</span>&lt;enter value from the <span class="s2">&#34;password&#34;</span> attribute in the JSON payload above&gt;
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">AZURE_SERVICE_OPERATOR_NAMESPACE</span><span class="o">=</span>&lt;name of the namespace into which ASO will be installed&gt;
+</span></span></code></pre></div><p>Add the repo, create namespace</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">helm repo add azureserviceoperator https://raw.githubusercontent.com/Azure/azure-service-operator/master/charts
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">kubectl create namespace <span class="nv">$AZURE_SERVICE_OPERATOR_NAMESPACE</span>
+</span></span></code></pre></div><p>Use <code>helm upgrade</code> to initiate setup:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">helm upgrade --install aso azureserviceoperator/azure-service-operator <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>-n <span class="nv">$AZURE_SERVICE_OPERATOR_NAMESPACE</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--set <span class="nv">azureSubscriptionID</span><span class="o">=</span><span class="nv">$AZURE_SUBSCRIPTION_ID</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--set <span class="nv">azureTenantID</span><span class="o">=</span><span class="nv">$AZURE_TENANT_ID</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--set <span class="nv">azureClientID</span><span class="o">=</span><span class="nv">$AZURE_CLIENT_ID</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--set <span class="nv">azureClientSecret</span><span class="o">=</span><span class="nv">$AZURE_CLIENT_SECRET</span>
+</span></span></code></pre></div><p>Before you proceed, wait for the Azure Service Operator <code>Pod</code> to startup</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl get pods -n <span class="nv">$AZURE_SERVICE_OPERATOR_NAMESPACE</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">NAME                                              READY   STATUS    RESTARTS   AGE
+</span></span><span class="line"><span class="cl">azureoperator-controller-manager-68f44fd4-cm6wl   2/2     Running   <span class="m">0</span>          6m
+</span></span></code></pre></div><h2 id="setup-azure-event-hubs-components">Setup Azure Event Hubs components&hellip;</h2>
 <p>Start by cloning the repo:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">git clone https://github.com/abhirockzz/eventhubs-using-aso-on-k8s
-<span class="nb">cd</span> eventhubs-using-aso-on-k8s
-</code></pre></div><p>Create an <a href="https://docs.microsoft.com/azure/azure-resource-manager/management/overview?WT.mc_id=devto-blog-abhishgu#resource-groups">Azure Resource Group</a></p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">git clone https://github.com/abhirockzz/eventhubs-using-aso-on-k8s
+</span></span><span class="line"><span class="cl"><span class="nb">cd</span> eventhubs-using-aso-on-k8s
+</span></span></code></pre></div><p>Create an <a href="https://docs.microsoft.com/azure/azure-resource-manager/management/overview?WT.mc_id=devto-blog-abhishgu#resource-groups">Azure Resource Group</a></p>
 <blockquote>
 <p>I have used the <code>southeastasia</code> location. Please update <code>eh-resource-group.yaml</code> if you need to use a different one</p>
 </blockquote>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">kubectl apply -f deploy/eh-resource-group.yaml
-
-//confirm that its created
-kubectl get resourcegroups/eh-aso-rg
-</code></pre></div><p>Create <a href="https://docs.microsoft.com/azure/event-hubs/event-hubs-features?WT.mc_id=devto-blog-abhishgu#namespace">Event Hubs namespace</a></p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl apply -f deploy/eh-resource-group.yaml
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">//confirm that its created
+</span></span><span class="line"><span class="cl">kubectl get resourcegroups/eh-aso-rg
+</span></span></code></pre></div><p>Create <a href="https://docs.microsoft.com/azure/event-hubs/event-hubs-features?WT.mc_id=devto-blog-abhishgu#namespace">Event Hubs namespace</a></p>
 <blockquote>
 <p>I have used the <code>southeastasia</code> location. Please update <code>eh-namespace.yaml</code> if you need to use a different one</p>
 </blockquote>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">kubectl apply -f deploy/eh-namespace.yaml
-
-//wait <span class="k">for</span> creation
-kubectl get eventhubnamespaces -w
-</code></pre></div><p>Once done, you should see this:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">NAME        PROVISIONED   MESSAGE
-eh-aso-ns   <span class="nb">true</span>          successfully provisioned
-</code></pre></div><p>You can get details with <code>kubectl describe eventhubnamespaces</code> and also double-check using <a href="https://docs.microsoft.com/cli/azure/eventhubs/namespace?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az-eventhubs-namespace-show">az eventhubs namespace show</a></p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl apply -f deploy/eh-namespace.yaml
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">//wait <span class="k">for</span> creation
+</span></span><span class="line"><span class="cl">kubectl get eventhubnamespaces -w
+</span></span></code></pre></div><p>Once done, you should see this:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">NAME        PROVISIONED   MESSAGE
+</span></span><span class="line"><span class="cl">eh-aso-ns   <span class="nb">true</span>          successfully provisioned
+</span></span></code></pre></div><p>You can get details with <code>kubectl describe eventhubnamespaces</code> and also double-check using <a href="https://docs.microsoft.com/cli/azure/eventhubs/namespace?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az-eventhubs-namespace-show">az eventhubs namespace show</a></p>
 <p>The namespace is ready, we can now create an Event Hub</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">kubectl apply -f deploy/eh-hub.yaml
-
-kubectl get eventhubs/eh-aso-hub
-
-//once done...
-NAME        PROVISIONED   MESSAGE
-eh-aso-hub  true          successfully provisioned
-</code></pre></div><p>You can get details with <code>kubectl describe eventhub</code> and also double-check using <a href="https://docs.microsoft.com/cli/azure/eventhubs/eventhub?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az-eventhubs-eventhub-show">az eventhubs eventhub show</a></p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">kubectl apply -f deploy/eh-hub.yaml
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">kubectl get eventhubs/eh-aso-hub
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">//once done...
+</span></span><span class="line"><span class="cl">NAME        PROVISIONED   MESSAGE
+</span></span><span class="line"><span class="cl">eh-aso-hub  true          successfully provisioned
+</span></span></code></pre></div><p>You can get details with <code>kubectl describe eventhub</code> and also double-check using <a href="https://docs.microsoft.com/cli/azure/eventhubs/eventhub?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az-eventhubs-eventhub-show">az eventhubs eventhub show</a></p>
 <p>As a final step, create the consumer group</p>
 <blockquote>
 <p>This is addition to the default consumer group (appropriately named <code>$Default</code>)</p>
 </blockquote>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">kubectl apply -f deploy/eh-consumer-group.yaml
-
-kubectl get consumergroups/eh-aso-cg
-
-NAME        PROVISIONED   MESSAGE
-eh-aso-cg  true          successfully provisioned
-</code></pre></div><p>You can get details with <code>kubectl describe consumergroup</code> and also double-check using <a href="https://docs.microsoft.com/cli/azure/eventhubs/eventhub/consumer-group?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az-eventhubs-eventhub-consumer-group-show"> eazventhubs eventhub consumer-group show</a></p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">kubectl apply -f deploy/eh-consumer-group.yaml
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">kubectl get consumergroups/eh-aso-cg
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">NAME        PROVISIONED   MESSAGE
+</span></span><span class="line"><span class="cl">eh-aso-cg  true          successfully provisioned
+</span></span></code></pre></div><p>You can get details with <code>kubectl describe consumergroup</code> and also double-check using <a href="https://docs.microsoft.com/cli/azure/eventhubs/eventhub/consumer-group?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az-eventhubs-eventhub-consumer-group-show"> eazventhubs eventhub consumer-group show</a></p>
 <h2 id="whats-next">What&rsquo;s next?</h2>
 <p>Let&rsquo;s make use of what we just setup! We&rsquo;ll deploy a pair of producer and consumer apps to Kubernetes that will send and receive messages from Event Hubs respectively. Both these client apps are written in <a href="https://golang.org/">Go</a> and use the <a href="https://github.com/Shopify/sarama/">Sarama library for Kafka</a>. I am not going to dive into the details since they are relatively straightforward</p>
 <p>Deploy the consumer app:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">kubectl apply -f deploy/consumer.yaml
-
-//wait <span class="k">for</span> it to start
-kubectl get pods -l<span class="o">=</span><span class="nv">app</span><span class="o">=</span>eh-consumer -w
-</code></pre></div><p>Keep a track of the logs for the consumer app:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">kubectl logs -f <span class="k">$(</span>kubectl get pods -l<span class="o">=</span><span class="nv">app</span><span class="o">=</span>eh-consumer --output<span class="o">=</span><span class="nv">jsonpath</span><span class="o">={</span>.items..metadata.name<span class="o">}</span><span class="k">)</span>
-</code></pre></div><p>You should see something similar to:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">Event Hubs broker <span class="o">[</span>eh-aso-ns.servicebus.windows.net:9093<span class="o">]</span>
-Sarama client consumer group ID eh-aso-cg
-new consumer group created
-Event Hubs topic eh-aso-hub
-Waiting <span class="k">for</span> program to <span class="nb">exit</span>
-Partition allocation - map<span class="o">[</span>eh-aso-hub:<span class="o">[</span><span class="m">0</span> <span class="m">1</span> 2<span class="o">]]</span>
-</code></pre></div><p>Using another terminal, deploy the producer app:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">kubectl apply -f deploy/producer.yaml
-</code></pre></div><p>Once the producer app is up and running, the consumer should kick in, start consumer the messages and print them to the console. So you&rsquo;ll see logs similar to this:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">...
-Message topic:<span class="s2">&#34;eh-aso-hub&#34;</span> partition:0 offset:6
-Message content value-2020-07-06 15:37:06.116674866 +0000 UTC <span class="nv">m</span><span class="o">=</span>+67.450171692
-Message topic:<span class="s2">&#34;eh-aso-hub&#34;</span> partition:0 offset:7
-Message content value-2020-07-06 15:37:09.133115988 +0000 UTC <span class="nv">m</span><span class="o">=</span>+70.466612714
-Message topic:<span class="s2">&#34;eh-aso-hub&#34;</span> partition:0 offset:8
-Message content value-2020-07-06 15:37:12.149068005 +0000 UTC <span class="nv">m</span><span class="o">=</span>+73.482564831
-...
-</code></pre></div><blockquote>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl apply -f deploy/consumer.yaml
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">//wait <span class="k">for</span> it to start
+</span></span><span class="line"><span class="cl">kubectl get pods -l<span class="o">=</span><span class="nv">app</span><span class="o">=</span>eh-consumer -w
+</span></span></code></pre></div><p>Keep a track of the logs for the consumer app:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl logs -f <span class="k">$(</span>kubectl get pods -l<span class="o">=</span><span class="nv">app</span><span class="o">=</span>eh-consumer --output<span class="o">=</span><span class="nv">jsonpath</span><span class="o">={</span>.items..metadata.name<span class="o">}</span><span class="k">)</span>
+</span></span></code></pre></div><p>You should see something similar to:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">Event Hubs broker <span class="o">[</span>eh-aso-ns.servicebus.windows.net:9093<span class="o">]</span>
+</span></span><span class="line"><span class="cl">Sarama client consumer group ID eh-aso-cg
+</span></span><span class="line"><span class="cl">new consumer group created
+</span></span><span class="line"><span class="cl">Event Hubs topic eh-aso-hub
+</span></span><span class="line"><span class="cl">Waiting <span class="k">for</span> program to <span class="nb">exit</span>
+</span></span><span class="line"><span class="cl">Partition allocation - map<span class="o">[</span>eh-aso-hub:<span class="o">[</span><span class="m">0</span> <span class="m">1</span> 2<span class="o">]]</span>
+</span></span></code></pre></div><p>Using another terminal, deploy the producer app:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl apply -f deploy/producer.yaml
+</span></span></code></pre></div><p>Once the producer app is up and running, the consumer should kick in, start consumer the messages and print them to the console. So you&rsquo;ll see logs similar to this:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">...
+</span></span><span class="line"><span class="cl">Message topic:<span class="s2">&#34;eh-aso-hub&#34;</span> partition:0 offset:6
+</span></span><span class="line"><span class="cl">Message content value-2020-07-06 15:37:06.116674866 +0000 UTC <span class="nv">m</span><span class="o">=</span>+67.450171692
+</span></span><span class="line"><span class="cl">Message topic:<span class="s2">&#34;eh-aso-hub&#34;</span> partition:0 offset:7
+</span></span><span class="line"><span class="cl">Message content value-2020-07-06 15:37:09.133115988 +0000 UTC <span class="nv">m</span><span class="o">=</span>+70.466612714
+</span></span><span class="line"><span class="cl">Message topic:<span class="s2">&#34;eh-aso-hub&#34;</span> partition:0 offset:8
+</span></span><span class="line"><span class="cl">Message content value-2020-07-06 15:37:12.149068005 +0000 UTC <span class="nv">m</span><span class="o">=</span>+73.482564831
+</span></span><span class="line"><span class="cl">...
+</span></span></code></pre></div><blockquote>
 <p>In case you want to check producer logs as well: <code>kubectl logs -f $(kubectl get pods -l=app=eh-producer --output=jsonpath={.items..metadata.name})</code></p>
 </blockquote>
 <p>Alright, it worked!</p>
@@ -431,40 +431,40 @@ Message content value-2020-07-06 15:37:12.149068005 +0000 UTC <span class="nv">m
 <p>&hellip; how did the consumer and producer apps connect to Event Hubs without connection info, credentials etc.?</p>
 <p><img src="https://media.giphy.com/media/xTiQygY6HW1GjoYKFq/giphy.gif" alt=""></p>
 <p>Notice this part of Event Hub manifest (<code>eh-hub.yaml</code> file):</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="nn">...</span><span class="w">
-</span><span class="w"></span><span class="nt">spec</span><span class="p">:</span><span class="w">
-</span><span class="w">  </span><span class="nt">secretName</span><span class="p">:</span><span class="w"> </span><span class="l">eh-secret</span><span class="w">
-</span><span class="w">  </span><span class="nt">location</span><span class="p">:</span><span class="w"> </span><span class="l">southeastasia</span><span class="w">
-</span><span class="w">  </span><span class="nt">resourceGroup</span><span class="p">:</span><span class="w"> </span><span class="l">eh-aso-rg</span><span class="w">
-</span><span class="w"></span><span class="nn">...</span><span class="w">
-</span></code></pre></div><p><code>secretName: eh-secret</code> ensured that a Kubernetes <code>Secret</code> was created with the required connectivity details including  connection strings (primary, secondary), keys (primary, secondary), along with the basic info such as Event Hubs namespace and hub name.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nn">...</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">secretName</span><span class="p">:</span><span class="w"> </span><span class="l">eh-secret</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">location</span><span class="p">:</span><span class="w"> </span><span class="l">southeastasia</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">resourceGroup</span><span class="p">:</span><span class="w"> </span><span class="l">eh-aso-rg</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nn">...</span><span class="w">
+</span></span></span></code></pre></div><p><code>secretName: eh-secret</code> ensured that a Kubernetes <code>Secret</code> was created with the required connectivity details including  connection strings (primary, secondary), keys (primary, secondary), along with the basic info such as Event Hubs namespace and hub name.</p>
 <p>The producer and consumer <code>Deployment</code>s were simply able to refer to this. Take a look at this snippet from the consumer app <code>Deployment</code></p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="nn">...</span><span class="w">
-</span><span class="w">      </span><span class="nt">containers</span><span class="p">:</span><span class="w">
-</span><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">eh-consumer</span><span class="w">
-</span><span class="w">          </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l">abhirockzz/eh-kafka-consumer</span><span class="w">
-</span><span class="w">          </span><span class="nt">env</span><span class="p">:</span><span class="w">
-</span><span class="w">            </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">EVENTHUBS_CONNECTION_STRING</span><span class="w">
-</span><span class="w">              </span><span class="nt">valueFrom</span><span class="p">:</span><span class="w">
-</span><span class="w">                </span><span class="nt">secretKeyRef</span><span class="p">:</span><span class="w">
-</span><span class="w">                  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">eh-secret</span><span class="w">
-</span><span class="w">                  </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l">primaryConnectionString</span><span class="w">
-</span><span class="w">            </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">EVENTHUBS_NAMESPACE</span><span class="w">
-</span><span class="w">              </span><span class="nt">valueFrom</span><span class="p">:</span><span class="w">
-</span><span class="w">                </span><span class="nt">secretKeyRef</span><span class="p">:</span><span class="w">
-</span><span class="w">                  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">eh-secret</span><span class="w">
-</span><span class="w">                  </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l">eventhubNamespace</span><span class="w">
-</span><span class="w">            </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">EVENTHUBS_BROKER</span><span class="w">
-</span><span class="w">              </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l">$(EVENTHUBS_NAMESPACE).servicebus.windows.net:9093</span><span class="w">
-</span><span class="w">            </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">EVENTHUBS_TOPIC</span><span class="w">
-</span><span class="w">              </span><span class="nt">valueFrom</span><span class="p">:</span><span class="w">
-</span><span class="w">                </span><span class="nt">secretKeyRef</span><span class="p">:</span><span class="w">
-</span><span class="w">                  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">eh-secret</span><span class="w">
-</span><span class="w">                  </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l">eventhubName</span><span class="w">
-</span><span class="w">            </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">EVENTHUBS_CONSUMER_GROUPID</span><span class="w">
-</span><span class="w">              </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l">eh-aso-cg</span><span class="w">
-</span><span class="w"></span><span class="nn">...</span><span class="w">
-</span></code></pre></div><p>The app uses env vars <code>EVENTHUBS_CONNECTION_STRING</code>, <code>EVENTHUBS_NAMESPACE</code> and <code>EVENTHUBS_TOPIC</code> whose values were sourced from the Secret (<code>eh-secret</code>). The value for <code>EVENTHUBS_CONSUMER_GROUPID</code> is hardcoded to <code>eh-aso-cg</code> which was the name of the consumer group specified in <code>eh-consumer-group.yaml</code>.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nn">...</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">containers</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">eh-consumer</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l">abhirockzz/eh-kafka-consumer</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">env</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">EVENTHUBS_CONNECTION_STRING</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">valueFrom</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                </span><span class="nt">secretKeyRef</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">eh-secret</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                  </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l">primaryConnectionString</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">EVENTHUBS_NAMESPACE</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">valueFrom</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                </span><span class="nt">secretKeyRef</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">eh-secret</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                  </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l">eventhubNamespace</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">EVENTHUBS_BROKER</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l">$(EVENTHUBS_NAMESPACE).servicebus.windows.net:9093</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">EVENTHUBS_TOPIC</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">valueFrom</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                </span><span class="nt">secretKeyRef</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">eh-secret</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                  </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l">eventhubName</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">EVENTHUBS_CONSUMER_GROUPID</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l">eh-aso-cg</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nn">...</span><span class="w">
+</span></span></span></code></pre></div><p>The app uses env vars <code>EVENTHUBS_CONNECTION_STRING</code>, <code>EVENTHUBS_NAMESPACE</code> and <code>EVENTHUBS_TOPIC</code> whose values were sourced from the Secret (<code>eh-secret</code>). The value for <code>EVENTHUBS_CONSUMER_GROUPID</code> is hardcoded to <code>eh-aso-cg</code> which was the name of the consumer group specified in <code>eh-consumer-group.yaml</code>.</p>
 <h2 id="clean-up">Clean up</h2>
 <p>To remove all the resources including Event Hubs and the client apps, simply use <code>kubectl delete -f deploy</code></p>
 <h2 id="conclusion">Conclusion</h2>
@@ -570,7 +570,7 @@ Message content value-2020-07-06 15:37:12.149068005 +0000 UTC <span class="nv">m
         </p>
         
         <p class="credits theme-by text-muted">
-          <a href="https://gohugo.io">Hugo v0.89.2</a> powered &nbsp;&bull;&nbsp; Theme <a href="https://github.com/halogenica/beautifulhugo">Beautiful Hugo</a> adapted from <a href="https://deanattali.com/beautiful-jekyll/">Beautiful Jekyll</a>
+          <a href="https://gohugo.io">Hugo v0.94.2</a> powered &nbsp;&bull;&nbsp; Theme <a href="https://github.com/halogenica/beautifulhugo">Beautiful Hugo</a> adapted from <a href="https://deanattali.com/beautiful-jekyll/">Beautiful Jekyll</a>
           
         </p>
       </div>
