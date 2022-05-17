@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en" itemscope itemtype="http://schema.org/WebPage">
+  <head>
+    
+
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+
+  <title>Build a Twitter Leaderboard app with Redis and AWS Lambda (part 1) - Abhishek&#39;s blog</title>
+  <meta name="description" content="Hello and welcome 👋🏼 to this two-part blog series that uses a practical application to demonstrate how to integrate Redis with AWS Lambda.">
+  <meta name="author" content="Abhishek Gupta"/><script type="application/ld+json">
+{
+    "@context": "http://schema.org",
+    "@type": "WebSite",
+    "name": "Abhishek\u0027s blog",
+    
+    "url": "https:\/\/abhirockzz.github.io"
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Organization",
+  "name": "",
+  "url": "https:\/\/abhirockzz.github.io"
+  
+  
+  
+  
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [{
+        "@type": "ListItem",
+        "position": 1,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io",
+          "name": "home"
+        }
+    },{
+        "@type": "ListItem",
+        "position": 3,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io\/posts\/twitter-leaderboard-app-redis-lambda-part1\/",
+          "name": "Build a twitter leaderboard app with redis and aws lambda (part 1)"
+        }
+    }]
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Article",
+  "author": {
+    "name" : "Abhishek Gupta"
+  },
+  "headline": "Build a Twitter Leaderboard app with Redis and AWS Lambda (part 1)",
+  "description" : "Hello and welcome 👋🏼 to this two-part blog series that uses a practical application to demonstrate how to integrate Redis with AWS Lambda.",
+  "inLanguage" : "en",
+  "wordCount":  1354 ,
+  "datePublished" : "2022-05-17T00:00:00",
+  "dateModified" : "2022-05-17T00:00:00",
+  "image" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+  "keywords" : [ "redis, serverless, golang, nosql, database, tutorial" ],
+  "mainEntityOfPage" : "https:\/\/abhirockzz.github.io\/posts\/twitter-leaderboard-app-redis-lambda-part1\/",
+  "publisher" : {
+    "@type": "Organization",
+    "name" : "https:\/\/abhirockzz.github.io",
+    "logo" : {
+        "@type" : "ImageObject",
+        "url" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+        "height" :  60 ,
+        "width" :  60
+    }
+  }
+}
+</script>
+
+<meta property="og:title" content="Build a Twitter Leaderboard app with Redis and AWS Lambda (part 1)" />
+<meta property="og:description" content="Hello and welcome 👋🏼 to this two-part blog series that uses a practical application to demonstrate how to integrate Redis with AWS Lambda.">
+<meta property="og:image" content="https://abhirockzz.github.io/icon.jpg" />
+<meta property="og:url" content="https://abhirockzz.github.io/posts/twitter-leaderboard-app-redis-lambda-part1/" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Abhishek&#39;s blog" />
+
+  <meta name="twitter:title" content="Build a Twitter Leaderboard app with Redis and AWS Lambda (part 1)" />
+  <meta name="twitter:description" content="Hello and welcome 👋🏼 to this two-part blog series that uses a practical application to demonstrate how to integrate Redis with AWS Lambda.">
+  <meta name="twitter:image" content="https://abhirockzz.github.io/icon.jpg" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:site" content="@abhi_tweeter" />
+  <meta name="twitter:creator" content="@abhi_tweeter" />
+  <link href='https://abhirockzz.github.io/icons/myicon.png' rel='icon' type='image/x-icon'/>
+  <meta name="generator" content="Hugo 0.94.2" />
+  <link rel="alternate" href="https://abhirockzz.github.io/index.xml" type="application/rss+xml" title="Abhishek&#39;s blog"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css" integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.5.0/css/all.css" integrity="sha384-B4dIYHKNBt8Bc12p+WXckhzcICo0wtJAoU8YZTY5qE0Id1GSseTk6S+L3BlXeVIU" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous"><link rel="stylesheet" href="https://abhirockzz.github.io/css/main.css" /><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800" /><link rel="stylesheet" href="https://abhirockzz.github.io/css/syntax.css" /><link rel="stylesheet" href="https://abhirockzz.github.io/css/codeblock.css" /><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.css" integrity="sha384-h/L2W9KefUClHWaty3SLE5F/qvc4djlyR4qY3NUV5HGQBBW7stbcfff1+I/vmsHh" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/default-skin/default-skin.min.css" integrity="sha384-iD0dNku6PYSIQLyfTOpB06F2KCZJAKLOThS5HRe8b3ibhdEQ6eKsFf/EeFxdOt5R" crossorigin="anonymous">
+
+
+<script type="application/javascript">
+var doNotTrack = false;
+if (!doNotTrack) {
+	window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+	ga('create', 'UA-54762029-1', 'auto');
+	
+	ga('send', 'pageview');
+}
+</script>
+<script async src='https://www.google-analytics.com/analytics.js'></script>
+
+
+  </head>
+  <body>
+    <nav class="navbar navbar-default navbar-fixed-top navbar-custom">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#main-navbar">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="https://abhirockzz.github.io">Abhishek&#39;s blog</a>
+    </div>
+
+    <div class="collapse navbar-collapse" id="main-navbar">
+      <ul class="nav navbar-nav navbar-right">
+        
+          
+            <li>
+              <a title="Blog" href="/">Blog</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="About" href="/about">About</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Books" href="/books">Books</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Open-Source" href="/projects">Open-Source</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Presentations" href="/presentations">Presentations</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Tags" href="/tags">Tags</a>
+            </li>
+          
+        
+
+        
+
+        
+      </ul>
+    </div>
+
+    
+      <div class="avatar-container">
+        <div class="avatar-img-border">
+          <a title="Abhishek&#39;s blog" href="https://abhirockzz.github.io">
+            <img class="avatar-img" src="https://abhirockzz.github.io/icon.jpg" alt="Abhishek&#39;s blog" />
+          </a>
+        </div>
+      </div>
+    
+
+  </div>
+</nav>
+
+
+
+
+    
+
+
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+<div class="pswp__bg"></div>
+
+<div class="pswp__scroll-wrap">
+    
+    <div class="pswp__container">
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+    </div>
+    
+    <div class="pswp__ui pswp__ui--hidden">
+    <div class="pswp__top-bar">
+      
+      <div class="pswp__counter"></div>
+      <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+      <button class="pswp__button pswp__button--share" title="Share"></button>
+      <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+      <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+      
+      
+      <div class="pswp__preloader">
+        <div class="pswp__preloader__icn">
+          <div class="pswp__preloader__cut">
+            <div class="pswp__preloader__donut"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+      <div class="pswp__share-tooltip"></div>
+    </div>
+    <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+    </button>
+    <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+    </button>
+    <div class="pswp__caption">
+      <div class="pswp__caption__center"></div>
+    </div>
+    </div>
+    </div>
+</div>
+
+
+  
+  
+  
+
+
+
+
+
+
+  
+
+  <header class="header-section ">
+    
+    <div class="intro-header no-img">
+      <div class="container">
+        <div class="row">
+          <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+            <div class="posts-heading">
+              
+                <h1>Build a Twitter Leaderboard app with Redis and AWS Lambda (part 1)</h1>
+              
+              
+                <hr class="small">
+              
+              
+              
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+
+    
+<div class="container" role="main">
+  <div class="row">
+    <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+      <article role="main" class="blog-post">
+        <p>Hello and welcome 👋🏼 to this two-part blog series that uses a practical application to demonstrate how to integrate Redis with AWS Lambda. The first part (this one) covers the application - by the end of this blog, you should have the solution deployed, played around with it and in the process, have a good overview of the solution.</p>
+<p>The second part is about the Infrastructure (IaaC to be specific) aspects - its mostly centred around AWS CDK along with some code walkthrough.</p>
+<p>Over the course of this blog series, you will learn:</p>
+<ul>
+<li>How to use Lambda and Redis together - including VPC and other configuration to make things work</li>
+<li>How to use Lambda Function URL</li>
+<li>How to deploy your Lambda function as a Docker container (not a zip file)</li>
+<li>Use AWS CDK to create all the components of the solution - Infrastructure (VPC, subnets etc.), database as well as Lambda functions (this includes multiple stacks in the context of a single CDK app)</li>
+</ul>
+<p>I have used <a href="https://go.dev/">Go</a> for the Lambda functions (<a href="https://github.com/aws/aws-lambda-go">aws-lambda-go</a>) as well as infrastructure (with <a href="https://docs.aws.amazon.com/cdk/v2/guide/work-with-cdk-go.html">CKD Go support</a>), but you should be easily able to apply the concepts to the programming language of your choice.</p>
+<blockquote>
+<p>As always, the code is <a href="https://github.com/abhirockzz/twitter-leaderboard-app">available on Github</a></p>
+</blockquote>
+<p>Here is a quick overview of the services involved in the solution:</p>
+<ul>
+<li><a href="https://docs.aws.amazon.com/memorydb/latest/devguide/what-is-memorydb-for-redis.html">Amazon MemoryDB for Redis</a> - It is a durable, in-memory database service that is compatible with Redis, thus empowering you to build applications using the same flexible and friendly Redis data structures, APIs, and commands that they already use today.</li>
+<li><a href="https://docs.aws.amazon.com/lambda/latest/dg/lambda-urls.html">Lambda Function URL</a> is a relatively new feature (at the time of writing this blog) that provides dedicated HTTP(S) endpoint for your Lambda function. It is really useful when all you need is a single endpoint for your function (e.g. to serve as a webhook) and don&rsquo;t want to setup and configure an API Gateway.</li>
+<li><a href="https://docs.aws.amazon.com/cdk/v2/guide/home.html">AWS Cloud Development Kit</a> (CDK) is all about IaaC (Infrastructure-as-code). It is a framework for defining cloud infrastructure in code and provisioning it through AWS CloudFormation. You can choose from a list of supported programming languages (at the time of writing - TypeScript, JavaScript, Python, Java, C#/.Net, and Go (in developer preview)) to define your infrastructure components as code, just like you would with any other application!</li>
+</ul>
+<h2 id="the-twitter-hashtag-leaderboard-app">The Twitter Hashtag Leaderboard app</h2>
+<p>Don&rsquo;t worry, it&rsquo;s simpler than it sounds! Here is the high level architecture:</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/2qxmomj6nb5iw1kbl0wk.png" alt="Image description"></p>
+<p>The solution can be divided into two logical parts:</p>
+<ul>
+<li>The first part handles tweet ingestion: A Lambda function fetches tweets (from Twitter), extracts hashtags for each tweet, and stores them in MemoryDB (in a Redis Sorted Set). This function gets invoked based on a schedule based on a rule in CloudWatch trigger</li>
+<li>The second part provides the leaderboard functionality: This is yet another Lambda function that provides a HTTP(s) endpoint (thanks to Lambda Function URL) to query the sorted set and extract top 10 hashtags (leaderboard)</li>
+</ul>
+<p>I told you, it&rsquo;s quite simple!</p>
+<p>Alright, with the intro out of the way, we can move on to the fun part - which is deploying the application. Before that, make sure you have the following ready:</p>
+<h2 id="requirements">Requirements</h2>
+<ul>
+<li><a href="https://portal.aws.amazon.com/gp/aws/developer/registration/index.html">Create an AWS account</a> (if you do not already have one) and log in. The IAM user that you use must have sufficient permissions to make necessary AWS service calls and manage AWS resources.</li>
+<li>Install and configure <a href="https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html">AWS CLI</a></li>
+<li>Install and bootstrap <a href="https://docs.aws.amazon.com/cdk/v2/guide/getting_started.html#getting_started_install">AWS CDK</a></li>
+<li>Setup <a href="https://docs.docker.com/get-docker/">Docker</a></li>
+<li><a href="https://go.dev/dl/">Install Go</a></li>
+<li>Get your <a href="https://developer.twitter.com/en/docs/twitter-api/getting-started/getting-access-to-the-twitter-api">Twitter API credentials</a></li>
+</ul>
+<h2 id="deploy-the-application---one-cdk-stack-at-a-time">Deploy the application - One CDK Stack at a time</h2>
+<p>We will cover the details in the second part. For now, just know that the infrastructure part of this solution is comprised of three (CDK) <a href="https://docs.aws.amazon.com/cdk/v2/guide/stacks.html">Stack</a>s (in the context of a single <a href="https://docs.aws.amazon.com/cdk/v2/guide/apps.html">CDK App</a>). Although its possible to deploy all of them together (with <code>cdk deploy --all</code>), we will do it one by one. This way, you can review what&rsquo;s happening at each stage, introspect the  components that have been created and better understand how everything is wired together.</p>
+<p>First, clone the Github repo:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">git clone https://github.com/abhirockzz/twitter-leaderboard-app
+</span></span></code></pre></div><h3 id="starting-with-the-infrastructure">Starting with the infrastructure&hellip;</h3>
+<p>The first stack deploys a <a href="https://docs.aws.amazon.com/vpc/latest/userguide/what-is-amazon-vpc.html">VPC</a> (and also subnets, NAT gateway etc.), a MemoryDB for Redis cluster and a few security groups.</p>
+<p>Choose a password of your choice for MemoryDB and export it as a environment variable (this is just for demonstration purposes - for production, you will have specific processes in place to handle sensitive info)</p>
+<p>Be mindful of the password requirements. From the <a href="https://docs.aws.amazon.com/memorydb/latest/devguide/clusters.acls.html">documentation</a>:</p>
+<blockquote>
+<p>&ldquo;In particular, be aware of these user password constraints when using ACLs for MemoryDB:</p>
+<ul>
+<li>Passwords must be 16–128 printable characters.</li>
+<li>The following non-alphanumeric characters are not allowed: , &quot;&rdquo; / @.&quot;</li>
+</ul>
+</blockquote>
+<p>Change to the correct folder and kick off the stack deployment:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">MEMORYDB_PASSWORD</span><span class="o">=</span>&lt;enter a password e.g. P@ssw0rd12345678&gt;
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="nb">cd</span> cdk
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># stack1 is the name of the stack - used for simplicity</span>
+</span></span><span class="line"><span class="cl">cdk deploy stack1
+</span></span></code></pre></div><p>There is lots to be done. While CDK is hard at work for us, you need to wait patiently :) This is probably a good time to navigate to the <code>CloudFormation</code> in AWS console and see what&rsquo;s going on behind the scenes.</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/1pllzgbe8fb4ikmcin59.png" alt="Image description"></p>
+<p>Once the stack creation is complete, go the AWS console and check out your freshly minted VPC, MemoryDB cluster and other components!</p>
+<p>Here is the stack output for your reference:</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/5jw2nicbmnky35h1nab1.png" alt="Image description"></p>
+<p>The next two stacks deploy separate Lambda functions. Before moving on though, make sure you build the Go binaries for both these functions.</p>
+<p><strong>Go, build!</strong></p>
+<p>Move to the respective folders and just invoke <code>go build</code> for each function:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="nb">cd</span> tweet-ingest <span class="o">&amp;&amp;</span> <span class="nv">GOOS</span><span class="o">=</span>linux go build -o app
+</span></span><span class="line"><span class="cl"><span class="nb">cd</span> leaderboard-function <span class="o">&amp;&amp;</span> <span class="nv">GOOS</span><span class="o">=</span>linux go build -o app
+</span></span></code></pre></div><blockquote>
+<p>To package the Lambda function as a Docker container, I used the <a href="https://gallery.ecr.aws/lambda/go">Go:1.x base image</a>. But, you can explore <a href="https://docs.aws.amazon.com/lambda/latest/dg/go-image.html">other options</a> as well. During deployment (via <code>cdk deploy</code>), the Docker image is built locally, pushed to a <a href="https://docs.aws.amazon.com/AmazonECR/latest/userguide/Registries.html">private ECR registry</a> and finally the Lambda function is created - all this, with a few lines of code!</p>
+</blockquote>
+<h3 id="the-second-stack---for-the-first-lambda-function">The second stack - For the first Lambda function</h3>
+<p>The function requires your Twitter API credentials (along with the MemoryDB password) - seed them as environment variables. Then, initiate stack creation:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">MEMORYDB_PASSWORD</span><span class="o">=</span>&lt;enter the password you had previously chosen e.g. P@ssw0rd12345678&gt;
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">TWITTER_API_KEY</span><span class="o">=</span>&lt;enter twitter API key&gt;
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">TWITTER_API_SECRET</span><span class="o">=</span>&lt;enter twitter API secret&gt;
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">TWITTER_ACCESS_TOKEN</span><span class="o">=</span>&lt;enter twitter access token&gt;
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">TWITTER_ACCESS_TOKEN_SECRET</span><span class="o">=</span>&lt;enter twitter API access token secret&gt;
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># note the name of the stack is stack2</span>
+</span></span><span class="line"><span class="cl">cdk deploy stack2
+</span></span></code></pre></div><p>This one will be faster (compared to <code>stack1</code>), I promise!</p>
+<p>Once the stack creation is complete, to make things work, there is one manual step required. Go to the AWS console, open the Lambda function (named <code>tweet-ingest-function</code>), that was just created, click <strong>Add Trigger</strong> and manually add the CloudWatch trigger configuration.</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/pj9791pnoxvc7sjl9sdx.png" alt="Image description"></p>
+<p>Now your function will be automatically triggered once every minute!</p>
+<p>To check how things are going, check out the logs for your Lambda function (AWS console &gt; Lambda &gt; Monitor):</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/mu4bq7rilwzkw6w2slnz.png" alt="Image description"></p>
+<p>I would also encourage you to check the VPC configuration for your Lambda function:</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/27aaw4i4qaq16mvm864t.png" alt="Image description"></p>
+<h3 id="and-finally-deploy-the-leaderboard-function">And finally, deploy the Leaderboard function</h3>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">MEMORYDB_PASSWORD</span><span class="o">=</span>&lt;enter the password you had previously chosen e.g. P@ssw0rd12345678&gt;
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># note the name of the stack is stack3</span>
+</span></span><span class="line"><span class="cl">cdk deploy stack3
+</span></span></code></pre></div><p>After successful deployment, you should have a Lambda Function URL ready for you to access - you can simply copy it from the stack output!</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/dsfpnpn6u0gzrmnhug94.png" alt="Image description"></p>
+<p>Just access the endpoint (I have used <code>curl</code> CLI, but a browser should work just fine):</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">curl -i &lt;enter lambda <span class="k">function</span> URL from the stack output&gt;
+</span></span></code></pre></div><p>You should get back a JSON payload with info about top 10 hashtags along with their names and number of times they were mentioned - something similar to this:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="line"><span class="cl"><span class="p">[</span>
+</span></span><span class="line"><span class="cl">  <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;Score&#34;</span><span class="p">:</span> <span class="mi">121</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;Member&#34;</span><span class="p">:</span> <span class="s2">&#34;AWS&#34;</span>
+</span></span><span class="line"><span class="cl">  <span class="p">},</span>
+</span></span><span class="line"><span class="cl">  <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;Score&#34;</span><span class="p">:</span> <span class="mi">56</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;Member&#34;</span><span class="p">:</span> <span class="s2">&#34;gaming&#34;</span>
+</span></span><span class="line"><span class="cl">  <span class="p">},</span>
+</span></span><span class="line"><span class="cl">  <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;Score&#34;</span><span class="p">:</span> <span class="mi">56</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;Member&#34;</span><span class="p">:</span> <span class="s2">&#34;RESTOCK&#34;</span>
+</span></span><span class="line"><span class="cl">  <span class="p">},</span>
+</span></span><span class="line"><span class="cl">  <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;Score&#34;</span><span class="p">:</span> <span class="mi">56</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;Member&#34;</span><span class="p">:</span> <span class="s2">&#34;ALERT&#34;</span>
+</span></span><span class="line"><span class="cl">  <span class="p">},</span>
+</span></span><span class="line"><span class="cl">  <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;Score&#34;</span><span class="p">:</span> <span class="mi">35</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;Member&#34;</span><span class="p">:</span> <span class="s2">&#34;aws&#34;</span>
+</span></span><span class="line"><span class="cl">  <span class="p">},</span>
+</span></span><span class="line"><span class="cl">  <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;Score&#34;</span><span class="p">:</span> <span class="mi">26</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;Member&#34;</span><span class="p">:</span> <span class="s2">&#34;rtx3080&#34;</span>
+</span></span><span class="line"><span class="cl">  <span class="p">},</span>
+</span></span><span class="line"><span class="cl">  <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;Score&#34;</span><span class="p">:</span> <span class="mi">26</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;Member&#34;</span><span class="p">:</span> <span class="s2">&#34;geforce3080&#34;</span>
+</span></span><span class="line"><span class="cl">  <span class="p">},</span>
+</span></span><span class="line"><span class="cl">  <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;Score&#34;</span><span class="p">:</span> <span class="mi">24</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;Member&#34;</span><span class="p">:</span> <span class="s2">&#34;Infographic&#34;</span>
+</span></span><span class="line"><span class="cl">  <span class="p">},</span>
+</span></span><span class="line"><span class="cl">  <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;Score&#34;</span><span class="p">:</span> <span class="mi">23</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;Member&#34;</span><span class="p">:</span> <span class="s2">&#34;箱マスク&#34;</span>
+</span></span><span class="line"><span class="cl">  <span class="p">},</span>
+</span></span><span class="line"><span class="cl">  <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;Score&#34;</span><span class="p">:</span> <span class="mi">23</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;Member&#34;</span><span class="p">:</span> <span class="s2">&#34;startups&#34;</span>
+</span></span><span class="line"><span class="cl">  <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">]</span>
+</span></span></code></pre></div><p>This concludes the first part. In the second one, we dive into the CDK aspects and look at some Go code - see you there!</p>
+
+
+        
+          <div class="blog-tags">
+            
+              <a href="https://abhirockzz.github.io/tags/redis/">redis</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io/tags/serverless/">serverless</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io/tags/golang/">golang</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io/tags/nosql/">nosql</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io/tags/database/">database</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io/tags/tutorial/">tutorial</a>&nbsp;
+            
+          </div>
+        
+
+        
+
+        
+      </article>
+
+      
+        <ul class="pager blog-pager">
+          
+            <li class="previous">
+              <a href="https://abhirockzz.github.io/posts/redis-on-aws-getting-started-easy-way/" data-toggle="tooltip" data-placement="top" title="Getting started with Redis on AWS - the easy way!">&larr; Previous Post</a>
+            </li>
+          
+          
+        </ul>
+      
+
+
+      
+
+    </div>
+  </div>
+</div>
+
+      
+<footer>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+        <ul class="list-inline text-center footer-links">
+          
+              <li>
+                <a href="https://github.com/abhirockzz" title="GitHub">
+                  <span class="fa-stack fa-lg">
+                    <i class="fas fa-circle fa-stack-2x"></i>
+                    <i class="fab fa-github fa-stack-1x fa-inverse"></i>
+                  </span>
+                </a>
+              </li>
+              <li>
+                <a href="https://twitter.com/abhi_tweeter" title="Twitter">
+                  <span class="fa-stack fa-lg">
+                    <i class="fas fa-circle fa-stack-2x"></i>
+                    <i class="fab fa-twitter fa-stack-1x fa-inverse"></i>
+                  </span>
+                </a>
+              </li>
+              <li>
+                <a href="https://linkedin.com/in/abhirockzz" title="LinkedIn">
+                  <span class="fa-stack fa-lg">
+                    <i class="fas fa-circle fa-stack-2x"></i>
+                    <i class="fab fa-linkedin fa-stack-1x fa-inverse"></i>
+                  </span>
+                </a>
+              </li>
+          
+          <li>
+            <a href="" title="RSS">
+              <span class="fa-stack fa-lg">
+                <i class="fas fa-circle fa-stack-2x"></i>
+                <i class="fas fa-rss fa-stack-1x fa-inverse"></i>
+              </span>
+            </a>
+          </li>
+          
+        </ul>
+        <p class="credits copyright text-muted">
+          
+            
+              <a href="https://abhirockzz.github.io">Abhishek Gupta</a>
+            
+          
+
+          &nbsp;&bull;&nbsp;&copy;
+          
+            2022
+          
+
+          
+            &nbsp;&bull;&nbsp;
+            <a href="https://abhirockzz.github.io">Abhishek&#39;s blog</a>
+          
+        </p>
+        
+        <p class="credits theme-by text-muted">
+          <a href="https://gohugo.io">Hugo v0.94.2</a> powered &nbsp;&bull;&nbsp; Theme <a href="https://github.com/halogenica/beautifulhugo">Beautiful Hugo</a> adapted from <a href="https://deanattali.com/beautiful-jekyll/">Beautiful Jekyll</a>
+          
+        </p>
+      </div>
+    </div>
+  </div>
+</footer><script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.js" integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/contrib/auto-render.min.js" integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
+<script src="https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+<script src="https://abhirockzz.github.io/js/main.js"></script><script> renderMathInElement(document.body); </script><script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.js" integrity="sha384-QELNnmcmU8IR9ZAykt67vGr9/rZJdHbiWi64V88fCPaOohUlHCqUD/unNN0BXSqy" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe-ui-default.min.js" integrity="sha384-m67o7SkQ1ALzKZIFh4CiTA8tmadaujiTa9Vu+nqPSwDOqHrDmxLezTdFln8077+q" crossorigin="anonymous"></script><script src="https://abhirockzz.github.io/js/load-photoswipe.js"></script>
+
+
+
+
+
+
+
+
+
+    
+  </body>
+</html>
+
