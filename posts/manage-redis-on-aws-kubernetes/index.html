@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en" itemscope itemtype="http://schema.org/WebPage">
+  <head>
+    
+
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+
+  <title>Manage Redis on AWS from Kubernetes - Abhishek&#39;s blog</title>
+  <meta name="description" content="Using AWS Controller for Kubernetes and CDK for Kubernetes
+In this blog post, you will learn how to use ACK with Amazon EKS for creating a Redis cluster on AWS (with Amazon MemoryDB).">
+  <meta name="author" content="Abhishek Gupta"/><script type="application/ld+json">
+{
+    "@context": "http://schema.org",
+    "@type": "WebSite",
+    "name": "Abhishek\u0027s blog",
+    
+    "url": "https:\/\/abhirockzz.github.io"
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Organization",
+  "name": "",
+  "url": "https:\/\/abhirockzz.github.io"
+  
+  
+  
+  
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [{
+        "@type": "ListItem",
+        "position": 1,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io",
+          "name": "home"
+        }
+    },{
+        "@type": "ListItem",
+        "position": 3,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io\/posts\/manage-redis-on-aws-kubernetes\/",
+          "name": "Manage redis on aws from kubernetes"
+        }
+    }]
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Article",
+  "author": {
+    "name" : "Abhishek Gupta"
+  },
+  "headline": "Manage Redis on AWS from Kubernetes",
+  "description" : "Using AWS Controller for Kubernetes and CDK for Kubernetes\nIn this blog post, you will learn how to use ACK with Amazon EKS for creating a Redis cluster on AWS (with Amazon MemoryDB).",
+  "inLanguage" : "en",
+  "wordCount":  2180 ,
+  "datePublished" : "2022-09-21T00:00:00",
+  "dateModified" : "2022-09-21T00:00:00",
+  "image" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+  "keywords" : [ "redis, kubernetes, golang, cdk, cncf, tutorial" ],
+  "mainEntityOfPage" : "https:\/\/abhirockzz.github.io\/posts\/manage-redis-on-aws-kubernetes\/",
+  "publisher" : {
+    "@type": "Organization",
+    "name" : "https:\/\/abhirockzz.github.io",
+    "logo" : {
+        "@type" : "ImageObject",
+        "url" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+        "height" :  60 ,
+        "width" :  60
+    }
+  }
+}
+</script>
+
+<meta property="og:title" content="Manage Redis on AWS from Kubernetes" />
+<meta property="og:description" content="Using AWS Controller for Kubernetes and CDK for Kubernetes
+In this blog post, you will learn how to use ACK with Amazon EKS for creating a Redis cluster on AWS (with Amazon MemoryDB).">
+<meta property="og:image" content="https://abhirockzz.github.io/icon.jpg" />
+<meta property="og:url" content="https://abhirockzz.github.io/posts/manage-redis-on-aws-kubernetes/" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Abhishek&#39;s blog" />
+
+  <meta name="twitter:title" content="Manage Redis on AWS from Kubernetes" />
+  <meta name="twitter:description" content="Using AWS Controller for Kubernetes and CDK for Kubernetes
+In this blog post, you will learn how to use ACK with Amazon EKS for creating a Redis cluster on AWS (with Amazon MemoryDB).">
+  <meta name="twitter:image" content="https://abhirockzz.github.io/icon.jpg" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:site" content="@abhi_tweeter" />
+  <meta name="twitter:creator" content="@abhi_tweeter" />
+  <link href='https://abhirockzz.github.io/icons/myicon.png' rel='icon' type='image/x-icon'/>
+  <meta name="generator" content="Hugo 0.101.0" />
+  <link rel="alternate" href="https://abhirockzz.github.io/index.xml" type="application/rss+xml" title="Abhishek&#39;s blog"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css" integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.5.0/css/all.css" integrity="sha384-B4dIYHKNBt8Bc12p+WXckhzcICo0wtJAoU8YZTY5qE0Id1GSseTk6S+L3BlXeVIU" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous"><link rel="stylesheet" href="https://abhirockzz.github.io/css/main.css" /><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800" /><link rel="stylesheet" href="https://abhirockzz.github.io/css/syntax.css" /><link rel="stylesheet" href="https://abhirockzz.github.io/css/codeblock.css" /><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.css" integrity="sha384-h/L2W9KefUClHWaty3SLE5F/qvc4djlyR4qY3NUV5HGQBBW7stbcfff1+I/vmsHh" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/default-skin/default-skin.min.css" integrity="sha384-iD0dNku6PYSIQLyfTOpB06F2KCZJAKLOThS5HRe8b3ibhdEQ6eKsFf/EeFxdOt5R" crossorigin="anonymous">
+
+
+<script type="application/javascript">
+var doNotTrack = false;
+if (!doNotTrack) {
+	window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+	ga('create', 'UA-54762029-1', 'auto');
+	
+	ga('send', 'pageview');
+}
+</script>
+<script async src='https://www.google-analytics.com/analytics.js'></script>
+
+
+  </head>
+  <body>
+    <nav class="navbar navbar-default navbar-fixed-top navbar-custom">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#main-navbar">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="https://abhirockzz.github.io">Abhishek&#39;s blog</a>
+    </div>
+
+    <div class="collapse navbar-collapse" id="main-navbar">
+      <ul class="nav navbar-nav navbar-right">
+        
+          
+            <li>
+              <a title="Blog" href="/">Blog</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="About" href="/about">About</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Books" href="/books">Books</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Open-Source" href="/projects">Open-Source</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Presentations" href="/presentations">Presentations</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Tags" href="/tags">Tags</a>
+            </li>
+          
+        
+
+        
+
+        
+      </ul>
+    </div>
+
+    
+      <div class="avatar-container">
+        <div class="avatar-img-border">
+          <a title="Abhishek&#39;s blog" href="https://abhirockzz.github.io">
+            <img class="avatar-img" src="https://abhirockzz.github.io/icon.jpg" alt="Abhishek&#39;s blog" />
+          </a>
+        </div>
+      </div>
+    
+
+  </div>
+</nav>
+
+
+
+
+    
+
+
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+<div class="pswp__bg"></div>
+
+<div class="pswp__scroll-wrap">
+    
+    <div class="pswp__container">
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+    </div>
+    
+    <div class="pswp__ui pswp__ui--hidden">
+    <div class="pswp__top-bar">
+      
+      <div class="pswp__counter"></div>
+      <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+      <button class="pswp__button pswp__button--share" title="Share"></button>
+      <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+      <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+      
+      
+      <div class="pswp__preloader">
+        <div class="pswp__preloader__icn">
+          <div class="pswp__preloader__cut">
+            <div class="pswp__preloader__donut"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+      <div class="pswp__share-tooltip"></div>
+    </div>
+    <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+    </button>
+    <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+    </button>
+    <div class="pswp__caption">
+      <div class="pswp__caption__center"></div>
+    </div>
+    </div>
+    </div>
+</div>
+
+
+  
+  
+  
+
+
+
+
+
+
+  
+
+  <header class="header-section ">
+    
+    <div class="intro-header no-img">
+      <div class="container">
+        <div class="row">
+          <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+            <div class="posts-heading">
+              
+                <h1>Manage Redis on AWS from Kubernetes</h1>
+              
+              
+                <hr class="small">
+              
+              
+              
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+
+    
+<div class="container" role="main">
+  <div class="row">
+    <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+      <article role="main" class="blog-post">
+        <p><em><strong>Using AWS Controller for Kubernetes and CDK for Kubernetes</strong></em></p>
+<p>In this blog post, you will learn how to use <code>ACK</code> with <a href="https://docs.aws.amazon.com/eks/latest/userguide/what-is-eks.html">Amazon EKS</a> for creating a Redis cluster on AWS (with <a href="https://docs.aws.amazon.com/memorydb/latest/devguide/what-is-memorydb-for-redis.html">Amazon MemoryDB</a>).</p>
+<p><a href="https://aws-controllers-k8s.github.io/community/docs/community/overview/">AWS Controllers for Kubernetes</a> (also known as <strong>ACK</strong>) leverage <a href="https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/#custom-resources">Kubernetes Custom Resource and Custom Resource Definitions</a> and give you the ability to manage and use AWS services directly from Kubernetes without needing to define resources outside of the cluster. It <a href="https://aws-controllers-k8s.github.io/community/docs/community/services/">supports many AWS services</a> including <code>S3</code>, <code>DynamoDB</code>, <code>MemoryDB</code> etc.</p>
+<p>Normally you would define custom resources in ACK using YAML. But, in this case we will leverage <a href="https://cdk8s.io/docs/latest/">cdk8s</a> (Cloud Development Kit for Kubernetes), an open-source framework (part of CNCF) that allows you to define your Kubernetes applications using regular programming languages (instead of <code>yaml</code>). Thanks to <code>cdk8s</code> support for <a href="cdk8s-k8s-go-3.md">Kubernetes Custom Resource definitions</a>, we will import <code>MemoryDB</code> <code>ACK</code> CRDs as APIs and then define a cluster using code (I will be using <code>Go</code> for this).</p>
+<p>That&rsquo;s not all! In addition to the infrastructure, we will take care of the application that will represent the application which will connect with the MemoryDB cluster. To do this, we will use the <a href="https://cdk8s.io/docs/latest/plus/">cdk8s-plus library</a> to define a Kubernetes <code>Deployment</code> (and <code>Service</code> to expose it), thereby building an end to end solution. In the process, you will learn about some of other nuances of <code>ACK</code> such as <code>FieldExport</code> etc.</p>
+<p><img src="https://miro.medium.com/max/1400/1*2plcuR0yNCkRbBNcLNpxoA.png" alt=""></p>
+<h2 id="pre-requisites">Pre-requisites</h2>
+<p>To follow along step-by-step, in addition to an AWS account, you will need to have <a href="https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html">AWS CLI</a>, <a href="https://cdk8s.io/docs/latest/getting-started/#install-the-cli">cdk8s CLI</a>, <a href="https://kubernetes.io/docs/tasks/tools/#kubectl">kubectl</a>, <a href="https://helm.sh/docs/intro/install/">helm</a> and the <a href="https://go.dev/dl/">Go programming language</a> installed.</p>
+<p>There are a variety of ways in which you can create an <a href="https://docs.aws.amazon.com/eks/latest/userguide/create-cluster.html">Amazon EKS cluster</a>. I prefer using <a href="https://eksctl.io/">eksctl</a> CLI because of the convenience it offers!</p>
+<h2 id="first-set-up-the-memorydb-controller">First, set up the MemoryDB controller</h2>
+<blockquote>
+<p>Most of the below steps are adapted from the <code>ACK</code> documentation - <a href="https://aws-controllers-k8s.github.io/community/docs/user-docs/install/">Install an ACK Controller</a></p>
+</blockquote>
+<p><strong>Install it using <code>Helm</code>:</strong></p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">SERVICE</span><span class="o">=</span>memorydb
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">RELEASE_VERSION</span><span class="o">=</span><span class="sb">`</span>curl -sL https://api.github.com/repos/aws-controllers-k8s/<span class="nv">$SERVICE</span>-controller/releases/latest <span class="p">|</span> grep <span class="s1">&#39;&#34;tag_name&#34;:&#39;</span> <span class="p">|</span> cut -d<span class="s1">&#39;&#34;&#39;</span> -f4<span class="sb">`</span>
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">ACK_SYSTEM_NAMESPACE</span><span class="o">=</span>ack-system
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># you can change the region as required</span>
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">AWS_REGION</span><span class="o">=</span>us-east-1
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">aws ecr-public get-login-password --region us-east-1 <span class="p">|</span> helm registry login --username AWS --password-stdin public.ecr.aws
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">helm install --create-namespace -n <span class="nv">$ACK_SYSTEM_NAMESPACE</span> ack-<span class="nv">$SERVICE</span>-controller <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>  oci://public.ecr.aws/aws-controllers-k8s/<span class="nv">$SERVICE</span>-chart --version<span class="o">=</span><span class="nv">$RELEASE_VERSION</span> --set<span class="o">=</span>aws.region<span class="o">=</span><span class="nv">$AWS_REGION</span>
+</span></span></code></pre></div><p>To confirm, run:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl get crd
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># output (multiple CRDs)</span>
+</span></span><span class="line"><span class="cl">NAME                                         CREATED AT
+</span></span><span class="line"><span class="cl">acls.memorydb.services.k8s.aws               2022-08-13T19:15:46Z
+</span></span><span class="line"><span class="cl">adoptedresources.services.k8s.aws            2022-08-13T19:15:53Z
+</span></span><span class="line"><span class="cl">clusters.memorydb.services.k8s.aws           2022-08-13T19:15:47Z
+</span></span><span class="line"><span class="cl">eniconfigs.crd.k8s.amazonaws.com             2022-08-13T19:02:10Z
+</span></span><span class="line"><span class="cl">fieldexports.services.k8s.aws                2022-08-13T19:15:56Z
+</span></span><span class="line"><span class="cl">parametergroups.memorydb.services.k8s.aws    2022-08-13T19:15:48Z
+</span></span><span class="line"><span class="cl">securitygrouppolicies.vpcresources.k8s.aws   2022-08-13T19:02:12Z
+</span></span><span class="line"><span class="cl">snapshots.memorydb.services.k8s.aws          2022-08-13T19:15:51Z
+</span></span><span class="line"><span class="cl">subnetgroups.memorydb.services.k8s.aws       2022-08-13T19:15:52Z
+</span></span><span class="line"><span class="cl">users.memorydb.services.k8s.aws              2022-08-13T19:15:53Z
+</span></span></code></pre></div><p>Since the controller has to interact with AWS Services (make API calls), we need to configure <a href="https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html">IAM Roles for Service Accounts</a> (also known as <strong>IRSA</strong>).</p>
+<blockquote>
+<p>Refer to <a href="https://aws-controllers-k8s.github.io/community/docs/user-docs/irsa/">Configure IAM Permissions</a> for details</p>
+</blockquote>
+<p><strong>IRSA configuration</strong></p>
+<p>First, create an OIDC identity provider for your cluster.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">EKS_CLUSTER_NAME</span><span class="o">=</span>&lt;name of your EKS cluster&gt;
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">AWS_REGION</span><span class="o">=</span>&lt;cluster region&gt;
+</span></span><span class="line"><span class="cl">eksctl utils associate-iam-oidc-provider --cluster <span class="nv">$EKS_CLUSTER_NAME</span> --region <span class="nv">$AWS_REGION</span> --approve
+</span></span></code></pre></div><p>The goal is to create an IAM role and attach appropriate permissions via policies. We can then create a <a href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/">Kubernetes Service Account</a> and attach the IAM role to it. Thus, the controller <code>Pod</code> will be able to make AWS API calls. Note that we are using providing all <code>MemoryDB</code> permissions to our control via the <code>arn:aws:iam::aws:policy/AmazonMemoryDBFullAccess</code> policy.</p>
+<p>Thanks to <code>eksctl</code>, this can be done with a single line!</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">SERVICE</span><span class="o">=</span>memorydb
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">ACK_K8S_SERVICE_ACCOUNT_NAME</span><span class="o">=</span>ack-<span class="nv">$SERVICE</span>-controller
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># recommend using the same name</span>
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">ACK_SYSTEM_NAMESPACE</span><span class="o">=</span>ack-system
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">EKS_CLUSTER_NAME</span><span class="o">=</span>&lt;enter EKS cluster name&gt;
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">POLICY_ARN</span><span class="o">=</span>arn:aws:iam::aws:policy/AmazonMemoryDBFullAccess
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># IAM role has a format - do not change it. you can&#39;t use any arbitrary name</span>
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">IAM_ROLE_NAME</span><span class="o">=</span>ack-<span class="nv">$SERVICE</span>-controller-role
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">eksctl create iamserviceaccount <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>    --name <span class="nv">$ACK_K8S_SERVICE_ACCOUNT_NAME</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>    --namespace <span class="nv">$ACK_SYSTEM_NAMESPACE</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>    --cluster <span class="nv">$EKS_CLUSTER_NAME</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>    --role-name <span class="nv">$IAM_ROLE_NAME</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>    --attach-policy-arn <span class="nv">$POLICY_ARN</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>    --approve <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>    --override-existing-serviceaccounts
+</span></span></code></pre></div><blockquote>
+<p>The policy (<code>AmazonMemoryDBFullAccess</code>) is chosen as per <a href="https://github.com/aws-controllers-k8s/memorydb-controller/blob/main/config/iam/recommended-policy-arn">https://github.com/aws-controllers-k8s/memorydb-controller/blob/main/config/iam/recommended-policy-arn</a></p>
+</blockquote>
+<p>To confirm, you can check whether the IAM role was created and also introspect the Kubernetes service account</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">aws iam get-role --role-name<span class="o">=</span><span class="nv">$IAM_ROLE_NAME</span> --query Role.Arn --output text
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">kubectl describe serviceaccount/<span class="nv">$ACK_K8S_SERVICE_ACCOUNT_NAME</span> -n <span class="nv">$ACK_SYSTEM_NAMESPACE</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># you will see similar output</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">Name:                ack-memorydb-controller
+</span></span><span class="line"><span class="cl">Namespace:           ack-system
+</span></span><span class="line"><span class="cl">Labels:              app.kubernetes.io/instance<span class="o">=</span>ack-memorydb-controller
+</span></span><span class="line"><span class="cl">                     app.kubernetes.io/managed-by<span class="o">=</span>eksctl
+</span></span><span class="line"><span class="cl">                     app.kubernetes.io/name<span class="o">=</span>memorydb-chart
+</span></span><span class="line"><span class="cl">                     app.kubernetes.io/version<span class="o">=</span>v0.0.2
+</span></span><span class="line"><span class="cl">                     helm.sh/chart<span class="o">=</span>memorydb-chart-v0.0.2
+</span></span><span class="line"><span class="cl">                     k8s-app<span class="o">=</span>memorydb-chart
+</span></span><span class="line"><span class="cl">Annotations:         eks.amazonaws.com/role-arn: arn:aws:iam::568863012249:role/ack-memorydb-controller-role
+</span></span><span class="line"><span class="cl">                     meta.helm.sh/release-name: ack-memorydb-controller
+</span></span><span class="line"><span class="cl">                     meta.helm.sh/release-namespace: ack-system
+</span></span><span class="line"><span class="cl">Image pull secrets:  &lt;none&gt;
+</span></span><span class="line"><span class="cl">Mountable secrets:   ack-memorydb-controller-token-2cmmx
+</span></span><span class="line"><span class="cl">Tokens:              ack-memorydb-controller-token-2cmmx
+</span></span><span class="line"><span class="cl">Events:              &lt;none&gt;
+</span></span></code></pre></div><p>For <code>IRSA</code> to take effect, you need to restart the ACK <code>Deployment</code>:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="c1"># Note the deployment name for ACK service controller from following command</span>
+</span></span><span class="line"><span class="cl">kubectl get deployments -n <span class="nv">$ACK_SYSTEM_NAMESPACE</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">kubectl -n <span class="nv">$ACK_SYSTEM_NAMESPACE</span> rollout restart deployment ack-memorydb-controller-memorydb-chart
+</span></span></code></pre></div><p>Confirm that the <code>Deployment</code> has restarted (currently <code>Running</code>) and the <code>IRSA</code> is properly configured:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl get pods -n <span class="nv">$ACK_SYSTEM_NAMESPACE</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">kubectl describe pod -n <span class="nv">$ACK_SYSTEM_NAMESPACE</span> ack-memorydb-controller-memorydb-chart-5975b8d757-k6x9k <span class="p">|</span> grep <span class="s2">&#34;^\s*AWS_&#34;</span>
+</span></span><span class="line"><span class="cl"><span class="c1"># The output should contain following two lines:</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="nv">AWS_ROLE_ARN</span><span class="o">=</span>arn:aws:iam::&lt;AWS_ACCOUNT_ID&gt;:role/&lt;IAM_ROLE_NAME&gt;
+</span></span><span class="line"><span class="cl"><span class="nv">AWS_WEB_IDENTITY_TOKEN_FILE</span><span class="o">=</span>/var/run/secrets/eks.amazonaws.com/serviceaccount/token
+</span></span></code></pre></div><p>Now that we&rsquo;re done with the configuration, its time for&hellip;</p>
+<h2 id="cdk8s-in-action"><code>cdk8s</code> in action!</h2>
+<p>We will go step by step:</p>
+<ul>
+<li>Build and push the application Docker images to private registry in <a href="https://docs.aws.amazon.com/AmazonECR/latest/userguide/what-is-ecr.html">Amazon ECR</a></li>
+<li>Deploy <code>MemoryDB</code> along with the application and required configuration</li>
+<li>Test the application</li>
+</ul>
+<h3 id="build-docker-image-and-push-to-ecr">Build Docker image and push to ECR</h3>
+<p><strong>Create ECR private repository</strong></p>
+<p>Login to ECR:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">aws ecr get-login-password --region &lt;enter region&gt; <span class="p">|</span> docker login --username AWS --password-stdin &lt;enter aws_account_id&gt;.dkr.ecr.&lt;enter region&gt;.amazonaws.com
+</span></span></code></pre></div><p>Create private repository:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">aws ecr create-repository <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>    --repository-name memorydb-app <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>    --region &lt;enter region&gt;
+</span></span></code></pre></div><p><strong>Build image and push to ECR</strong></p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="c1"># if you&#39;re on Mac M1</span>
+</span></span><span class="line"><span class="cl"><span class="c1">#export DOCKER_DEFAULT_PLATFORM=linux/amd64</span>
+</span></span><span class="line"><span class="cl">docker build -t memorydb-app .
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">docker tag memorydb-app:latest &lt;enter aws_account_id&gt;.dkr.ecr.&lt;enter region&gt;.amazonaws.com/memorydb-app:latest
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">docker push &lt;enter aws_account_id&gt;.dkr.ecr.&lt;enter region&gt;.amazonaws.com/memorydb-app:latest
+</span></span></code></pre></div><h3 id="use-cdk8s-and-kubectl-to-deploy-memorydb-and-the-application">Use <code>cdk8s</code> and <code>kubectl</code> to deploy MemoryDB and the application</h3>
+<p>This is a ready-to-use <code>cdk8s</code> project that you can use. The entire logic is in <a href="https://github.com/abhirockzz/memorydb-ack-cdk8s-go/blob/master/memorydb-cdk8s/main.go">main.go file</a> - I will dive into the nitty gritty of the code in the next section.</p>
+<p>Clone the project from Github and change to the right directory:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">git clone https://github.com/abhirockzz/memorydb-ack-cdk8s-go.git
+</span></span><span class="line"><span class="cl">cd memorydb-ack-cdk8s-go
+</span></span></code></pre></div><p><strong>Generate and deploy manifests</strong></p>
+<p>Use <code>cdk8s synth</code> to generate the manifest for <code>MemoryDB</code>, the application as well as required configuration. We can then <code>apply</code> it using <code>kubectl</code>.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">SUBNET_ID_LIST</span><span class="o">=</span>&lt;enter comma-separated list of subnet IDs. should be same as your EKS cluster&gt;
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># for example:</span>
+</span></span><span class="line"><span class="cl"><span class="c1"># export SUBNET_ID_LIST=subnet-086c4a45ec9a206e1,subnet-0d9a9c6d2ca7a24df,subnet-028ca54bb859a4994</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">SECURITY_GROUP_ID</span><span class="o">=</span>&lt;enter security group ID&gt;
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># for example</span>
+</span></span><span class="line"><span class="cl"><span class="c1"># export SECURITY_GROUP_ID=sg-06b6535ee64980616</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">DOCKER_IMAGE</span><span class="o">=</span>&lt;enter ECR repo that you created earlier&gt;
+</span></span><span class="line"><span class="cl"><span class="c1"># example</span>
+</span></span><span class="line"><span class="cl"><span class="c1"># export DOCKER_IMAGE=1234567891012.dkr.ecr.us-east-1.amazonaws.com/memorydb-app:latest</span>
+</span></span></code></pre></div><blockquote>
+<p>You can also add other environment variables <code>MEMORYDB_CLUSTER_NAME</code>, <code>MEMORYDB_USERNAME</code>, <code>MEMORYDB_PASSWORD</code>. These are not mandatory and default to <code>memorydb-cluster-ack-cdk8s</code>, <code>demouser</code> and <code>Password123456789</code> respectively</p>
+</blockquote>
+<p>To generate the manifests:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">cdk8s synth
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># check the &#34;dist&#34; folder - you should see these files:</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">0000-memorydb.k8s.yaml
+</span></span><span class="line"><span class="cl">0001-config.k8s.yaml
+</span></span><span class="line"><span class="cl">0002-deployment.k8s.yaml
+</span></span></code></pre></div><p>Let&rsquo;s deploy them one by one, starting with the one which creates the <code>MemoryDB</code> cluster. In addition to the cluster, it will also provision the supporting components including <a href="https://docs.aws.amazon.com/memorydb/latest/devguide/components.html#whatis.components.acls">ACL</a>, <a href="https://docs.aws.amazon.com/memorydb/latest/devguide/components.html#whatis.components.user">User</a> and <a href="https://docs.aws.amazon.com/memorydb/latest/devguide/components.html#whatis.components.subnetgroups">Subnet Group</a>s.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl apply -f dist/0000-memorydb.k8s.yaml
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">#output</span>
+</span></span><span class="line"><span class="cl">secret/memdb-secret created
+</span></span><span class="line"><span class="cl">users.memorydb.services.k8s.aws/demouser created
+</span></span><span class="line"><span class="cl">acls.memorydb.services.k8s.aws/demo-acl created
+</span></span><span class="line"><span class="cl">subnetgroups.memorydb.services.k8s.aws/demo-subnet-group created
+</span></span><span class="line"><span class="cl">clusters.memorydb.services.k8s.aws/memorydb-cluster-ack-cdk8s
+</span></span></code></pre></div><blockquote>
+<p><strong>Kubernetes <code>Secret</code></strong> is used to hold the password for <code>MemoryDB</code> cluster user.</p>
+</blockquote>
+<p>This initiates the cluster creation. You can check the status using the AWS console. Once the creation is complete, you can test connectivity with <code>redis-cli</code>:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="c1"># run this from EC2 instance in the same subnet as the cluster</span>
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">REDIS</span><span class="o">=</span>&lt;enter cluster endpoint&gt;
+</span></span><span class="line"><span class="cl"><span class="c1"># example</span>
+</span></span><span class="line"><span class="cl"><span class="c1"># export REDIS=clustercfg.memorydb-cluster-ack-cdk8s.smtjf4.memorydb.us-east-1.amazonaws.com</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">redis-cli -h <span class="nv">$REDIS</span> -c --user demouser --pass Password123456789 --tls --insecure
+</span></span></code></pre></div><p>Let&rsquo;s apply second manifest. This will create configuration related components i.e. <code>ConfigMap</code> and <code>FieldExport</code>s - these are required by our application (to be deployed after this)</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl apply -f dist/0001-config.k8s.yaml
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">#output</span>
+</span></span><span class="line"><span class="cl">configmap/export-memorydb-info created
+</span></span><span class="line"><span class="cl">fieldexports.services.k8s.aws/export-memorydb-endpoint created
+</span></span><span class="line"><span class="cl">fieldexports.services.k8s.aws/export-memorydb-username created
+</span></span></code></pre></div><p>In this case, we create two <code>FieldExport</code>s to extract data from the cluster (from <code>.status.clusterEndpoint.address</code>) and user (<code>.spec.name</code>) resources that we created before and seed it into a <code>ConfigMap</code>.</p>
+<blockquote>
+<p><code>ConfigMap</code> and <code>FieldExport</code>:</p>
+<p><code>FieldExport</code> is an ACK component that can <em>&ldquo;export any spec or status field from an ACK resource into a Kubernetes <code>ConfigMap</code> or <code>Secret</code>&rdquo;</em>. You can read up on the details in the <a href="https://aws-controllers-k8s.github.io/community/docs/user-docs/field-export/">ACK docs</a> along with some examples.</p>
+</blockquote>
+<p>You should be able to confirm by checking the <code>FieldExport</code> and <code>ConfigMap</code>:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl get fieldexport
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">#output</span>
+</span></span><span class="line"><span class="cl">NAME                       AGE
+</span></span><span class="line"><span class="cl">export-memorydb-endpoint   20s
+</span></span><span class="line"><span class="cl">export-memorydb-username   20s
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">kubectl get configmap/export-memorydb-info -o yaml
+</span></span></code></pre></div><p>We started out with a blank <code>ConfigMap</code>, but <code>ACK</code> magically populated it with the required attributes:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">data</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">default.export-memorydb-endpoint</span><span class="p">:</span><span class="w"> </span><span class="l">clustercfg.memorydb-cluster-ack-cdk8s.smtjf4.memorydb.us-east-1.amazonaws.com</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">default.export-memorydb-username</span><span class="p">:</span><span class="w"> </span><span class="l">demouser</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">immutable</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">ConfigMap</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="c">#....omitted</span><span class="w">
+</span></span></span></code></pre></div><p>Let&rsquo;s create the application resources - <code>Deployment</code> and the <code>Service</code>.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl apply -f dist/0003-deployment.k8s.yaml
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">#output</span>
+</span></span><span class="line"><span class="cl">deployment.apps/memorydb-app created
+</span></span><span class="line"><span class="cl">service/memorydb-app-service configured
+</span></span></code></pre></div><blockquote>
+<p>Since the Service type is <code>LoadBalancer</code>, an appropriate <a href="https://docs.aws.amazon.com/eks/latest/userguide/network-load-balancing.html">AWS Load Balancer will be provisioned</a> to allow for external access.</p>
+</blockquote>
+<p>Check <code>Pod</code> and <code>Service</code>:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl get pods
+</span></span><span class="line"><span class="cl">kubectl get service/memorydb-app-service
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># to get the load balancer IP</span>
+</span></span><span class="line"><span class="cl"><span class="nv">APP_URL</span><span class="o">=</span><span class="k">$(</span>kubectl get service/memorydb-app-service -o <span class="nv">jsonpath</span><span class="o">=</span><span class="s2">&#34;{.status.loadBalancer.ingress[0].hostname}&#34;</span><span class="k">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="nb">echo</span> <span class="nv">$APP_URL</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># output example</span>
+</span></span><span class="line"><span class="cl">a0042d5b5b0ad40abba9c6c42e6342a2-879424587.us-east-1.elb.amazonaws.com
+</span></span></code></pre></div><p>You have deployed the application and know the endpoint over which it&rsquo;s publicly accessible. Here is a high-level view of the current architecture:</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/0c7i0sjs5utencdyfy8s.png" alt="Image description"></p>
+<h3 id="now-you-can-access-the-application">Now you can access the application&hellip;</h3>
+<p>It&rsquo;s quite simple - it exposes a couple of HTTP endpoints to write and read data from Redis (you can check it on <a href="https://github.com/abhirockzz/memorydb-ack-cdk8s-go/tree/master/memorydb-app">GitHub</a>):</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-mysql" data-lang="mysql"><span class="line"><span class="cl"><span class="c1"># create a couple of users - this will be added as a `HASH` in Redis
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="n">curl</span><span class="w"> </span><span class="o">-</span><span class="n">i</span><span class="w"> </span><span class="o">-</span><span class="n">X</span><span class="w"> </span><span class="n">POST</span><span class="w"> </span><span class="o">-</span><span class="n">d</span><span class="w"> </span><span class="s1">&#39;{&#34;email&#34;:&#34;user1@foo.com&#34;, &#34;name&#34;:&#34;user1&#34;}&#39;</span><span class="w"> </span><span class="n">http</span><span class="p">:</span><span class="o">//</span><span class="err">$</span><span class="n">APP_URL</span><span class="p">:</span><span class="mi">9090</span><span class="o">/</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="n">curl</span><span class="w"> </span><span class="o">-</span><span class="n">i</span><span class="w"> </span><span class="o">-</span><span class="n">X</span><span class="w"> </span><span class="n">POST</span><span class="w"> </span><span class="o">-</span><span class="n">d</span><span class="w"> </span><span class="s1">&#39;{&#34;email&#34;:&#34;user2@foo.com&#34;, &#34;name&#34;:&#34;user2&#34;}&#39;</span><span class="w"> </span><span class="n">http</span><span class="p">:</span><span class="o">//</span><span class="err">$</span><span class="n">APP_URL</span><span class="p">:</span><span class="mi">9090</span><span class="o">/</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="n">HTTP</span><span class="o">/</span><span class="mi">1</span><span class="p">.</span><span class="mi">1</span><span class="w"> </span><span class="mi">200</span><span class="w"> </span><span class="n">OK</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="n">Content</span><span class="o">-</span><span class="n">Length</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="c1"># search for user via email
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="n">curl</span><span class="w"> </span><span class="o">-</span><span class="n">i</span><span class="w"> </span><span class="n">http</span><span class="p">:</span><span class="o">//</span><span class="err">$</span><span class="n">APP_URL</span><span class="p">:</span><span class="mi">9090</span><span class="o">/</span><span class="n">user2</span><span class="o">@</span><span class="n">foo</span><span class="p">.</span><span class="n">com</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="n">HTTP</span><span class="o">/</span><span class="mi">1</span><span class="p">.</span><span class="mi">1</span><span class="w"> </span><span class="mi">200</span><span class="w"> </span><span class="n">OK</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="n">Content</span><span class="o">-</span><span class="n">Length</span><span class="p">:</span><span class="w"> </span><span class="mi">41</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="n">Content</span><span class="o">-</span><span class="n">Type</span><span class="p">:</span><span class="w"> </span><span class="kt">text</span><span class="o">/</span><span class="n">plain</span><span class="p">;</span><span class="w"> </span><span class="kp">charset</span><span class="o">=</span><span class="n">utf</span><span class="o">-</span><span class="mi">8</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="err">{</span><span class="s2">&#34;email&#34;</span><span class="p">:</span><span class="s2">&#34;user2@foo.com&#34;</span><span class="p">,</span><span class="s2">&#34;name&#34;</span><span class="p">:</span><span class="s2">&#34;user2&#34;</span><span class="err">}</span><span class="w">
+</span></span></span></code></pre></div><blockquote>
+<p>If you get a <code>Could not resolve host</code> error while accessing the LB URL, wait for a minute or so and re-try</p>
+</blockquote>
+<p>Once you&rsquo;re done&hellip;</p>
+<h3 id="-dont-forget-to-delete-resources">&hellip; don&rsquo;t forget to delete resources..</h3>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="c1"># delete MemoryDB cluster, configuration and the application</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">kubectl delete -f dist/
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># to uninstall the ACK controller</span>
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">SERVICE</span><span class="o">=</span>memorydb
+</span></span><span class="line"><span class="cl">helm uninstall -n <span class="nv">$ACK_SYSTEM_NAMESPACE</span> ack-<span class="nv">$SERVICE</span>-controller
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># delete the EKS cluster. if created via eksctl:</span>
+</span></span><span class="line"><span class="cl">eksctl delete cluster --name &lt;enter name of eks cluster&gt;
+</span></span></code></pre></div><p>So far, you deployed the ACK controller for MemoryDB, setup a cluster, an application that connects to it and tested the end to end solution. Great!</p>
+<p>Now let&rsquo;s look at the <code>cdk8s</code> code that makes it all happen. The logic is divided into three <code>Chart</code>s. I will only focus on key sections of the code and rest will be omitted for brevity.</p>
+<blockquote>
+<p>You can refer to the complete code on <a href="https://github.com/abhirockzz/memorydb-ack-cdk8s-go/tree/master/memorydb-cdk8s">GitHub</a></p>
+</blockquote>
+<h2 id="code-walk-through">Code walk through</h2>
+<p><strong>MemoryDB and related components</strong></p>
+<p>We start by defining the <code>MemoryDB</code> cluster along with the required components - ACL, User and Subnet Group.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">NewMemoryDBChart</span><span class="p">(</span><span class="nx">scope</span> <span class="nx">constructs</span><span class="p">.</span><span class="nx">Construct</span><span class="p">,</span> <span class="nx">id</span> <span class="kt">string</span><span class="p">,</span> <span class="nx">props</span> <span class="o">*</span><span class="nx">MyChartProps</span><span class="p">)</span> <span class="nx">cdk8s</span><span class="p">.</span><span class="nx">Chart</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">//...
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">secret</span> <span class="p">=</span> <span class="nx">cdk8splus22</span><span class="p">.</span><span class="nf">NewSecret</span><span class="p">(</span><span class="nx">chart</span><span class="p">,</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="s">&#34;password&#34;</span><span class="p">),</span> <span class="o">&amp;</span><span class="nx">cdk8splus22</span><span class="p">.</span><span class="nx">SecretProps</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">Metadata</span><span class="p">:</span>   <span class="o">&amp;</span><span class="nx">cdk8s</span><span class="p">.</span><span class="nx">ApiObjectMetadata</span><span class="p">{</span><span class="nx">Name</span><span class="p">:</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="nx">secretName</span><span class="p">)},</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">StringData</span><span class="p">:</span> <span class="o">&amp;</span><span class="kd">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="o">*</span><span class="kt">string</span><span class="p">{</span><span class="s">&#34;password&#34;</span><span class="p">:</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="nx">memoryDBPassword</span><span class="p">)},</span>
+</span></span><span class="line"><span class="cl">	<span class="p">})</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">user</span> <span class="p">=</span> <span class="nx">users_memorydbservicesk8saws</span><span class="p">.</span><span class="nf">NewUser</span><span class="p">(</span><span class="nx">chart</span><span class="p">,</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="s">&#34;user&#34;</span><span class="p">),</span> <span class="o">&amp;</span><span class="nx">users_memorydbservicesk8saws</span><span class="p">.</span><span class="nx">UserProps</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">Metadata</span><span class="p">:</span> <span class="o">&amp;</span><span class="nx">cdk8s</span><span class="p">.</span><span class="nx">ApiObjectMetadata</span><span class="p">{</span><span class="nx">Name</span><span class="p">:</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="nx">memoryDBUsername</span><span class="p">)},</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">Spec</span><span class="p">:</span> <span class="o">&amp;</span><span class="nx">users_memorydbservicesk8saws</span><span class="p">.</span><span class="nx">UserSpec</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">Name</span><span class="p">:</span>         <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="nx">memoryDBUsername</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">AccessString</span><span class="p">:</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="nx">memoryDBUserAccessString</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">AuthenticationMode</span><span class="p">:</span> <span class="o">&amp;</span><span class="nx">users_memorydbservicesk8saws</span><span class="p">.</span><span class="nx">UserSpecAuthenticationMode</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">				<span class="nx">Type</span><span class="p">:</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="s">&#34;Password&#34;</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">				<span class="nx">Passwords</span><span class="p">:</span> <span class="o">&amp;</span><span class="p">[]</span><span class="o">*</span><span class="nx">users_memorydbservicesk8saws</span><span class="p">.</span><span class="nx">UserSpecAuthenticationModePasswords</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">					<span class="p">{</span><span class="nx">Name</span><span class="p">:</span> <span class="nx">secret</span><span class="p">.</span><span class="nf">Name</span><span class="p">(),</span> <span class="nx">Key</span><span class="p">:</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="nx">secretKeyName</span><span class="p">)},</span>
+</span></span><span class="line"><span class="cl">				<span class="p">},</span>
+</span></span><span class="line"><span class="cl">			<span class="p">},</span>
+</span></span><span class="line"><span class="cl">		<span class="p">},</span>
+</span></span><span class="line"><span class="cl">	<span class="p">})</span>
+</span></span></code></pre></div><p><code>ACL</code> references the <code>User</code> defined above:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl">	<span class="nx">acl</span> <span class="o">:=</span> <span class="nx">acl_memorydbservicesk8saws</span><span class="p">.</span><span class="nf">NewAcl</span><span class="p">(</span><span class="nx">chart</span><span class="p">,</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="s">&#34;acl&#34;</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">		<span class="o">&amp;</span><span class="nx">acl_memorydbservicesk8saws</span><span class="p">.</span><span class="nx">AclProps</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">Metadata</span><span class="p">:</span> <span class="o">&amp;</span><span class="nx">cdk8s</span><span class="p">.</span><span class="nx">ApiObjectMetadata</span><span class="p">{</span><span class="nx">Name</span><span class="p">:</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="nx">memoryDBACLName</span><span class="p">)},</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">Spec</span><span class="p">:</span> <span class="o">&amp;</span><span class="nx">acl_memorydbservicesk8saws</span><span class="p">.</span><span class="nx">AclSpec</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">				<span class="nx">Name</span><span class="p">:</span>      <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="nx">memoryDBACLName</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">				<span class="nx">UserNames</span><span class="p">:</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">Strings</span><span class="p">(</span><span class="o">*</span><span class="nx">user</span><span class="p">.</span><span class="nf">Name</span><span class="p">()),</span>
+</span></span><span class="line"><span class="cl">			<span class="p">},</span>
+</span></span><span class="line"><span class="cl">		<span class="p">})</span>
+</span></span></code></pre></div><p>The subnet IDs (for subnet group) as well as the security group ID for the cluster are read from environment variables.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl">	<span class="nx">subnetGroup</span> <span class="o">:=</span> <span class="nx">subnetgroups_memorydbservicesk8saws</span><span class="p">.</span><span class="nf">NewSubnetGroup</span><span class="p">(</span><span class="nx">chart</span><span class="p">,</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="s">&#34;sg&#34;</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">		<span class="o">&amp;</span><span class="nx">subnetgroups_memorydbservicesk8saws</span><span class="p">.</span><span class="nx">SubnetGroupProps</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">Metadata</span><span class="p">:</span> <span class="o">&amp;</span><span class="nx">cdk8s</span><span class="p">.</span><span class="nx">ApiObjectMetadata</span><span class="p">{</span><span class="nx">Name</span><span class="p">:</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="nx">memoryDBSubnetGroup</span><span class="p">)},</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">Spec</span><span class="p">:</span> <span class="o">&amp;</span><span class="nx">subnetgroups_memorydbservicesk8saws</span><span class="p">.</span><span class="nx">SubnetGroupSpec</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">				<span class="nx">Name</span><span class="p">:</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="nx">memoryDBSubnetGroup</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">				<span class="nx">SubnetIDs</span><span class="p">:</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">Strings</span><span class="p">(</span><span class="nx">strings</span><span class="p">.</span><span class="nf">Split</span><span class="p">(</span><span class="nx">subnetIDs</span><span class="p">,</span> <span class="s">&#34;,&#34;</span><span class="p">)</span><span class="o">...</span><span class="p">),</span> <span class="c1">//same as EKS cluster
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="p">},</span>
+</span></span><span class="line"><span class="cl">		<span class="p">})</span>
+</span></span></code></pre></div><p>Finally, the <code>MemoryDB</code> cluster is defined - it references all the resources created above (it has been omitted on purpose):</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl">	<span class="nx">memoryDBCluster</span> <span class="p">=</span> <span class="nx">memorydbservicesk8saws</span><span class="p">.</span><span class="nf">NewCluster</span><span class="p">(</span><span class="nx">chart</span><span class="p">,</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="s">&#34;memorydb-ack-cdk8s&#34;</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">		<span class="o">&amp;</span><span class="nx">memorydbservicesk8saws</span><span class="p">.</span><span class="nx">ClusterProps</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">Metadata</span><span class="p">:</span> <span class="o">&amp;</span><span class="nx">cdk8s</span><span class="p">.</span><span class="nx">ApiObjectMetadata</span><span class="p">{</span><span class="nx">Name</span><span class="p">:</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="nx">memoryDBClusterName</span><span class="p">)},</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">Spec</span><span class="p">:</span> <span class="o">&amp;</span><span class="nx">memorydbservicesk8saws</span><span class="p">.</span><span class="nx">ClusterSpec</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">				<span class="nx">Name</span><span class="p">:</span>                <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="nx">memoryDBClusterName</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">				<span class="c1">//omitted
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="p">},</span>
+</span></span><span class="line"><span class="cl">		<span class="p">})</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="nx">chart</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p><strong>Configuration</strong></p>
+<p>Then we move on to the next chart that handles the configuration related aspects. It defines a <code>ConfigMap</code> (which is empty) and <code>FieldExport</code>s -  one each for the MemoryDB cluster endpoint and username (the password is read from the <code>Secret</code>)</p>
+<blockquote>
+<p>As soon as these are created, the <code>ConfigMap</code> is populated with the required data as per <code>from</code> and <code>to</code> configuration in the <code>FieldExport</code>.</p>
+</blockquote>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">NewConfigChart</span><span class="p">(</span><span class="nx">scope</span> <span class="nx">constructs</span><span class="p">.</span><span class="nx">Construct</span><span class="p">,</span> <span class="nx">id</span> <span class="kt">string</span><span class="p">,</span> <span class="nx">props</span> <span class="o">*</span><span class="nx">MyChartProps</span><span class="p">)</span> <span class="nx">cdk8s</span><span class="p">.</span><span class="nx">Chart</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">//...
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">cfgMap</span> <span class="p">=</span> <span class="nx">cdk8splus22</span><span class="p">.</span><span class="nf">NewConfigMap</span><span class="p">(</span><span class="nx">chart</span><span class="p">,</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="s">&#34;config-map&#34;</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">		<span class="o">&amp;</span><span class="nx">cdk8splus22</span><span class="p">.</span><span class="nx">ConfigMapProps</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">Metadata</span><span class="p">:</span> <span class="o">&amp;</span><span class="nx">cdk8s</span><span class="p">.</span><span class="nx">ApiObjectMetadata</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">				<span class="nx">Name</span><span class="p">:</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="nx">configMapName</span><span class="p">)}})</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">fieldExportForClusterEndpoint</span> <span class="p">=</span> <span class="nx">servicesk8saws</span><span class="p">.</span><span class="nf">NewFieldExport</span><span class="p">(</span><span class="nx">chart</span><span class="p">,</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="s">&#34;fexp-cluster&#34;</span><span class="p">),</span> <span class="o">&amp;</span><span class="nx">servicesk8saws</span><span class="p">.</span><span class="nx">FieldExportProps</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">Metadata</span><span class="p">:</span> <span class="o">&amp;</span><span class="nx">cdk8s</span><span class="p">.</span><span class="nx">ApiObjectMetadata</span><span class="p">{</span><span class="nx">Name</span><span class="p">:</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="nx">fieldExportNameForClusterEndpoint</span><span class="p">)},</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">Spec</span><span class="p">:</span> <span class="o">&amp;</span><span class="nx">servicesk8saws</span><span class="p">.</span><span class="nx">FieldExportSpec</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">From</span><span class="p">:</span> <span class="o">&amp;</span><span class="nx">servicesk8saws</span><span class="p">.</span><span class="nx">FieldExportSpecFrom</span><span class="p">{</span><span class="nx">Path</span><span class="p">:</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="s">&#34;.status.clusterEndpoint.address&#34;</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">				<span class="nx">Resource</span><span class="p">:</span> <span class="o">&amp;</span><span class="nx">servicesk8saws</span><span class="p">.</span><span class="nx">FieldExportSpecFromResource</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">					<span class="nx">Group</span><span class="p">:</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="s">&#34;memorydb.services.k8s.aws&#34;</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">					<span class="nx">Kind</span><span class="p">:</span>  <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="s">&#34;Cluster&#34;</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">					<span class="nx">Name</span><span class="p">:</span>  <span class="nx">memoryDBCluster</span><span class="p">.</span><span class="nf">Name</span><span class="p">()}},</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">To</span><span class="p">:</span> <span class="o">&amp;</span><span class="nx">servicesk8saws</span><span class="p">.</span><span class="nx">FieldExportSpecTo</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">				<span class="nx">Name</span><span class="p">:</span> <span class="nx">cfgMap</span><span class="p">.</span><span class="nf">Name</span><span class="p">(),</span>
+</span></span><span class="line"><span class="cl">				<span class="nx">Kind</span><span class="p">:</span> <span class="nx">servicesk8saws</span><span class="p">.</span><span class="nx">FieldExportSpecToKind_CONFIGMAP</span><span class="p">}}})</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">fieldExportForUsername</span> <span class="p">=</span> <span class="nx">servicesk8saws</span><span class="p">.</span><span class="nf">NewFieldExport</span><span class="p">(</span><span class="nx">chart</span><span class="p">,</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="s">&#34;fexp-username&#34;</span><span class="p">),</span> <span class="o">&amp;</span><span class="nx">servicesk8saws</span><span class="p">.</span><span class="nx">FieldExportProps</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">Metadata</span><span class="p">:</span> <span class="o">&amp;</span><span class="nx">cdk8s</span><span class="p">.</span><span class="nx">ApiObjectMetadata</span><span class="p">{</span><span class="nx">Name</span><span class="p">:</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="nx">fieldExportNameForUsername</span><span class="p">)},</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">Spec</span><span class="p">:</span> <span class="o">&amp;</span><span class="nx">servicesk8saws</span><span class="p">.</span><span class="nx">FieldExportSpec</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">From</span><span class="p">:</span> <span class="o">&amp;</span><span class="nx">servicesk8saws</span><span class="p">.</span><span class="nx">FieldExportSpecFrom</span><span class="p">{</span><span class="nx">Path</span><span class="p">:</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="s">&#34;.spec.name&#34;</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">				<span class="nx">Resource</span><span class="p">:</span> <span class="o">&amp;</span><span class="nx">servicesk8saws</span><span class="p">.</span><span class="nx">FieldExportSpecFromResource</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">					<span class="nx">Group</span><span class="p">:</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="s">&#34;memorydb.services.k8s.aws&#34;</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">					<span class="nx">Kind</span><span class="p">:</span>  <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="s">&#34;User&#34;</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">					<span class="nx">Name</span><span class="p">:</span>  <span class="nx">user</span><span class="p">.</span><span class="nf">Name</span><span class="p">()}},</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">To</span><span class="p">:</span> <span class="o">&amp;</span><span class="nx">servicesk8saws</span><span class="p">.</span><span class="nx">FieldExportSpecTo</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">				<span class="nx">Name</span><span class="p">:</span> <span class="nx">cfgMap</span><span class="p">.</span><span class="nf">Name</span><span class="p">(),</span>
+</span></span><span class="line"><span class="cl">				<span class="nx">Kind</span><span class="p">:</span> <span class="nx">servicesk8saws</span><span class="p">.</span><span class="nx">FieldExportSpecToKind_CONFIGMAP</span><span class="p">}}})</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="nx">chart</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p><strong>The application chart</strong></p>
+<p>Finally, we deal with the <code>Deployment</code> (in its dedicated <code>Chart</code>) - it makes use of the configuration objects we defined in the earlier chart:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">NewDeploymentChart</span><span class="p">(</span><span class="nx">scope</span> <span class="nx">constructs</span><span class="p">.</span><span class="nx">Construct</span><span class="p">,</span> <span class="nx">id</span> <span class="kt">string</span><span class="p">,</span> <span class="nx">props</span> <span class="o">*</span><span class="nx">MyChartProps</span><span class="p">)</span> <span class="nx">cdk8s</span><span class="p">.</span><span class="nx">Chart</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">//....
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">dep</span> <span class="o">:=</span> <span class="nx">cdk8splus22</span><span class="p">.</span><span class="nf">NewDeployment</span><span class="p">(</span><span class="nx">chart</span><span class="p">,</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="s">&#34;memorydb-app-deployment&#34;</span><span class="p">),</span> <span class="o">&amp;</span><span class="nx">cdk8splus22</span><span class="p">.</span><span class="nx">DeploymentProps</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">Metadata</span><span class="p">:</span> <span class="o">&amp;</span><span class="nx">cdk8s</span><span class="p">.</span><span class="nx">ApiObjectMetadata</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">Name</span><span class="p">:</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="s">&#34;memorydb-app&#34;</span><span class="p">)}})</span>
+</span></span></code></pre></div><p>The next important part is the container and it&rsquo;s configuration. We specify the ECR image repository along with the environment variables - they reference the <code>ConfigMap</code> we defined in the previous chart (everything is connected!):</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="c1">//...
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">container</span> <span class="o">:=</span> <span class="nx">dep</span><span class="p">.</span><span class="nf">AddContainer</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">		<span class="o">&amp;</span><span class="nx">cdk8splus22</span><span class="p">.</span><span class="nx">ContainerProps</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">Name</span><span class="p">:</span>  <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="s">&#34;memorydb-app-container&#34;</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">Image</span><span class="p">:</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="nx">appDockerImage</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">Port</span><span class="p">:</span>  <span class="nx">jsii</span><span class="p">.</span><span class="nf">Number</span><span class="p">(</span><span class="nx">appPort</span><span class="p">)})</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">container</span><span class="p">.</span><span class="nf">Env</span><span class="p">().</span><span class="nf">AddVariable</span><span class="p">(</span><span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="s">&#34;MEMORYDB_CLUSTER_ENDPOINT&#34;</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">cdk8splus22</span><span class="p">.</span><span class="nf">EnvValue_FromConfigMap</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">cfgMap</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="s">&#34;default.&#34;</span><span class="o">+*</span><span class="nx">fieldExportForClusterEndpoint</span><span class="p">.</span><span class="nf">Name</span><span class="p">()),</span>
+</span></span><span class="line"><span class="cl">			<span class="o">&amp;</span><span class="nx">cdk8splus22</span><span class="p">.</span><span class="nx">EnvValueFromConfigMapOptions</span><span class="p">{</span><span class="nx">Optional</span><span class="p">:</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">Bool</span><span class="p">(</span><span class="kc">false</span><span class="p">)}))</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">container</span><span class="p">.</span><span class="nf">Env</span><span class="p">().</span><span class="nf">AddVariable</span><span class="p">(</span><span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="s">&#34;MEMORYDB_USERNAME&#34;</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">cdk8splus22</span><span class="p">.</span><span class="nf">EnvValue_FromConfigMap</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">cfgMap</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="s">&#34;default.&#34;</span><span class="o">+*</span><span class="nx">fieldExportForUsername</span><span class="p">.</span><span class="nf">Name</span><span class="p">()),</span>
+</span></span><span class="line"><span class="cl">			<span class="o">&amp;</span><span class="nx">cdk8splus22</span><span class="p">.</span><span class="nx">EnvValueFromConfigMapOptions</span><span class="p">{</span><span class="nx">Optional</span><span class="p">:</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">Bool</span><span class="p">(</span><span class="kc">false</span><span class="p">)}))</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">container</span><span class="p">.</span><span class="nf">Env</span><span class="p">().</span><span class="nf">AddVariable</span><span class="p">(</span><span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="s">&#34;MEMORYDB_PASSWORD&#34;</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">cdk8splus22</span><span class="p">.</span><span class="nf">EnvValue_FromSecretValue</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">			<span class="o">&amp;</span><span class="nx">cdk8splus22</span><span class="p">.</span><span class="nx">SecretValue</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">				<span class="nx">Secret</span><span class="p">:</span> <span class="nx">secret</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">				<span class="nx">Key</span><span class="p">:</span>    <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="s">&#34;password&#34;</span><span class="p">)},</span>
+</span></span><span class="line"><span class="cl">			<span class="o">&amp;</span><span class="nx">cdk8splus22</span><span class="p">.</span><span class="nx">EnvValueFromSecretOptions</span><span class="p">{}))</span>
+</span></span></code></pre></div><p>Finally, we define the <code>Service</code> (type <code>LoadBalancer</code>) which enables external application access and tie it all together in the <code>main</code> function:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="c1">//...
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">dep</span><span class="p">.</span><span class="nf">ExposeViaService</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">		<span class="o">&amp;</span><span class="nx">cdk8splus22</span><span class="p">.</span><span class="nx">DeploymentExposeViaServiceOptions</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">Name</span><span class="p">:</span>        <span class="nx">jsii</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="s">&#34;memorydb-app-service&#34;</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">ServiceType</span><span class="p">:</span> <span class="nx">cdk8splus22</span><span class="p">.</span><span class="nx">ServiceType_LOAD_BALANCER</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">Ports</span><span class="p">:</span> <span class="o">&amp;</span><span class="p">[]</span><span class="o">*</span><span class="nx">cdk8splus22</span><span class="p">.</span><span class="nx">ServicePort</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">				<span class="p">{</span><span class="nx">Protocol</span><span class="p">:</span> <span class="nx">cdk8splus22</span><span class="p">.</span><span class="nx">Protocol_TCP</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">					<span class="nx">Port</span><span class="p">:</span>       <span class="nx">jsii</span><span class="p">.</span><span class="nf">Number</span><span class="p">(</span><span class="nx">lbPort</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">					<span class="nx">TargetPort</span><span class="p">:</span> <span class="nx">jsii</span><span class="p">.</span><span class="nf">Number</span><span class="p">(</span><span class="nx">appPort</span><span class="p">)}}})</span>
+</span></span><span class="line"><span class="cl"><span class="c1">//...
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">app</span> <span class="o">:=</span> <span class="nx">cdk8s</span><span class="p">.</span><span class="nf">NewApp</span><span class="p">(</span><span class="kc">nil</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">memorydb</span> <span class="o">:=</span> <span class="nf">NewMemoryDBChart</span><span class="p">(</span><span class="nx">app</span><span class="p">,</span> <span class="s">&#34;memorydb&#34;</span><span class="p">,</span> <span class="kc">nil</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">config</span> <span class="o">:=</span> <span class="nf">NewConfigChart</span><span class="p">(</span><span class="nx">app</span><span class="p">,</span> <span class="s">&#34;config&#34;</span><span class="p">,</span> <span class="kc">nil</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">config</span><span class="p">.</span><span class="nf">AddDependency</span><span class="p">(</span><span class="nx">memorydb</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">deployment</span> <span class="o">:=</span> <span class="nf">NewDeploymentChart</span><span class="p">(</span><span class="nx">app</span><span class="p">,</span> <span class="s">&#34;deployment&#34;</span><span class="p">,</span> <span class="kc">nil</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">deployment</span><span class="p">.</span><span class="nf">AddDependency</span><span class="p">(</span><span class="nx">memorydb</span><span class="p">,</span> <span class="nx">config</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">app</span><span class="p">.</span><span class="nf">Synth</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>That&rsquo;s all for now!</p>
+<h2 id="wrap-up">Wrap up..</h2>
+<p>Combining AWS Controllers for Kubernetes and <code>cdk8s</code> can prove useful if you want to manage AWS services as well as the Kubernetes applications - using code (not <code>yaml</code>). In this blog you saw how to do this in the context of <code>MemoryDB</code> and an application that was composed of a <code>Deployment</code> and <code>Service</code>. I encourage you to try out other AWS services as well - <a href="https://aws-controllers-k8s.github.io/community/docs/community/services/">here is a complete list</a>.</p>
+<p>Until then, Happy Building!</p>
+
+
+        
+          <div class="blog-tags">
+            
+              <a href="https://abhirockzz.github.io/tags/redis/">redis</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io/tags/kubernetes/">kubernetes</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io/tags/golang/">golang</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io/tags/cdk/">cdk</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io/tags/cncf/">cncf</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io/tags/tutorial/">tutorial</a>&nbsp;
+            
+          </div>
+        
+
+        
+
+        
+      </article>
+
+      
+        <ul class="pager blog-pager">
+          
+            <li class="previous">
+              <a href="https://abhirockzz.github.io/posts/url-shortener-dynamodb-apprunner/" data-toggle="tooltip" data-placement="top" title="Use AWS App Runner, DynamoDB and CDK to deploy and run a Cloud native Go app">&larr; Previous Post</a>
+            </li>
+          
+          
+        </ul>
+      
+
+
+      
+
+    </div>
+  </div>
+</div>
+
+      
+<footer>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+        <ul class="list-inline text-center footer-links">
+          
+              <li>
+                <a href="https://github.com/abhirockzz" title="GitHub">
+                  <span class="fa-stack fa-lg">
+                    <i class="fas fa-circle fa-stack-2x"></i>
+                    <i class="fab fa-github fa-stack-1x fa-inverse"></i>
+                  </span>
+                </a>
+              </li>
+              <li>
+                <a href="https://twitter.com/abhi_tweeter" title="Twitter">
+                  <span class="fa-stack fa-lg">
+                    <i class="fas fa-circle fa-stack-2x"></i>
+                    <i class="fab fa-twitter fa-stack-1x fa-inverse"></i>
+                  </span>
+                </a>
+              </li>
+              <li>
+                <a href="https://linkedin.com/in/abhirockzz" title="LinkedIn">
+                  <span class="fa-stack fa-lg">
+                    <i class="fas fa-circle fa-stack-2x"></i>
+                    <i class="fab fa-linkedin fa-stack-1x fa-inverse"></i>
+                  </span>
+                </a>
+              </li>
+          
+          <li>
+            <a href="" title="RSS">
+              <span class="fa-stack fa-lg">
+                <i class="fas fa-circle fa-stack-2x"></i>
+                <i class="fas fa-rss fa-stack-1x fa-inverse"></i>
+              </span>
+            </a>
+          </li>
+          
+        </ul>
+        <p class="credits copyright text-muted">
+          
+            
+              <a href="https://abhirockzz.github.io">Abhishek Gupta</a>
+            
+          
+
+          &nbsp;&bull;&nbsp;&copy;
+          
+            2022
+          
+
+          
+            &nbsp;&bull;&nbsp;
+            <a href="https://abhirockzz.github.io">Abhishek&#39;s blog</a>
+          
+        </p>
+        
+        <p class="credits theme-by text-muted">
+          <a href="https://gohugo.io">Hugo v0.101.0</a> powered &nbsp;&bull;&nbsp; Theme <a href="https://github.com/halogenica/beautifulhugo">Beautiful Hugo</a> adapted from <a href="https://deanattali.com/beautiful-jekyll/">Beautiful Jekyll</a>
+          
+        </p>
+      </div>
+    </div>
+  </div>
+</footer><script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.js" integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/contrib/auto-render.min.js" integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
+<script src="https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+<script src="https://abhirockzz.github.io/js/main.js"></script><script> renderMathInElement(document.body); </script><script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.js" integrity="sha384-QELNnmcmU8IR9ZAykt67vGr9/rZJdHbiWi64V88fCPaOohUlHCqUD/unNN0BXSqy" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe-ui-default.min.js" integrity="sha384-m67o7SkQ1ALzKZIFh4CiTA8tmadaujiTa9Vu+nqPSwDOqHrDmxLezTdFln8077+q" crossorigin="anonymous"></script><script src="https://abhirockzz.github.io/js/load-photoswipe.js"></script>
+
+
+
+
+
+
+
+
+
+    
+  </body>
+</html>
+
