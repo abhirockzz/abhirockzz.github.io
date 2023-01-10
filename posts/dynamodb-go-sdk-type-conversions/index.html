@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en" itemscope itemtype="http://schema.org/WebPage">
+  <head>
+    
+
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+
+  <title>How to handle type conversions with the DynamoDB Go SDK - Abhishek&#39;s blog</title>
+  <meta name="description" content="Learn with practical code samples
+DynamoDB provides a rich set of data types including Strings, Numbers, Sets, Lists, Maps etc. In the Go SDK for DynamoDB, the types package contains Go representations of these data types and the attributevalue module provides functions to work with Go and DynamoDB types.">
+  <meta name="author" content="Abhishek Gupta"/><script type="application/ld+json">
+{
+    "@context": "http://schema.org",
+    "@type": "WebSite",
+    "name": "Abhishek\u0027s blog",
+    
+    "url": "https:\/\/abhirockzz.github.io"
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Organization",
+  "name": "",
+  "url": "https:\/\/abhirockzz.github.io"
+  
+  
+  
+  
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [{
+        "@type": "ListItem",
+        "position": 1,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io",
+          "name": "home"
+        }
+    },{
+        "@type": "ListItem",
+        "position": 3,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io\/posts\/dynamodb-go-sdk-type-conversions\/",
+          "name": "How to handle type conversions with the dynamo db go sdk"
+        }
+    }]
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Article",
+  "author": {
+    "name" : "Abhishek Gupta"
+  },
+  "headline": "How to handle type conversions with the DynamoDB Go SDK",
+  "description" : "Learn with practical code samples\nDynamoDB provides a rich set of data types including Strings, Numbers, Sets, Lists, Maps etc. In the Go SDK for DynamoDB, the types package contains Go representations of these data types and the attributevalue module provides functions to work with Go and DynamoDB types.",
+  "inLanguage" : "en",
+  "wordCount":  2037 ,
+  "datePublished" : "2022-12-13T00:00:00",
+  "dateModified" : "2022-12-13T00:00:00",
+  "image" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+  "keywords" : [ "golang, dynamodb, database, aws, nosql" ],
+  "mainEntityOfPage" : "https:\/\/abhirockzz.github.io\/posts\/dynamodb-go-sdk-type-conversions\/",
+  "publisher" : {
+    "@type": "Organization",
+    "name" : "https:\/\/abhirockzz.github.io",
+    "logo" : {
+        "@type" : "ImageObject",
+        "url" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+        "height" :  60 ,
+        "width" :  60
+    }
+  }
+}
+</script>
+
+<meta property="og:title" content="How to handle type conversions with the DynamoDB Go SDK" />
+<meta property="og:description" content="Learn with practical code samples
+DynamoDB provides a rich set of data types including Strings, Numbers, Sets, Lists, Maps etc. In the Go SDK for DynamoDB, the types package contains Go representations of these data types and the attributevalue module provides functions to work with Go and DynamoDB types.">
+<meta property="og:image" content="https://abhirockzz.github.io/icon.jpg" />
+<meta property="og:url" content="https://abhirockzz.github.io/posts/dynamodb-go-sdk-type-conversions/" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Abhishek&#39;s blog" />
+
+  <meta name="twitter:title" content="How to handle type conversions with the DynamoDB Go SDK" />
+  <meta name="twitter:description" content="Learn with practical code samples
+DynamoDB provides a rich set of data types including Strings, Numbers, Sets, Lists, Maps etc. In the Go SDK for DynamoDB, the types package contains Go …">
+  <meta name="twitter:image" content="https://abhirockzz.github.io/icon.jpg" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:site" content="@abhi_tweeter" />
+  <meta name="twitter:creator" content="@abhi_tweeter" />
+  <link href='https://abhirockzz.github.io/icons/myicon.png' rel='icon' type='image/x-icon'/>
+  <meta name="generator" content="Hugo 0.101.0" />
+  <link rel="alternate" href="https://abhirockzz.github.io/index.xml" type="application/rss+xml" title="Abhishek&#39;s blog"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css" integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.5.0/css/all.css" integrity="sha384-B4dIYHKNBt8Bc12p+WXckhzcICo0wtJAoU8YZTY5qE0Id1GSseTk6S+L3BlXeVIU" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous"><link rel="stylesheet" href="https://abhirockzz.github.io/css/main.css" /><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800" /><link rel="stylesheet" href="https://abhirockzz.github.io/css/syntax.css" /><link rel="stylesheet" href="https://abhirockzz.github.io/css/codeblock.css" /><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.css" integrity="sha384-h/L2W9KefUClHWaty3SLE5F/qvc4djlyR4qY3NUV5HGQBBW7stbcfff1+I/vmsHh" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/default-skin/default-skin.min.css" integrity="sha384-iD0dNku6PYSIQLyfTOpB06F2KCZJAKLOThS5HRe8b3ibhdEQ6eKsFf/EeFxdOt5R" crossorigin="anonymous">
+
+
+<script type="application/javascript">
+var doNotTrack = false;
+if (!doNotTrack) {
+	window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+	ga('create', 'UA-54762029-1', 'auto');
+	
+	ga('send', 'pageview');
+}
+</script>
+<script async src='https://www.google-analytics.com/analytics.js'></script>
+
+
+  </head>
+  <body>
+    <nav class="navbar navbar-default navbar-fixed-top navbar-custom">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#main-navbar">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="https://abhirockzz.github.io">Abhishek&#39;s blog</a>
+    </div>
+
+    <div class="collapse navbar-collapse" id="main-navbar">
+      <ul class="nav navbar-nav navbar-right">
+        
+          
+            <li>
+              <a title="Blog" href="/">Blog</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="About" href="/about">About</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Books" href="/books">Books</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Open-Source" href="/projects">Open-Source</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Presentations" href="/presentations">Presentations</a>
+            </li>
+          
+        
+          
+            <li>
+              <a title="Tags" href="/tags">Tags</a>
+            </li>
+          
+        
+
+        
+
+        
+      </ul>
+    </div>
+
+    
+      <div class="avatar-container">
+        <div class="avatar-img-border">
+          <a title="Abhishek&#39;s blog" href="https://abhirockzz.github.io">
+            <img class="avatar-img" src="https://abhirockzz.github.io/icon.jpg" alt="Abhishek&#39;s blog" />
+          </a>
+        </div>
+      </div>
+    
+
+  </div>
+</nav>
+
+
+
+
+    
+
+
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+<div class="pswp__bg"></div>
+
+<div class="pswp__scroll-wrap">
+    
+    <div class="pswp__container">
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+    </div>
+    
+    <div class="pswp__ui pswp__ui--hidden">
+    <div class="pswp__top-bar">
+      
+      <div class="pswp__counter"></div>
+      <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+      <button class="pswp__button pswp__button--share" title="Share"></button>
+      <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+      <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+      
+      
+      <div class="pswp__preloader">
+        <div class="pswp__preloader__icn">
+          <div class="pswp__preloader__cut">
+            <div class="pswp__preloader__donut"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+      <div class="pswp__share-tooltip"></div>
+    </div>
+    <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+    </button>
+    <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+    </button>
+    <div class="pswp__caption">
+      <div class="pswp__caption__center"></div>
+    </div>
+    </div>
+    </div>
+</div>
+
+
+  
+  
+  
+
+
+
+
+
+
+  
+
+  <header class="header-section ">
+    
+    <div class="intro-header no-img">
+      <div class="container">
+        <div class="row">
+          <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+            <div class="posts-heading">
+              
+                <h1>How to handle type conversions with the DynamoDB Go SDK</h1>
+              
+              
+                <hr class="small">
+              
+              
+              
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+
+    
+<div class="container" role="main">
+  <div class="row">
+    <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+      <article role="main" class="blog-post">
+        <p><em>Learn with practical code samples</em></p>
+<p><code>DynamoDB</code> provides a <a href="https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.NamingRulesDataTypes.html">rich set of data types</a> including <code>String</code>s, <code>Number</code>s, <code>Set</code>s, <code>List</code>s, <code>Map</code>s etc. In the <a href="https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/dynamodb">Go SDK for DynamoDB</a>, the
+<a href="https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/dynamodb/types">types</a> package contains Go representations of these data types and the <a href="https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue">attributevalue</a> module provides functions to work with Go and <code>DynamoDB</code> types.</p>
+<p>This blog post will demonstrate how to handle conversions between Go types in your application and <code>DynamoDB</code>. We will start off with simple code snippets to introduce some of the API constructs and wrap up with a example of how to use these Go SDK features in the context of a complete application (including a code walk though).</p>
+<blockquote>
+<p>You can refer to the complete code on <a href="https://github.com/abhirockzz/dynamodb-go-sdk-type-conversion">GitHub</a></p>
+</blockquote>
+<p>To begin with, go through a few examples.</p>
+<blockquote>
+<p>Please note that error handling has been purposely omitted in the below code snippets to keep them concise.</p>
+</blockquote>
+<h3 id="converting-from-go-to-dynamodb-types">Converting from Go to DynamoDB types</h3>
+<p>The <a href="https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue#Marshal">Marshal</a> family of functions takes care of this. It works with basic scalars (<code>int</code>, <code>uint</code>, <code>float</code>, <code>bool</code>, <code>string</code>), <code>map</code>s, <code>slice</code>s, and <code>struct</code>s.</p>
+<p>To work with scalar types, just use the (generic) <code>Marshal</code> function:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">marshalScalars</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">av</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">attributevalue</span><span class="p">.</span><span class="nf">Marshal</span><span class="p">(</span><span class="s">&#34;foo&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">log</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="nx">av</span><span class="p">.(</span><span class="o">*</span><span class="nx">types</span><span class="p">.</span><span class="nx">AttributeValueMemberS</span><span class="p">).</span><span class="nx">Value</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">av</span><span class="p">,</span> <span class="nx">err</span> <span class="p">=</span> <span class="nx">attributevalue</span><span class="p">.</span><span class="nf">Marshal</span><span class="p">(</span><span class="kc">true</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">log</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="nx">av</span><span class="p">.(</span><span class="o">*</span><span class="nx">types</span><span class="p">.</span><span class="nx">AttributeValueMemberBOOL</span><span class="p">).</span><span class="nx">Value</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">av</span><span class="p">,</span> <span class="nx">err</span> <span class="p">=</span> <span class="nx">attributevalue</span><span class="p">.</span><span class="nf">Marshal</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">log</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="nx">av</span><span class="p">.(</span><span class="o">*</span><span class="nx">types</span><span class="p">.</span><span class="nx">AttributeValueMemberN</span><span class="p">).</span><span class="nx">Value</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">av</span><span class="p">,</span> <span class="nx">err</span> <span class="p">=</span> <span class="nx">attributevalue</span><span class="p">.</span><span class="nf">Marshal</span><span class="p">(</span><span class="mf">42.42</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">log</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="nx">av</span><span class="p">.(</span><span class="o">*</span><span class="nx">types</span><span class="p">.</span><span class="nx">AttributeValueMemberN</span><span class="p">).</span><span class="nx">Value</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p><code>Marshal</code> converts a Go data type into a <a href="https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/dynamodb/types#AttributeValue">AttributeValue</a>. But <code>AttributeValue</code> itself is just an <code>interface</code> and requires you to cast it to a concrete type such as <a href="https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/dynamodb/types#AttributeValueMemberS">AttributeValueMemberS</a> (for <code>string</code>), <a href="https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/dynamodb/types#AttributeValueMemberBOOL">AttributeValueMemberBOOL</a> (for <code>boolean</code>) etc.</p>
+<blockquote>
+<p>If you try to cast incompatible types, the SDK responds with a helpful error message. For example, <code>panic: interface conversion: types.AttributeValue is *types.AttributeValueMemberN, not *types.AttributeValueMemberS</code></p>
+</blockquote>
+<p>When working with <code>slice</code>s and<code> map</code>s, you are better off using specific functions such as <a href="https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue#MarshalList">MarshalList</a> and <a href="https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue#MarshalMap">MarshalMap</a>:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">marshalSlicesAndMaps</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">avl</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">attributevalue</span><span class="p">.</span><span class="nf">MarshalList</span><span class="p">([]</span><span class="kt">string</span><span class="p">{</span><span class="s">&#34;foo&#34;</span><span class="p">,</span> <span class="s">&#34;bar&#34;</span><span class="p">})</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">v</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">avl</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">log</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="nx">v</span><span class="p">.(</span><span class="o">*</span><span class="nx">types</span><span class="p">.</span><span class="nx">AttributeValueMemberS</span><span class="p">).</span><span class="nx">Value</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">avm</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">attributevalue</span><span class="p">.</span><span class="nf">MarshalMap</span><span class="p">(</span><span class="kd">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="kd">interface</span><span class="p">{}{</span><span class="s">&#34;foo&#34;</span><span class="p">:</span> <span class="s">&#34;bar&#34;</span><span class="p">,</span> <span class="s">&#34;boo&#34;</span><span class="p">:</span> <span class="s">&#34;42&#34;</span><span class="p">})</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">for</span> <span class="nx">k</span><span class="p">,</span> <span class="nx">v</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">avm</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">log</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="nx">k</span><span class="p">,</span> <span class="s">&#34;=&#34;</span><span class="p">,</span> <span class="nx">v</span><span class="p">.(</span><span class="o">*</span><span class="nx">types</span><span class="p">.</span><span class="nx">AttributeValueMemberS</span><span class="p">).</span><span class="nx">Value</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>The above examples gave you a sense of how to work with simple data types in isolation. In a real world application, you will make use of <em>composite</em> data types to represent your <em>domain</em> model - most likely they will be in the form of Go <code>struct</code>s. So let&rsquo;s look at a few examples of that.</p>
+<h3 id="working-with-go-structs">Working with Go structs</h3>
+<p>Here is a simple one:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">User</span> <span class="kd">struct</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">Name</span> <span class="kt">string</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">Age</span>  <span class="kt">string</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">marshalStruct</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">user</span> <span class="o">:=</span> <span class="nx">User</span><span class="p">{</span><span class="nx">Name</span><span class="p">:</span> <span class="s">&#34;foo&#34;</span><span class="p">,</span> <span class="nx">Age</span><span class="p">:</span> <span class="s">&#34;42&#34;</span><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">av</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">attributevalue</span><span class="p">.</span><span class="nf">Marshal</span><span class="p">(</span><span class="nx">user</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">avm</span> <span class="o">:=</span> <span class="nx">av</span><span class="p">.(</span><span class="o">*</span><span class="nx">types</span><span class="p">.</span><span class="nx">AttributeValueMemberM</span><span class="p">).</span><span class="nx">Value</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">log</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;name&#34;</span><span class="p">,</span> <span class="nx">avm</span><span class="p">[</span><span class="s">&#34;Name&#34;</span><span class="p">].(</span><span class="o">*</span><span class="nx">types</span><span class="p">.</span><span class="nx">AttributeValueMemberS</span><span class="p">).</span><span class="nx">Value</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">log</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;age&#34;</span><span class="p">,</span> <span class="nx">avm</span><span class="p">[</span><span class="s">&#34;Age&#34;</span><span class="p">].(</span><span class="o">*</span><span class="nx">types</span><span class="p">.</span><span class="nx">AttributeValueMemberS</span><span class="p">).</span><span class="nx">Value</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">avMap</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">attributevalue</span><span class="p">.</span><span class="nf">MarshalMap</span><span class="p">(</span><span class="nx">user</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">for</span> <span class="nx">name</span><span class="p">,</span> <span class="nx">value</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">avMap</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">log</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="nx">name</span><span class="p">,</span> <span class="s">&#34;=&#34;</span><span class="p">,</span> <span class="nx">value</span><span class="p">.(</span><span class="o">*</span><span class="nx">types</span><span class="p">.</span><span class="nx">AttributeValueMemberS</span><span class="p">).</span><span class="nx">Value</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><blockquote>
+<p>Notice how convenient it is to use <code>MarshalMap</code> (instead of <code>Marshal</code>) when dealing Go structs especially if your application does not know all the attribute names.</p>
+</blockquote>
+<p>So far, it seems like we can handle simple use-cases. But we can do better. This example had a homogenous data type i.e. the <code>struct</code> had only <code>string</code> type making it easy to iterate over the result <code>map</code> and cast the value to a <code>*types.AttributeValueMemberS</code> - if that were not the case, you would have to iterate over each and every attribute value type and type cast it to the appropriate Go type. This will be evident when working with rest of the <code>DynamoDB</code> APIs. For example, the result of a <a href="https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/dynamodb#Client.GetItem">GetItem</a> invocation (<a href="https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/dynamodb#GetItemOutput">GetItemOutput</a>) contains a <code>map[string]types.AttributeValue</code>.</p>
+<p>The SDK provides a way for us to make this much easier!</p>
+<h3 id="converting-from-dynamodb-to-go-types">Converting from DynamoDB to Go types</h3>
+<p>The <code>Unmarshal</code> family of functions takes care of this. Here is another example:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">AdvancedUser</span> <span class="kd">struct</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">Name</span>         <span class="kt">string</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">Age</span>          <span class="kt">int</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">IsOnline</span>     <span class="kt">bool</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">Favourites</span>   <span class="p">[]</span><span class="kt">string</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">Contact</span>      <span class="kd">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="kt">string</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">RegisteredOn</span> <span class="nx">time</span><span class="p">.</span><span class="nx">Time</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">marshalUnmarshal</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">user</span> <span class="o">:=</span> <span class="nx">AdvancedUser</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">Name</span><span class="p">:</span>         <span class="s">&#34;abhishek&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">Age</span><span class="p">:</span>          <span class="mi">35</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">IsOnline</span><span class="p">:</span>     <span class="kc">false</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">Favourites</span><span class="p">:</span>   <span class="p">[]</span><span class="kt">string</span><span class="p">{</span><span class="s">&#34;Lost In Translation, The Walking Dead&#34;</span><span class="p">},</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">Contact</span><span class="p">:</span>      <span class="kd">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="kt">string</span><span class="p">{</span><span class="s">&#34;mobile&#34;</span><span class="p">:</span> <span class="s">&#34;+919718861200&#34;</span><span class="p">,</span> <span class="s">&#34;email&#34;</span><span class="p">:</span> <span class="s">&#34;abhirockzz@gmail.com&#34;</span><span class="p">},</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">RegisteredOn</span><span class="p">:</span> <span class="nx">time</span><span class="p">.</span><span class="nf">Now</span><span class="p">(),</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">avMap</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">attributevalue</span><span class="p">.</span><span class="nf">MarshalMap</span><span class="p">(</span><span class="nx">user</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="kd">var</span> <span class="nx">result</span> <span class="nx">AdvancedUser</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">err</span> <span class="p">=</span> <span class="nx">attributevalue</span><span class="p">.</span><span class="nf">UnmarshalMap</span><span class="p">(</span><span class="nx">avMap</span><span class="p">,</span> <span class="o">&amp;</span><span class="nx">result</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">log</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;\nname&#34;</span><span class="p">,</span> <span class="nx">result</span><span class="p">.</span><span class="nx">Name</span><span class="p">,</span> <span class="s">&#34;\nage&#34;</span><span class="p">,</span> <span class="nx">result</span><span class="p">.</span><span class="nx">Age</span><span class="p">,</span> <span class="s">&#34;\nfavs&#34;</span><span class="p">,</span> <span class="nx">result</span><span class="p">.</span><span class="nx">Favourites</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>With <code>MarshalMap</code>, we converted an instance of <code>AdvancedUser</code> struct into a <code>map[string]types.AttributeValue</code> (imagine you get this as a response to a <code>GetItem</code> API call). Now, instead of iterating over individual <code>AttributeValue</code>s, we simply use <a href="https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue#UnmarshalMap">UnmarshalMap</a> to convert it back a Go <code>struct</code>.</p>
+<p>There is more! Utility functions like <code>UnmarshalListOfMaps</code> make it convenient to work with multiple <code>slice</code>s of Go <code>struct</code>s.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">marshalUnmarshalMultiple</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">user1</span> <span class="o">:=</span> <span class="nx">User</span><span class="p">{</span><span class="nx">Name</span><span class="p">:</span> <span class="s">&#34;user1&#34;</span><span class="p">,</span> <span class="nx">Age</span><span class="p">:</span> <span class="s">&#34;42&#34;</span><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">user1Map</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">attributevalue</span><span class="p">.</span><span class="nf">MarshalMap</span><span class="p">(</span><span class="nx">user1</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">log</span><span class="p">.</span><span class="nf">Fatal</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">user2</span> <span class="o">:=</span> <span class="nx">User</span><span class="p">{</span><span class="nx">Name</span><span class="p">:</span> <span class="s">&#34;user2&#34;</span><span class="p">,</span> <span class="nx">Age</span><span class="p">:</span> <span class="s">&#34;24&#34;</span><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">user2Map</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">attributevalue</span><span class="p">.</span><span class="nf">MarshalMap</span><span class="p">(</span><span class="nx">user2</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">log</span><span class="p">.</span><span class="nf">Fatal</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="kd">var</span> <span class="nx">users</span> <span class="p">[]</span><span class="nx">User</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">err</span> <span class="p">=</span> <span class="nx">attributevalue</span><span class="p">.</span><span class="nf">UnmarshalListOfMaps</span><span class="p">([]</span><span class="kd">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="nx">types</span><span class="p">.</span><span class="nx">AttributeValue</span><span class="p">{</span><span class="nx">user1Map</span><span class="p">,</span> <span class="nx">user2Map</span><span class="p">},</span> <span class="o">&amp;</span><span class="nx">users</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">log</span><span class="p">.</span><span class="nf">Fatal</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">user</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">users</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">log</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;name&#34;</span><span class="p">,</span> <span class="nx">user</span><span class="p">.</span><span class="nx">Name</span><span class="p">,</span> <span class="s">&#34;age&#34;</span><span class="p">,</span> <span class="nx">user</span><span class="p">.</span><span class="nx">Age</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><h3 id="using-struct-tags-for-customization">Using struct tags for customization</h3>
+<p><code>Marshal</code> and <code>Unmarshal</code> functions support the <code>dynamodbav</code> struct tag to control conversion between Go types and <code>DynamoDB</code> <code>AttributeValue</code>. Consider the following <code>struct</code>:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">User</span> <span class="kd">struct</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">Email</span> <span class="kt">string</span> <span class="s">`dynamodbav:&#34;email&#34; json:&#34;user_email&#34;`</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">Age</span>   <span class="kt">int</span>    <span class="s">`dynamodbav:&#34;age,omitempty&#34; json:&#34;age,omitempty&#34;`</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">City</span>  <span class="kt">string</span> <span class="s">`dynamodbav:&#34;city&#34; json:&#34;city&#34;`</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>Couple of common scenarios where the <code>dynamodbav</code> comes in handy.</p>
+<p><strong>Customize attribute name</strong></p>
+<p>Say, we have a table with <strong>email</strong> as the partition key. Without the <code>dynamodbav:&quot;email&quot;</code> tag, when we marshal the <code>User</code> struct and try to save in table, it will use <code>Email</code> (upper case) as the attribute name - <code>DynamoDB</code> will not accept this since <a href="https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.NamingRulesDataTypes.html#HowItWorks.NamingRules">attribute names are case sensitive</a> - <em>&ldquo;All names must be encoded using UTF-8, and are case-sensitive.&rdquo;</em></p>
+<blockquote>
+<p>Notice that we have combined <a href="https://cs.opensource.google/go/go/+/go1.19:src/encoding/json/encode.go;l=157">json tags</a> as well (this is perfectly valid) - it&rsquo;s not used by <code>DynamoDB</code> but the json library while encoding and decoding data</p>
+</blockquote>
+<p><strong>Handle missing attributes</strong></p>
+<p><code>DynamoDB</code> is a NoSQL database and tables don&rsquo;t have a fixed schema (except for <code>partition</code> key and an optional <code>sort</code> key). For example, a user item may <em>not</em> include the age attribute.By using <code>dynamodbav:&quot;age,omitempty&quot;</code>, if the <code>Age</code> field is missing, it won&rsquo;t be sent to <code>DynamoDB</code> (it will be ignored)</p>
+<blockquote>
+<p>In the absence of this tag, our <code>DynamoDB</code> record will have <code>Age</code> attribute set to <code>0</code> - depending on your use case this may or may not</p>
+</blockquote>
+<p>To look at all the usage patterns of this struct tag, refer to the <a href="https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue#Marshal">Marshal API documentation</a>.</p>
+<p>As promised before, let&rsquo;s explore how to put all these APIs to use within the scope of an&hellip;</p>
+<h3 id="-end-to-end-example">&hellip; End-to-end example</h3>
+<p>We will look at a Go application that exposes a REST API with a few endpoints. It combines the CRUD APIs (<code>PutItem</code>, <code>GetItem</code> etc.) together with all the functions/APIs mentioned above.</p>
+<p><strong>Test the application</strong></p>
+<p>Before we see the code, let&rsquo;s quickly review and test the endpoints exposed by the application. You will need to have Go installed, clone the application and change to the right directory.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">git clone https://github.com/abhirockzz/dynamodb-go-sdk-type-conversion
+</span></span><span class="line"><span class="cl"><span class="nb">cd</span> dynamodb-go-sdk-type-conversion
+</span></span></code></pre></div><p>First, create a <code>DynamoDB</code> table (you can name it <strong>users</strong>). Use <strong>city</strong> as the <code>Partition</code> key, <strong>email</strong> as the <code>Sort</code> key.</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/cn7deegqv37tesorixk4.png" alt="Image description"></p>
+<p>You need some test data. You can do so manually, but I have included a simply utility to seed some test data during application startup. To use it, simply set the <code>SEED_TEST_DATA</code> variable at application startup:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">SEED_TEST_DATA</span><span class="o">=</span><span class="nb">true</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">go run main.go
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># output</span>
+</span></span><span class="line"><span class="cl">started http server...
+</span></span></code></pre></div><p>This will create <code>100</code> items. Check <code>DynamoDB</code> table to confirm:</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/p2v37zrutocef4m8u9h6.png" alt="Image description"></p>
+<p>Your application should be available at port <code>8080</code>. You can use <code>curl</code> or any other <code>HTTP</code> client to invoke the endpoints:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="c1"># to get all users</span>
+</span></span><span class="line"><span class="cl">curl -i http://localhost:8080/users/
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># to get all users in a particular city</span>
+</span></span><span class="line"><span class="cl">curl -i http://localhost:8080/users/London
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># to get a specific user</span>
+</span></span><span class="line"><span class="cl">curl -i <span class="s2">&#34;http://localhost:8080/user?city=London&amp;email=user11@foo.com&#34;</span>
+</span></span></code></pre></div><p>To better understand how the above APIs are used, let&rsquo;s briefly review key parts of the code:</p>
+<h3 id="code-walk-through">Code walk through</h3>
+<p><strong>Add new item to a DynamoDB table</strong></p>
+<p>Starting with the HTTP handler for adding a <code>User</code>:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">h</span> <span class="nx">Handler</span><span class="p">)</span> <span class="nf">CreateUser</span><span class="p">(</span><span class="nx">rw</span> <span class="nx">http</span><span class="p">.</span><span class="nx">ResponseWriter</span><span class="p">,</span> <span class="nx">req</span> <span class="o">*</span><span class="nx">http</span><span class="p">.</span><span class="nx">Request</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="kd">var</span> <span class="nx">user</span> <span class="nx">model</span><span class="p">.</span><span class="nx">User</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">err</span> <span class="o">:=</span> <span class="nx">json</span><span class="p">.</span><span class="nf">NewDecoder</span><span class="p">(</span><span class="nx">req</span><span class="p">.</span><span class="nx">Body</span><span class="p">).</span><span class="nf">Decode</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">user</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span><span class="c1">// handle error}
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>
+</span></span><span class="line"><span class="cl">	<span class="nx">err</span> <span class="p">=</span> <span class="nx">h</span><span class="p">.</span><span class="nx">d</span><span class="p">.</span><span class="nf">Save</span><span class="p">(</span><span class="nx">user</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span><span class="c1">// handle error}
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>
+</span></span><span class="line"><span class="cl">	<span class="nx">err</span> <span class="p">=</span> <span class="nx">json</span><span class="p">.</span><span class="nf">NewEncoder</span><span class="p">(</span><span class="nx">rw</span><span class="p">).</span><span class="nf">Encode</span><span class="p">(</span><span class="nx">user</span><span class="p">.</span><span class="nx">Email</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span><span class="c1">// handle error}
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="p">}</span>
+</span></span></code></pre></div><p>First, we convert the <code>JSON</code> payload into a <code>User</code> struct which we then pass to the <code>Save</code> function.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">d</span> <span class="nx">DB</span><span class="p">)</span> <span class="nf">Save</span><span class="p">(</span><span class="nx">user</span> <span class="nx">model</span><span class="p">.</span><span class="nx">User</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">item</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">attributevalue</span><span class="p">.</span><span class="nf">MarshalMap</span><span class="p">(</span><span class="nx">user</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span><span class="c1">// handle error}
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>
+</span></span><span class="line"><span class="cl">	<span class="nx">_</span><span class="p">,</span> <span class="nx">err</span> <span class="p">=</span> <span class="nx">d</span><span class="p">.</span><span class="nx">client</span><span class="p">.</span><span class="nf">PutItem</span><span class="p">(</span><span class="nx">context</span><span class="p">.</span><span class="nf">Background</span><span class="p">(),</span> <span class="o">&amp;</span><span class="nx">dynamodb</span><span class="p">.</span><span class="nx">PutItemInput</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">TableName</span><span class="p">:</span> <span class="nx">aws</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="nx">d</span><span class="p">.</span><span class="nx">table</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">Item</span><span class="p">:</span>      <span class="nx">item</span><span class="p">})</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span><span class="c1">// handle error}
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>Notice how <code>MarshalMap</code> is used to convert the <code>User</code> struct to a <code>map[string]types.AttributeValue</code> that the <code>PutItem</code> API can accept:</p>
+<p><strong>Get a single item from DynamoDB</strong></p>
+<p>Since our table has a <strong>composite</strong> primary key (<code>city</code> is the <code>partition</code> key and <code>email</code> is the <code>sort</code> key), we will need to provide <strong>both</strong> of them to locate a specific user item:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">h</span> <span class="nx">Handler</span><span class="p">)</span> <span class="nf">FetchUser</span><span class="p">(</span><span class="nx">rw</span> <span class="nx">http</span><span class="p">.</span><span class="nx">ResponseWriter</span><span class="p">,</span> <span class="nx">req</span> <span class="o">*</span><span class="nx">http</span><span class="p">.</span><span class="nx">Request</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">email</span> <span class="o">:=</span> <span class="nx">req</span><span class="p">.</span><span class="nx">URL</span><span class="p">.</span><span class="nf">Query</span><span class="p">().</span><span class="nf">Get</span><span class="p">(</span><span class="s">&#34;email&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">city</span> <span class="o">:=</span> <span class="nx">req</span><span class="p">.</span><span class="nx">URL</span><span class="p">.</span><span class="nf">Query</span><span class="p">().</span><span class="nf">Get</span><span class="p">(</span><span class="s">&#34;city&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">log</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;getting user with email&#34;</span><span class="p">,</span> <span class="nx">email</span><span class="p">,</span> <span class="s">&#34;in city&#34;</span><span class="p">,</span> <span class="nx">city</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">user</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">h</span><span class="p">.</span><span class="nx">d</span><span class="p">.</span><span class="nf">GetOne</span><span class="p">(</span><span class="nx">email</span><span class="p">,</span> <span class="nx">city</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span><span class="c1">// handle error}
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">err</span> <span class="p">=</span> <span class="nx">json</span><span class="p">.</span><span class="nf">NewEncoder</span><span class="p">(</span><span class="nx">rw</span><span class="p">).</span><span class="nf">Encode</span><span class="p">(</span><span class="nx">user</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span><span class="c1">// handle error}
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="p">}</span>
+</span></span></code></pre></div><p>We extract the <code>email</code> and <code>city</code> from the query parameters in the <code>HTTP</code> request and pass it on to the database layer (<code>GetOne</code> function).</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">d</span> <span class="nx">DB</span><span class="p">)</span> <span class="nf">GetOne</span><span class="p">(</span><span class="nx">email</span><span class="p">,</span> <span class="nx">city</span> <span class="kt">string</span><span class="p">)</span> <span class="p">(</span><span class="nx">model</span><span class="p">.</span><span class="nx">User</span><span class="p">,</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">result</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">d</span><span class="p">.</span><span class="nx">client</span><span class="p">.</span><span class="nf">GetItem</span><span class="p">(</span><span class="nx">context</span><span class="p">.</span><span class="nf">Background</span><span class="p">(),</span>
+</span></span><span class="line"><span class="cl">		<span class="o">&amp;</span><span class="nx">dynamodb</span><span class="p">.</span><span class="nx">GetItemInput</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">TableName</span><span class="p">:</span> <span class="nx">aws</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="nx">d</span><span class="p">.</span><span class="nx">table</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">Key</span><span class="p">:</span> <span class="kd">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="nx">types</span><span class="p">.</span><span class="nx">AttributeValue</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">				<span class="s">&#34;email&#34;</span><span class="p">:</span> <span class="o">&amp;</span><span class="nx">types</span><span class="p">.</span><span class="nx">AttributeValueMemberS</span><span class="p">{</span><span class="nx">Value</span><span class="p">:</span> <span class="nx">email</span><span class="p">},</span>
+</span></span><span class="line"><span class="cl">				<span class="s">&#34;city&#34;</span><span class="p">:</span>  <span class="o">&amp;</span><span class="nx">types</span><span class="p">.</span><span class="nx">AttributeValueMemberS</span><span class="p">{</span><span class="nx">Value</span><span class="p">:</span> <span class="nx">city</span><span class="p">}},</span>
+</span></span><span class="line"><span class="cl">		<span class="p">})</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span><span class="c1">// handle error}
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">result</span><span class="p">.</span><span class="nx">Item</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="nx">model</span><span class="p">.</span><span class="nx">User</span><span class="p">{},</span> <span class="nx">ErrNotFound</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="kd">var</span> <span class="nx">user</span> <span class="nx">model</span><span class="p">.</span><span class="nx">User</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">err</span> <span class="p">=</span> <span class="nx">attributevalue</span><span class="p">.</span><span class="nf">UnmarshalMap</span><span class="p">(</span><span class="nx">result</span><span class="p">.</span><span class="nx">Item</span><span class="p">,</span> <span class="o">&amp;</span><span class="nx">user</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span><span class="c1">// handle error}
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="nx">user</span><span class="p">,</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>We invoke <code>GetItem</code> API and get back the result in form of a <code>map[string]types.AttributeValue</code> (via the <code>Item</code> attribute in <code>GetItemOutput</code>).
+This is converted back into the Go (<code>User</code>) struct using <code>UnmarshalMap</code>.</p>
+<blockquote>
+<p>Notice that the <code>Key</code> attribute in <code>GetItemInput</code> also accepts a <code>map[string]types.AttributeValue</code>, but we don&rsquo;t use <code>MarshalMap</code> to create it</p>
+</blockquote>
+<p><strong>Fetch multiple items</strong></p>
+<p>We can choose to query for all users in a <em>specific</em> city - this is a perfectly valid access pattern since <code>city</code> is the <code>partition</code> key.</p>
+<p>The HTTP handler function accepts the city as a path parameter, which is passed on to the database layer.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">h</span> <span class="nx">Handler</span><span class="p">)</span> <span class="nf">FetchUsers</span><span class="p">(</span><span class="nx">rw</span> <span class="nx">http</span><span class="p">.</span><span class="nx">ResponseWriter</span><span class="p">,</span> <span class="nx">req</span> <span class="o">*</span><span class="nx">http</span><span class="p">.</span><span class="nx">Request</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">city</span> <span class="o">:=</span> <span class="nx">mux</span><span class="p">.</span><span class="nf">Vars</span><span class="p">(</span><span class="nx">req</span><span class="p">)[</span><span class="s">&#34;city&#34;</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">log</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;city&#34;</span><span class="p">,</span> <span class="nx">city</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">log</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;getting users in city&#34;</span><span class="p">,</span> <span class="nx">city</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">users</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">h</span><span class="p">.</span><span class="nx">d</span><span class="p">.</span><span class="nf">GetMany</span><span class="p">(</span><span class="nx">city</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">http</span><span class="p">.</span><span class="nf">Error</span><span class="p">(</span><span class="nx">rw</span><span class="p">,</span> <span class="nx">err</span><span class="p">.</span><span class="nf">Error</span><span class="p">(),</span> <span class="nx">http</span><span class="p">.</span><span class="nx">StatusInternalServerError</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">err</span> <span class="p">=</span> <span class="nx">json</span><span class="p">.</span><span class="nf">NewEncoder</span><span class="p">(</span><span class="nx">rw</span><span class="p">).</span><span class="nf">Encode</span><span class="p">(</span><span class="nx">users</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">http</span><span class="p">.</span><span class="nf">Error</span><span class="p">(</span><span class="nx">rw</span><span class="p">,</span> <span class="nx">err</span><span class="p">.</span><span class="nf">Error</span><span class="p">(),</span> <span class="nx">http</span><span class="p">.</span><span class="nx">StatusInternalServerError</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>From there on, <code>GetMany</code> function does all the work:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">d</span> <span class="nx">DB</span><span class="p">)</span> <span class="nf">GetMany</span><span class="p">(</span><span class="nx">city</span> <span class="kt">string</span><span class="p">)</span> <span class="p">([]</span><span class="nx">model</span><span class="p">.</span><span class="nx">User</span><span class="p">,</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">kcb</span> <span class="o">:=</span> <span class="nx">expression</span><span class="p">.</span><span class="nf">Key</span><span class="p">(</span><span class="s">&#34;city&#34;</span><span class="p">).</span><span class="nf">Equal</span><span class="p">(</span><span class="nx">expression</span><span class="p">.</span><span class="nf">Value</span><span class="p">(</span><span class="nx">city</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">kce</span><span class="p">,</span> <span class="nx">_</span> <span class="o">:=</span> <span class="nx">expression</span><span class="p">.</span><span class="nf">NewBuilder</span><span class="p">().</span><span class="nf">WithKeyCondition</span><span class="p">(</span><span class="nx">kcb</span><span class="p">).</span><span class="nf">Build</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">result</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">d</span><span class="p">.</span><span class="nx">client</span><span class="p">.</span><span class="nf">Query</span><span class="p">(</span><span class="nx">context</span><span class="p">.</span><span class="nf">Background</span><span class="p">(),</span> <span class="o">&amp;</span><span class="nx">dynamodb</span><span class="p">.</span><span class="nx">QueryInput</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">TableName</span><span class="p">:</span>                 <span class="nx">aws</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="nx">d</span><span class="p">.</span><span class="nx">table</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">KeyConditionExpression</span><span class="p">:</span>    <span class="nx">kce</span><span class="p">.</span><span class="nf">KeyCondition</span><span class="p">(),</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">ExpressionAttributeNames</span><span class="p">:</span>  <span class="nx">kce</span><span class="p">.</span><span class="nf">Names</span><span class="p">(),</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">ExpressionAttributeValues</span><span class="p">:</span> <span class="nx">kce</span><span class="p">.</span><span class="nf">Values</span><span class="p">(),</span>
+</span></span><span class="line"><span class="cl">	<span class="p">})</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">log</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;Query failed with error&#34;</span><span class="p">,</span> <span class="nx">err</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="p">[]</span><span class="nx">model</span><span class="p">.</span><span class="nx">User</span><span class="p">{},</span> <span class="nx">err</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">users</span> <span class="o">:=</span> <span class="p">[]</span><span class="nx">model</span><span class="p">.</span><span class="nx">User</span><span class="p">{}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nx">result</span><span class="p">.</span><span class="nx">Items</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="nx">users</span><span class="p">,</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">err</span> <span class="p">=</span> <span class="nx">attributevalue</span><span class="p">.</span><span class="nf">UnmarshalListOfMaps</span><span class="p">(</span><span class="nx">result</span><span class="p">.</span><span class="nx">Items</span><span class="p">,</span> <span class="o">&amp;</span><span class="nx">users</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">log</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;UnmarshalMap failed with error&#34;</span><span class="p">,</span> <span class="nx">err</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="p">[]</span><span class="nx">model</span><span class="p">.</span><span class="nx">User</span><span class="p">{},</span> <span class="nx">err</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="nx">users</span><span class="p">,</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>Pay attention to two things:</p>
+<ul>
+<li>How a <code>KeyConditionExpression</code> is being used (this is from the <code>expressions</code> package)</li>
+<li>And more interestingly, the usage of <code>UnmarshalListOfMaps</code> function to directly convert a <code>[]map[string]types.AttributeValue</code> (<code>slice</code> of items from DynamoDB) into a <code>slice</code> of <code>User</code> struct. If not for this function, we would need to extract each item from the result i.e. a <code>map[string]types.AttributeValue</code> and call <code>UnmarshalMap</code> for each of them. So this is pretty handy!</li>
+</ul>
+<p><strong>Finally - just get everything!</strong></p>
+<p>The <code>GetAll</code> function uses <code>Scan</code> operation to retrieve <strong>all</strong> the records in the <code>DynamoDB</code> table.</p>
+<blockquote>
+<p>A <code>Scan</code> operation goes over the entire table (or secondary index) and it&rsquo;s highly likely that it will end up consuming a large chunk of the provisioned throughput, especially if it&rsquo;s a large table. It should be your last resort - check whether <a href="https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_Query.html">Query API</a> (or <a href="https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_BatchGetItem.html">BatchGetItem</a>) works for your use case.</p>
+</blockquote>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">d</span> <span class="nx">DB</span><span class="p">)</span> <span class="nf">GetAll</span><span class="p">()</span> <span class="p">([]</span><span class="nx">model</span><span class="p">.</span><span class="nx">User</span><span class="p">,</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">result</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">d</span><span class="p">.</span><span class="nx">client</span><span class="p">.</span><span class="nf">Scan</span><span class="p">(</span><span class="nx">context</span><span class="p">.</span><span class="nf">Background</span><span class="p">(),</span> <span class="o">&amp;</span><span class="nx">dynamodb</span><span class="p">.</span><span class="nx">ScanInput</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">TableName</span><span class="p">:</span> <span class="nx">aws</span><span class="p">.</span><span class="nf">String</span><span class="p">(</span><span class="nx">d</span><span class="p">.</span><span class="nx">table</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">	<span class="p">})</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">log</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;Scan failed with error&#34;</span><span class="p">,</span> <span class="nx">err</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="p">[]</span><span class="nx">model</span><span class="p">.</span><span class="nx">User</span><span class="p">{},</span> <span class="nx">err</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">users</span> <span class="o">:=</span> <span class="p">[]</span><span class="nx">model</span><span class="p">.</span><span class="nx">User</span><span class="p">{}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">err</span> <span class="p">=</span> <span class="nx">attributevalue</span><span class="p">.</span><span class="nf">UnmarshalListOfMaps</span><span class="p">(</span><span class="nx">result</span><span class="p">.</span><span class="nx">Items</span><span class="p">,</span> <span class="o">&amp;</span><span class="nx">users</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">log</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;UnmarshalMap failed with error&#34;</span><span class="p">,</span> <span class="nx">err</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="p">[]</span><span class="nx">model</span><span class="p">.</span><span class="nx">User</span><span class="p">{},</span> <span class="nx">err</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="nx">users</span><span class="p">,</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><h2 id="wrap-up">Wrap up</h2>
+<p>I hope you found this useful and now you are aware of the APIs in <code>DynamoDB</code> Go SDK to work with simple Go types as well as <code>struct</code>s, <code>map</code>s, <code>slice</code>s etc. I would encourage you to explore some of the other nuances such as how to customize the <code>Marshal</code> and <code>Unmarshal</code> features using <a href="https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue#MarshalWithOptions">MarshalWithOptions</a> and <a href="https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue#UnmarshalWithOptions">UnmarshalWithOptions</a> respectively.</p>
+
+
+        
+          <div class="blog-tags">
+            
+              <a href="https://abhirockzz.github.io/tags/golang/">golang</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io/tags/dynamodb/">dynamodb</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io/tags/database/">database</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io/tags/aws/">aws</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io/tags/nosql/">nosql</a>&nbsp;
+            
+          </div>
+        
+
+        
+
+        
+      </article>
+
+      
+        <ul class="pager blog-pager">
+          
+            <li class="previous">
+              <a href="https://abhirockzz.github.io/posts/cdk8s-k8s-go-6/" data-toggle="tooltip" data-placement="top" title="Write your Kubernetes Infrastructure as Go code - Combine cdk8s with AWS CDK">&larr; Previous Post</a>
+            </li>
+          
+          
+            <li class="next">
+              <a href="https://abhirockzz.github.io/posts/dynamodb-go-sdk-scan-batch-ops/" data-toggle="tooltip" data-placement="top" title="DynamoDB Go SDK: How to use the Scan and Batch operations efficiently">Next Post &rarr;</a>
+            </li>
+          
+        </ul>
+      
+
+
+      
+
+    </div>
+  </div>
+</div>
+
+      
+<footer>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+        <ul class="list-inline text-center footer-links">
+          
+              <li>
+                <a href="https://github.com/abhirockzz" title="GitHub">
+                  <span class="fa-stack fa-lg">
+                    <i class="fas fa-circle fa-stack-2x"></i>
+                    <i class="fab fa-github fa-stack-1x fa-inverse"></i>
+                  </span>
+                </a>
+              </li>
+              <li>
+                <a href="https://twitter.com/abhi_tweeter" title="Twitter">
+                  <span class="fa-stack fa-lg">
+                    <i class="fas fa-circle fa-stack-2x"></i>
+                    <i class="fab fa-twitter fa-stack-1x fa-inverse"></i>
+                  </span>
+                </a>
+              </li>
+              <li>
+                <a href="https://linkedin.com/in/abhirockzz" title="LinkedIn">
+                  <span class="fa-stack fa-lg">
+                    <i class="fas fa-circle fa-stack-2x"></i>
+                    <i class="fab fa-linkedin fa-stack-1x fa-inverse"></i>
+                  </span>
+                </a>
+              </li>
+          
+          <li>
+            <a href="" title="RSS">
+              <span class="fa-stack fa-lg">
+                <i class="fas fa-circle fa-stack-2x"></i>
+                <i class="fas fa-rss fa-stack-1x fa-inverse"></i>
+              </span>
+            </a>
+          </li>
+          
+        </ul>
+        <p class="credits copyright text-muted">
+          
+            
+              <a href="https://abhirockzz.github.io">Abhishek Gupta</a>
+            
+          
+
+          &nbsp;&bull;&nbsp;&copy;
+          
+            2022
+          
+
+          
+            &nbsp;&bull;&nbsp;
+            <a href="https://abhirockzz.github.io">Abhishek&#39;s blog</a>
+          
+        </p>
+        
+        <p class="credits theme-by text-muted">
+          <a href="https://gohugo.io">Hugo v0.101.0</a> powered &nbsp;&bull;&nbsp; Theme <a href="https://github.com/halogenica/beautifulhugo">Beautiful Hugo</a> adapted from <a href="https://deanattali.com/beautiful-jekyll/">Beautiful Jekyll</a>
+          
+        </p>
+      </div>
+    </div>
+  </div>
+</footer><script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.js" integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/contrib/auto-render.min.js" integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
+<script src="https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+<script src="https://abhirockzz.github.io/js/main.js"></script><script> renderMathInElement(document.body); </script><script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.js" integrity="sha384-QELNnmcmU8IR9ZAykt67vGr9/rZJdHbiWi64V88fCPaOohUlHCqUD/unNN0BXSqy" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe-ui-default.min.js" integrity="sha384-m67o7SkQ1ALzKZIFh4CiTA8tmadaujiTa9Vu+nqPSwDOqHrDmxLezTdFln8077+q" crossorigin="anonymous"></script><script src="https://abhirockzz.github.io/js/load-photoswipe.js"></script>
+
+
+
+
+
+
+
+
+
+    
+  </body>
+</html>
+
