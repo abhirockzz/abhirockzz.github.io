@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en" itemscope itemtype="http://schema.org/WebPage">
+  <head>
+    
+
+<meta charset="utf-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+
+<title>Getting started with MSK Serverless and AWS Lambda using Go - Abhishek&#39;s blog</title>
+<meta name="description" content="In this blog post you will learn how to deploy a Go Lambda function and trigger it in response to events sent to a topic in a MSK Serverless cluster.
+
+Prerequisites
+Infrastructure setup
+Send data to MSK Serverless using producer application
+Configure and deploy the Lambda function
+Verify the integration
+Conclusion
+
+The following topics have been covered:
+
+How to use the franz-go Go Kafka client to connect to MSK Serverless using IAM authentication.
+Write a Go Lambda function to process data in MSK topic.
+Create the infrastructure - VPC, subnets, MSK cluster, Cloud9 etc.
+Configure Lambda and Cloud9 to access MSK using IAM roles and fine-grained permissions.
+
+Prerequisites
+You will need an AWS account, install AWS CLI as well a recent version of Go (1.18 or above)."><script type="application/ld+json">
+{
+    "@context": "http://schema.org",
+    "@type": "WebSite",
+    "name": "Abhishek\u0027s blog",
+    
+    "url": "https:\/\/abhirockzz.github.io\/"
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Organization",
+  "name": "",
+  "url": "https:\/\/abhirockzz.github.io\/"
+  
+  
+  
+  
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [{
+        "@type": "ListItem",
+        "position": 1,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io\/",
+          "name": "home"
+        }
+    },{
+        "@type": "ListItem",
+        "position": 3,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io\/posts\/msk-serverless-lambda-go-getting-started\/",
+          "name": "Getting started with msk serverless and aws lambda using go"
+        }
+    }]
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Article",
+  "author": {
+    "name" : ""
+  },
+  "headline": "Getting started with MSK Serverless and AWS Lambda using Go",
+  "description" : "In this blog post you will learn how to deploy a Go Lambda function and trigger it in response to events sent to a topic in a MSK Serverless cluster.\nPrerequisites Infrastructure setup Send data to MSK Serverless using producer application Configure and deploy the Lambda function Verify the integration Conclusion The following topics have been covered:\nHow to use the franz-go Go Kafka client to connect to MSK Serverless using IAM authentication. Write a Go Lambda function to process data in MSK topic. Create the infrastructure - VPC, subnets, MSK cluster, Cloud9 etc. Configure Lambda and Cloud9 to access MSK using IAM roles and fine-grained permissions. Prerequisites You will need an AWS account, install AWS CLI as well a recent version of Go (1.18 or above).\n",
+  "inLanguage" : "en",
+  "wordCount":  758 ,
+  "datePublished" : "2023-01-03T00:00:00",
+  "dateModified" : "2023-01-03T00:00:00",
+  "image" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+  "keywords" : [ "golang, kafka, serverless, aws, lambda" ],
+  "mainEntityOfPage" : "https:\/\/abhirockzz.github.io\/posts\/msk-serverless-lambda-go-getting-started\/",
+  "publisher" : {
+    "@type": "Organization",
+    "name" : "https:\/\/abhirockzz.github.io\/",
+    "logo" : {
+        "@type" : "ImageObject",
+        "url" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+        "height" :  60 ,
+        "width" :  60
+    }
+  }
+}
+</script>
+
+<meta property="og:title" content="Getting started with MSK Serverless and AWS Lambda using Go" />
+<meta property="og:description" content="In this blog post you will learn how to deploy a Go Lambda function and trigger it in response to events sent to a topic in a MSK Serverless cluster.
+
+Prerequisites
+Infrastructure setup
+Send data to MSK Serverless using producer application
+Configure and deploy the Lambda function
+Verify the integration
+Conclusion
+
+The following topics have been covered:
+
+How to use the franz-go Go Kafka client to connect to MSK Serverless using IAM authentication.
+Write a Go Lambda function to process data in MSK topic.
+Create the infrastructure - VPC, subnets, MSK cluster, Cloud9 etc.
+Configure Lambda and Cloud9 to access MSK using IAM roles and fine-grained permissions.
+
+Prerequisites
+You will need an AWS account, install AWS CLI as well a recent version of Go (1.18 or above).">
+<meta property="og:image" content="https://abhirockzz.github.io/icon.jpg" />
+<meta property="og:url" content="https://abhirockzz.github.io/posts/msk-serverless-lambda-go-getting-started/" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Abhishek&#39;s blog" />
+
+<meta name="twitter:title" content="Getting started with MSK Serverless and AWS Lambda using Go" />
+<meta name="twitter:description" content="In this blog post you will learn how to deploy a Go Lambda function and trigger it in response to events sent to a topic in a MSK Serverless cluster.
+
+Prerequisites
+Infrastructure setup
+Send data to …">
+<meta name="twitter:image" content="https://abhirockzz.github.io/icon.jpg" />
+<meta name="twitter:card" content="summary" />
+<link href='https://abhirockzz.github.io/icons/myicon.png' rel='icon' type='image/x-icon' />
+<meta name="generator" content="Hugo 0.145.0">
+<link rel="alternate" href="https://abhirockzz.github.io/%20index.xml" type="application/rss+xml" title="Abhishek&#39;s blog"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css"
+  integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.5.0/css/all.css"
+  integrity="sha384-B4dIYHKNBt8Bc12p+WXckhzcICo0wtJAoU8YZTY5qE0Id1GSseTk6S+L3BlXeVIU" crossorigin="anonymous">
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+  integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous"><link rel="stylesheet" href="https://abhirockzz.github.io/%20css/main.css" /><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic" />
+<link rel="stylesheet"
+  href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800" /><link rel="stylesheet" href="https://abhirockzz.github.io/%20css/syntax.css" /><link rel="stylesheet" href="https://abhirockzz.github.io/%20css/codeblock.css" /><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.css"
+  integrity="sha384-h/L2W9KefUClHWaty3SLE5F/qvc4djlyR4qY3NUV5HGQBBW7stbcfff1+I/vmsHh" crossorigin="anonymous">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/default-skin/default-skin.min.css"
+  integrity="sha384-iD0dNku6PYSIQLyfTOpB06F2KCZJAKLOThS5HRe8b3ibhdEQ6eKsFf/EeFxdOt5R" crossorigin="anonymous">
+
+
+  </head>
+  <body>
+    <nav class="navbar navbar-default navbar-fixed-top navbar-custom">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#main-navbar">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="https://abhirockzz.github.io/">Abhishek&#39;s blog</a>
+    </div>
+
+    <div class="collapse navbar-collapse" id="main-navbar">
+      <ul class="nav navbar-nav navbar-right">
+        
+        
+        <li>
+          <a title="Blog" href="/">Blog</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="About" href="/about">About</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Open-Source" href="/projects">Open-Source</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Presentations" href="/presentations">Presentations</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Publications" href="/publications">Publications</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Tags" href="/tags">Tags</a>
+        </li>
+        
+        
+
+        
+        <li>
+          
+          
+          
+        </li>
+        
+
+        
+      </ul>
+    </div>
+
+    
+    <div class="avatar-container">
+      <div class="avatar-img-border">
+        <a title="Abhishek&#39;s blog" href="https://abhirockzz.github.io/">
+          <img class="avatar-img" src="https://abhirockzz.github.io/icon.jpg" alt="Abhishek&#39;s blog" />
+        </a>
+      </div>
+    </div>
+    
+
+  </div>
+</nav>
+
+
+
+    
+
+
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+<div class="pswp__bg"></div>
+
+<div class="pswp__scroll-wrap">
+    
+    <div class="pswp__container">
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+    </div>
+    
+    <div class="pswp__ui pswp__ui--hidden">
+    <div class="pswp__top-bar">
+      
+      <div class="pswp__counter"></div>
+      <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+      <button class="pswp__button pswp__button--share" title="Share"></button>
+      <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+      <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+      
+      
+      <div class="pswp__preloader">
+        <div class="pswp__preloader__icn">
+          <div class="pswp__preloader__cut">
+            <div class="pswp__preloader__donut"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+      <div class="pswp__share-tooltip"></div>
+    </div>
+    <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+    </button>
+    <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+    </button>
+    <div class="pswp__caption">
+      <div class="pswp__caption__center"></div>
+    </div>
+    </div>
+    </div>
+</div>
+
+
+  
+  
+  
+
+
+
+
+
+
+  
+
+  <header class="header-section ">
+    
+    <div class="intro-header no-img">
+      <div class="container">
+        <div class="row">
+          <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+            <div class="posts-heading">
+              
+                <h1>Getting started with MSK Serverless and AWS Lambda using Go</h1>
+              
+              
+                <hr class="small">
+              
+              
+              
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+
+    
+<div class="container" role="main">
+  <div class="row">
+    <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+      <article role="main" class="blog-post">
+        <p>In this blog post you will learn how to deploy a <a href="https://docs.aws.amazon.com/lambda/latest/dg/lambda-golang.html">Go Lambda function</a> and trigger it in response to events sent to a topic in a <a href="https://docs.aws.amazon.com/lambda/latest/dg/with-msk.html">MSK Serverless</a> cluster.</p>
+<ul>
+<li><a href="#prerequisites">Prerequisites</a></li>
+<li><a href="#infrastructure-setup">Infrastructure setup</a></li>
+<li><a href="#send-data-to-msk-serverless-using-producer-application">Send data to MSK Serverless using producer application</a></li>
+<li><a href="#configure-and-deploy-the-lambda-function">Configure and deploy the Lambda function</a></li>
+<li><a href="#verify-the-integration">Verify the integration</a></li>
+<li><a href="#conclusion">Conclusion</a></li>
+</ul>
+<p>The following topics have been covered:</p>
+<ul>
+<li>How to use the <a href="https://github.com/twmb/franz-go">franz-go Go Kafka client</a> to connect to MSK Serverless using <a href="https://docs.aws.amazon.com/msk/latest/developerguide/iam-access-control.html">IAM authentication</a>.</li>
+<li>Write a Go Lambda function to process data in MSK topic.</li>
+<li>Create the infrastructure - VPC, subnets, MSK cluster, <code>Cloud9</code> etc.</li>
+<li>Configure Lambda and <code>Cloud9</code> to access MSK using IAM roles and fine-grained permissions.</li>
+</ul>
+<h2 id="prerequisites">Prerequisites</h2>
+<p>You will need an AWS account, <a href="https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html">install AWS CLI</a> as well a <a href="https://go.dev/doc/install">recent version of Go</a> (<code>1.18</code> or above).</p>
+<p>Clone <a href="https://github.com/abhirockzz/lambda-msk-serverless-trigger-golang">this GitHub repository</a> and change to the right directory:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>git clone https://github.com/abhirockzz/lambda-msk-serverless-trigger-golang
+</span></span><span style="display:flex;"><span>cd lambda-msk-serverless-trigger-golang
+</span></span></code></pre></div><h2 id="infrastructure-setup">Infrastructure setup</h2>
+<p><strong>Create VPC and other resources</strong></p>
+<p>Use a <a href="https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/gettingstarted.templatebasics.html">CloudFormation template</a> for this.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>aws cloudformation create-stack --stack-name msk-vpc-stack --template-body file://template.yaml
+</span></span></code></pre></div><p>Wait for the stack creation to complete before proceeding to other steps.</p>
+<p><strong>Create MSK Serverless cluster</strong></p>
+<p>Use <a href="https://docs.aws.amazon.com/msk/latest/developerguide/create-cluster.html">AWS Console to create the cluster</a>.</p>
+<p>Configure the <code>VPC</code> and <em>private</em> subnets created in the previous step.</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/lu89x8ooihb49zqp04a7.png" alt="Image description"></p>
+<p><strong>Create AWS Cloud9 instance</strong></p>
+<p>Make sure its in the <em>same</em> <code>VPC</code> as the MSK Serverless cluster and choose the <em>public</em> subnet that you created earlier.</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/z0ha9ate3tcgt3od9wlm.png" alt="Image description"></p>
+<p><strong>Configure MSK cluster security group</strong></p>
+<p>After the <code>Cloud9</code> instance is created, edit the MSK cluster security group to allow access from the <code>Cloud9</code> instance.</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/uh9xu3t0494uqteagctl.png" alt="Image description"></p>
+<p><strong>Configure Cloud9 to send data to MSK Serverless cluster</strong></p>
+<p>The code that we run from <code>Cloud9</code> is going to <em>produce</em> data to the MSK Serverless cluster. So we need to ensure that it has <a href="https://docs.aws.amazon.com/msk/latest/developerguide/iam-access-control.html">the right privileges</a>. For this, we need to create an IAM role and attach required permissions policy.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>aws iam create-role --role-name Cloud9MSKRole --assume-role-policy-document file://ec2-trust-policy.json
+</span></span></code></pre></div><p>Before creating the policy, update the <code>msk-producer-policy.json</code> file to reflect the required details including MSK cluster ARN etc.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>aws iam put-role-policy --role-name Cloud9MSKRole --policy-name MSKProducerPolicy --policy-document file://msk-producer-policy.json
+</span></span></code></pre></div><p>Attach the IAM role to the <code>Cloud9</code> EC2 instance:</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/c780pri1l2e3pzvypcre.png" alt="Image description"></p>
+<h2 id="send-data-to-msk-serverless-using-producer-application">Send data to MSK Serverless using producer application</h2>
+<p>Log into the <code>Cloud9</code> instance and run the producer application (its a Docker image) from a terminal.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>export MSK_BROKER<span style="color:#f92672">=</span>&lt;enter the MSK Serverless endpoint&gt;
+</span></span><span style="display:flex;"><span>export MSK_TOPIC<span style="color:#f92672">=</span>test-topic
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>docker run -p 8080:8080 -e MSK_BROKER<span style="color:#f92672">=</span>$MSK_BROKER -e MSK_TOPIC<span style="color:#f92672">=</span>$MSK_TOPIC public.ecr.aws/l0r2y6t0/msk-producer-app
+</span></span></code></pre></div><p>The application exposes a REST API endpoint using which you can send data to MSK.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>curl -i -X POST -d <span style="color:#e6db74">&#39;test event 1&#39;</span> http://localhost:8080
+</span></span></code></pre></div><p>This will create the specified topic (since it was <em>missing</em> to begin with) and also send the data to MSK.</p>
+<p>Now that the cluster and producer application are ready, we can move on to the consumer. Instead of creating a traditional consumer, we will deploy a Lambda function that will be automatically invoked in response to data being sent to the topic in MSK.</p>
+<h2 id="configure-and-deploy-the-lambda-function">Configure and deploy the Lambda function</h2>
+<p><strong>Create Lambda execution IAM role and attach the policy</strong></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>aws iam create-role --role-name LambdaMSKRole --assume-role-policy-document file://lambda-trust-policy.json
+</span></span><span style="display:flex;"><span>aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaMSKExecutionRole --role-name LambdaMSKRole
+</span></span></code></pre></div><p>Before creating the policy, update the <code>msk-consumer-policy.json</code> file to reflect the required details including MSK cluster ARN etc.</p>
+<pre tabindex="0"><code>aws iam put-role-policy --role-name LambdaMSKRole --policy-name MSKConsumerPolicy --policy-document file://msk-consumer-policy.json
+</code></pre><p><strong>Build and deploy the Go function and create a zip file</strong></p>
+<p>Build and zip the function code:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>GOOS<span style="color:#f92672">=</span>linux go build -o app
+</span></span><span style="display:flex;"><span>zip func.zip app
+</span></span></code></pre></div><p>Deploy to Lambda:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>export LAMBDA_ROLE_ARN<span style="color:#f92672">=</span>&lt;enter the ARN of the LambdaMSKRole created above e.g. arn:aws:iam::&lt;your AWS account ID&gt;:role/LambdaMSKRole&gt;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>aws lambda create-function <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>    --function-name msk-consumer-function <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>    --runtime go1.x <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>    --zip-file fileb://func.zip <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>    --handler app <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>    --role $LAMBDA_ROLE_ARN
+</span></span></code></pre></div><p><strong>Lambda VPC configuration</strong></p>
+<p>Make sure you choose the same <code>VPC</code> and <em>private</em> subnets as the MSK cluster. Also, select the <em>same</em> security group ID as MSK (for convenience) - if you select a different one, make sure to update MSK security group to add an inbound rule (for port <code>9098</code>), just like you did for the <code>Cloud9</code> instance in an earlier step.</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/4a36r10duu9p5tvcwgbf.png" alt="Image description"></p>
+<p><strong>Configure the MSK trigger for the function</strong></p>
+<p>Make sure to choose the right MSK Serverless cluster and enter the correct topic name.</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/ulmtkw9vj1w5sxrwyi3s.png" alt="Image description"></p>
+<h2 id="verify-the-integration">Verify the integration</h2>
+<p>Go back to the <code>Cloud9</code> terminal and send more data using the producer application</p>
+<blockquote>
+<p>I used a handy json utility called <a href="https://github.com/jpmens/jo">jo</a> (<code>sudo yum install jo</code>)</p></blockquote>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>APP_URL<span style="color:#f92672">=</span>http://localhost:8080
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">for</span> i in <span style="color:#f92672">{</span>1..5<span style="color:#f92672">}</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">do</span> jo email<span style="color:#f92672">=</span>user<span style="color:#e6db74">${</span>i<span style="color:#e6db74">}</span>@foo.com name<span style="color:#f92672">=</span>user<span style="color:#e6db74">${</span>i<span style="color:#e6db74">}</span> | curl -i -X POST -d @- $APP_URL;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">done</span>
+</span></span></code></pre></div><p>In the Lambda function logs, you should see the messages that you sent.</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>You were able to setup, configure and deploy a Go Lambda function and trigger it in response to events sent to a topic in a MSK Serverless cluster!</p>
+
+
+        
+          <div class="blog-tags">
+            
+              <a href="https://abhirockzz.github.io//tags/golang/">golang</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/kafka/">kafka</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/serverless/">serverless</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/aws/">aws</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/lambda/">lambda</a>&nbsp;
+            
+          </div>
+        
+
+        
+
+        
+      </article>
+
+      
+        <ul class="pager blog-pager">
+          
+            <li class="previous">
+              <a href="https://abhirockzz.github.io/posts/dynamodb-go-sdk-scan-batch-ops/" data-toggle="tooltip" data-placement="top" title="DynamoDB Go SDK: How to use the Scan and Batch operations efficiently">&larr; Previous Post</a>
+            </li>
+          
+          
+            <li class="next">
+              <a href="https://abhirockzz.github.io/posts/getting-started-msk-serverless-lamda-go/" data-toggle="tooltip" data-placement="top" title="Getting started with MSK Serverless and AWS Lambda using Go">Next Post &rarr;</a>
+            </li>
+          
+        </ul>
+      
+
+
+      
+
+    </div>
+  </div>
+</div>
+
+    
+<footer>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+        <ul class="list-inline text-center footer-links">
+          
+          
+          <li>
+            <a href="" title="RSS">
+              <span class="fa-stack fa-lg">
+                <i class="fas fa-circle fa-stack-2x"></i>
+                <i class="fas fa-rss fa-stack-1x fa-inverse"></i>
+              </span>
+            </a>
+          </li>
+          
+        </ul>
+        <p class="credits copyright text-muted">
+          
+
+          &nbsp;&bull;&nbsp;&copy;
+          
+          2025
+          
+
+          
+          &nbsp;&bull;&nbsp;
+          <a href="https://abhirockzz.github.io/">Abhishek&#39;s blog</a>
+          
+        </p>
+        
+        <p class="credits theme-by text-muted">
+          <a href="https://gohugo.io">Hugo v0.145.0</a> powered &nbsp;&bull;&nbsp; Theme <a href="https://github.com/halogenica/beautifulhugo">Beautiful Hugo</a> adapted from <a href="https://deanattali.com/beautiful-jekyll/">Beautiful Jekyll</a>
+          
+        </p>
+      </div>
+    </div>
+  </div>
+</footer><script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.js"
+  integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/contrib/auto-render.min.js"
+  integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
+<script src="https://code.jquery.com/jquery-1.12.4.min.js"
+  integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"
+  integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+<script src="https://abhirockzz.github.io/%20js/main.js"></script><script> renderMathInElement(document.body); </script><script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.js"
+  integrity="sha384-QELNnmcmU8IR9ZAykt67vGr9/rZJdHbiWi64V88fCPaOohUlHCqUD/unNN0BXSqy" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe-ui-default.min.js"
+  integrity="sha384-m67o7SkQ1ALzKZIFh4CiTA8tmadaujiTa9Vu+nqPSwDOqHrDmxLezTdFln8077+q" crossorigin="anonymous"></script><script src="https://abhirockzz.github.io/%20js/load-photoswipe.js"></script>
+
+
+
+
+
+
+
+
+    
+  </body>
+</html>
+

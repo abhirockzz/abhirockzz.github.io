@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en" itemscope itemtype="http://schema.org/WebPage">
+  <head>
+    
+
+<meta charset="utf-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+
+<title>Build a Serverless app using Go and Azure Functions - Abhishek&#39;s blog</title>
+<meta name="description" content="Webhook backend is a popular use case for FaaS (Functions-as-a-service) platforms. They could be used for many use cases such as sending customer notifications to responding with funny GIFs! Using a Serverless function, it&rsquo;s quite convenient to encapsulate the webhook functionality and expose it in the form of an HTTP endpoint. In this tutorial you will learn how to implement a Slack app as a Serverless backend using Azure Functions and Go. You can extend the Slack platform and integrate services by implementing custom apps or workflows that have access to the full scope of the platform allowing you to build powerful experiences in Slack."><script type="application/ld+json">
+{
+    "@context": "http://schema.org",
+    "@type": "WebSite",
+    "name": "Abhishek\u0027s blog",
+    
+    "url": "https:\/\/abhirockzz.github.io\/"
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Organization",
+  "name": "",
+  "url": "https:\/\/abhirockzz.github.io\/"
+  
+  
+  
+  
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [{
+        "@type": "ListItem",
+        "position": 1,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io\/",
+          "name": "home"
+        }
+    },{
+        "@type": "ListItem",
+        "position": 3,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io\/posts\/golang-serverless-backend\/",
+          "name": "Build a serverless app using go and azure functions"
+        }
+    }]
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Article",
+  "author": {
+    "name" : ""
+  },
+  "headline": "Build a Serverless app using Go and Azure Functions",
+  "description" : "Webhook backend is a popular use case for FaaS (Functions-as-a-service) platforms. They could be used for many use cases such as sending customer notifications to responding with funny GIFs! Using a Serverless function, it\u0026rsquo;s quite convenient to encapsulate the webhook functionality and expose it in the form of an HTTP endpoint. In this tutorial you will learn how to implement a Slack app as a Serverless backend using Azure Functions and Go. You can extend the Slack platform and integrate services by implementing custom apps or workflows that have access to the full scope of the platform allowing you to build powerful experiences in Slack.\n",
+  "inLanguage" : "en",
+  "wordCount":  1818 ,
+  "datePublished" : "2020-12-10T00:00:00",
+  "dateModified" : "2020-12-10T00:00:00",
+  "image" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+  "keywords" : [ "" ],
+  "mainEntityOfPage" : "https:\/\/abhirockzz.github.io\/posts\/golang-serverless-backend\/",
+  "publisher" : {
+    "@type": "Organization",
+    "name" : "https:\/\/abhirockzz.github.io\/",
+    "logo" : {
+        "@type" : "ImageObject",
+        "url" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+        "height" :  60 ,
+        "width" :  60
+    }
+  }
+}
+</script>
+
+<meta property="og:title" content="Build a Serverless app using Go and Azure Functions" />
+<meta property="og:description" content="Webhook backend is a popular use case for FaaS (Functions-as-a-service) platforms. They could be used for many use cases such as sending customer notifications to responding with funny GIFs! Using a Serverless function, it&rsquo;s quite convenient to encapsulate the webhook functionality and expose it in the form of an HTTP endpoint. In this tutorial you will learn how to implement a Slack app as a Serverless backend using Azure Functions and Go. You can extend the Slack platform and integrate services by implementing custom apps or workflows that have access to the full scope of the platform allowing you to build powerful experiences in Slack.">
+<meta property="og:image" content="https://abhirockzz.github.io/icon.jpg" />
+<meta property="og:url" content="https://abhirockzz.github.io/posts/golang-serverless-backend/" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Abhishek&#39;s blog" />
+
+<meta name="twitter:title" content="Build a Serverless app using Go and Azure Functions" />
+<meta name="twitter:description" content="Webhook backend is a popular use case for FaaS (Functions-as-a-service) platforms. They could be used for many use cases such as sending customer notifications to responding with funny GIFs! Using a …">
+<meta name="twitter:image" content="https://abhirockzz.github.io/icon.jpg" />
+<meta name="twitter:card" content="summary" />
+<link href='https://abhirockzz.github.io/icons/myicon.png' rel='icon' type='image/x-icon' />
+<meta name="generator" content="Hugo 0.145.0">
+<link rel="alternate" href="https://abhirockzz.github.io/%20index.xml" type="application/rss+xml" title="Abhishek&#39;s blog"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css"
+  integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.5.0/css/all.css"
+  integrity="sha384-B4dIYHKNBt8Bc12p+WXckhzcICo0wtJAoU8YZTY5qE0Id1GSseTk6S+L3BlXeVIU" crossorigin="anonymous">
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+  integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous"><link rel="stylesheet" href="https://abhirockzz.github.io/%20css/main.css" /><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic" />
+<link rel="stylesheet"
+  href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800" /><link rel="stylesheet" href="https://abhirockzz.github.io/%20css/syntax.css" /><link rel="stylesheet" href="https://abhirockzz.github.io/%20css/codeblock.css" /><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.css"
+  integrity="sha384-h/L2W9KefUClHWaty3SLE5F/qvc4djlyR4qY3NUV5HGQBBW7stbcfff1+I/vmsHh" crossorigin="anonymous">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/default-skin/default-skin.min.css"
+  integrity="sha384-iD0dNku6PYSIQLyfTOpB06F2KCZJAKLOThS5HRe8b3ibhdEQ6eKsFf/EeFxdOt5R" crossorigin="anonymous">
+
+
+  </head>
+  <body>
+    <nav class="navbar navbar-default navbar-fixed-top navbar-custom">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#main-navbar">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="https://abhirockzz.github.io/">Abhishek&#39;s blog</a>
+    </div>
+
+    <div class="collapse navbar-collapse" id="main-navbar">
+      <ul class="nav navbar-nav navbar-right">
+        
+        
+        <li>
+          <a title="Blog" href="/">Blog</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="About" href="/about">About</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Open-Source" href="/projects">Open-Source</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Presentations" href="/presentations">Presentations</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Publications" href="/publications">Publications</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Tags" href="/tags">Tags</a>
+        </li>
+        
+        
+
+        
+        <li>
+          
+          
+          
+        </li>
+        
+
+        
+      </ul>
+    </div>
+
+    
+    <div class="avatar-container">
+      <div class="avatar-img-border">
+        <a title="Abhishek&#39;s blog" href="https://abhirockzz.github.io/">
+          <img class="avatar-img" src="https://abhirockzz.github.io/icon.jpg" alt="Abhishek&#39;s blog" />
+        </a>
+      </div>
+    </div>
+    
+
+  </div>
+</nav>
+
+
+
+    
+
+
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+<div class="pswp__bg"></div>
+
+<div class="pswp__scroll-wrap">
+    
+    <div class="pswp__container">
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+    </div>
+    
+    <div class="pswp__ui pswp__ui--hidden">
+    <div class="pswp__top-bar">
+      
+      <div class="pswp__counter"></div>
+      <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+      <button class="pswp__button pswp__button--share" title="Share"></button>
+      <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+      <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+      
+      
+      <div class="pswp__preloader">
+        <div class="pswp__preloader__icn">
+          <div class="pswp__preloader__cut">
+            <div class="pswp__preloader__donut"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+      <div class="pswp__share-tooltip"></div>
+    </div>
+    <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+    </button>
+    <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+    </button>
+    <div class="pswp__caption">
+      <div class="pswp__caption__center"></div>
+    </div>
+    </div>
+    </div>
+</div>
+
+
+  
+  
+  
+
+
+
+
+
+
+  
+
+  <header class="header-section ">
+    
+    <div class="intro-header no-img">
+      <div class="container">
+        <div class="row">
+          <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+            <div class="posts-heading">
+              
+                <h1>Build a Serverless app using Go and Azure Functions</h1>
+              
+              
+                <hr class="small">
+              
+              
+              
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+
+    
+<div class="container" role="main">
+  <div class="row">
+    <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+      <article role="main" class="blog-post">
+        <p>Webhook backend is a popular use case for FaaS (Functions-as-a-service) platforms. They could be used for many use cases such as sending customer notifications to responding with funny GIFs! Using a Serverless function, it&rsquo;s quite convenient to encapsulate the webhook functionality and expose it in the form of an HTTP endpoint. In this tutorial you will learn how to implement a <a href="https://api.slack.com/start/overview#apps">Slack app</a> as a Serverless backend using <a href="https://docs.microsoft.com/azure/azure-functions/functions-custom-handlers?WT.mc_id=data-9656-abhishgu">Azure Functions</a> and <a href="https://golang.org/">Go</a>. You can extend the Slack platform and integrate services by implementing custom apps or workflows that have access to the full scope of the platform allowing you to build powerful experiences in Slack.</p>
+<p>This is a simpler version of the <a href="https://get.slack.help/hc/en-us/articles/204714258-Giphy-for-Slack">Giphy for Slack</a>. The original Giphy Slack app works by responding with multiple GIFs in response to a search request. For the sake of simplicity, the function app demonstrated in this post just returns a single (random) image corresponding to a search keyword using the <a href="https://developers.giphy.com/docs/#operation--gifs-random-get">Giphy Random API</a>. This post provides a step-by-step guide to getting the application deployed to <a href="https://azure.microsoft.com/en-in/services/functions/?WT.mc_id=data-9656-abhishgu">Azure Functions</a> and integrating it with your Slack workspace.</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/i/wup20aajbcat7rnwp3ra.jpg" alt=""></p>
+<p>In this post, you will:</p>
+<ul>
+<li>Get an overview of <a href="https://techcommunity.microsoft.com/t5/apps-on-azure/azure-functions-in-any-language-with-custom-handlers/ba-p/1942744">Custom Handlers in Azure Functions</a></li>
+<li>Understand what&rsquo;s going on behind the scenes with a brief code walk through</li>
+<li>Learn how to setup the solution using configure Azure Functions and Slack</li>
+<li>and of course, run your Slack app in the workspace!</li>
+</ul>
+<p>The backend function logic is written in Go (the code is<a href="https://github.com/abhirockzz/serverless-go-slack-app/">available on GitHub</a>. Those who have worked with Azure Functions might recall that Go is <em>not</em> one of the language handlers that is supported by default. That&rsquo;s where <a href="https://docs.microsoft.com/azure/azure-functions/functions-custom-handlers?WT.mc_id=data-9656-abhishgu">Custom Handlers</a> come to the rescue!</p>
+<h2 id="what-are-custom-handlers">What are Custom Handlers?</h2>
+<p>In a nutshell, a Custom Handler is a lightweight web server that receive events from the Functions host. The only thing you need to implement a Custom Handler in your favorite runtime/language is: HTTP support! This does not mean that Custom handlers are restricted to <a href="https://docs.microsoft.com/azure/azure-functions/functions-bindings-http-webhook-trigger?tabs=csharp&amp;WT.mc_id=data-9656-abhishgu">HTTP triggers</a> only - you are free to use <a href="https://docs.microsoft.com/azure/azure-functions/functions-triggers-bindings?tabs=csharp&amp;WT.mc_id=data-9656-abhishgu">other triggers along with input and output bindings</a> via extension bundles.</p>
+<p>Here is a summary of how Custom Handlers work at a high level (the diagram below has been picked from the documentation)</p>
+<p><img src="https://docs.microsoft.com/en-us/azure/azure-functions/media/functions-custom-handlers/azure-functions-custom-handlers-overview.png" alt=""></p>
+<p>An event trigger (via HTTP, Storage, Event Hubs etc.) invokes the Functions host. The way Custom Handlers differ from traditional functions is that the Functions host acts as a middle man: it issues a request payload to the web server of the Custom Handler (the function) along with a <em>payload</em> that contains trigger, input binding data and other metadata for the function. The function returns a response back to the Functions host which passes data from the response to the function&rsquo;s output bindings for processing.</p>
+<h2 id="overview">Overview</h2>
+<p>Before we dive into the other areas, it might help to understand the nitty gritty by exploring the code (which is relatively simple by the way)</p>
+<h3 id="application-structure">Application structure</h3>
+<p>Let&rsquo;s look at the how the app is setup. this is as defined in the doc</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>.
+</span></span><span style="display:flex;"><span>├── cmd
+</span></span><span style="display:flex;"><span>│   └── main.go
+</span></span><span style="display:flex;"><span>├── funcy
+</span></span><span style="display:flex;"><span>│   └── <span style="color:#66d9ef">function</span>.json
+</span></span><span style="display:flex;"><span>├── go.mod
+</span></span><span style="display:flex;"><span>├── host.json
+</span></span><span style="display:flex;"><span>└── pkg
+</span></span><span style="display:flex;"><span>    └── <span style="color:#66d9ef">function</span>
+</span></span><span style="display:flex;"><span>        ├── <span style="color:#66d9ef">function</span>.go
+</span></span><span style="display:flex;"><span>        ├── giphy.go
+</span></span><span style="display:flex;"><span>        └── slack.go
+</span></span></code></pre></div><ul>
+<li>The <code>function.json</code> file is a located in a folder whose name is used the function name (<a href="https://docs.microsoft.com/azure/azure-functions/functions-custom-handlers?WT.mc_id=data-9656-abhishgu#application-structure">this is by convention</a>)</li>
+</ul>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;bindings&#34;</span>: [
+</span></span><span style="display:flex;"><span>        {
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;type&#34;</span>: <span style="color:#e6db74">&#34;httpTrigger&#34;</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;direction&#34;</span>: <span style="color:#e6db74">&#34;in&#34;</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;name&#34;</span>: <span style="color:#e6db74">&#34;req&#34;</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;methods&#34;</span>: [
+</span></span><span style="display:flex;"><span>                <span style="color:#e6db74">&#34;get&#34;</span>,
+</span></span><span style="display:flex;"><span>                <span style="color:#e6db74">&#34;post&#34;</span>
+</span></span><span style="display:flex;"><span>            ]
+</span></span><span style="display:flex;"><span>        },
+</span></span><span style="display:flex;"><span>        {
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;type&#34;</span>: <span style="color:#e6db74">&#34;http&#34;</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;direction&#34;</span>: <span style="color:#e6db74">&#34;out&#34;</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;name&#34;</span>: <span style="color:#e6db74">&#34;res&#34;</span>
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    ]
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><ul>
+<li><code>host.json</code> tells the Functions host where to send requests by pointing to a web server capable of processing HTTP events. Notice the <code>customHandler.description.defaultExecutablePath</code> which defines that <code>go_funcy</code> is the name of the executable that&rsquo;ll be used to run the web server. <code>&quot;enableForwardingHttpRequest&quot;: true</code> ensures that the raw HTTP data is sent to the custom handlers without any modifications</li>
+</ul>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;version&#34;</span>: <span style="color:#e6db74">&#34;2.0&#34;</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;extensionBundle&#34;</span>: {
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;id&#34;</span>: <span style="color:#e6db74">&#34;Microsoft.Azure.Functions.ExtensionBundle&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;version&#34;</span>: <span style="color:#e6db74">&#34;[1.*, 2.0.0)&#34;</span>
+</span></span><span style="display:flex;"><span>    },
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;customHandler&#34;</span>: {
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;description&#34;</span>: {
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;defaultExecutablePath&#34;</span>: <span style="color:#e6db74">&#34;go_funcy&#34;</span>
+</span></span><span style="display:flex;"><span>        },
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;enableForwardingHttpRequest&#34;</span>: <span style="color:#66d9ef">true</span>
+</span></span><span style="display:flex;"><span>    },
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;logging&#34;</span>: {
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;logLevel&#34;</span>: {
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;default&#34;</span>: <span style="color:#e6db74">&#34;Trace&#34;</span>
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><ul>
+<li>The <code>cmd</code> and <code>pkg</code> directories contain the Go source code. Let&rsquo;s explore this in the next sub-section</li>
+</ul>
+<h3 id="code-walk-through">Code walk through</h3>
+<p><code>cmd/main.go</code> sets up and starts the HTTP server. Notice that the <code>/api/funcy</code> endpoint is the one which the Function host sends the request to the custom handler HTTP server.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">main</span>() {
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">port</span>, <span style="color:#a6e22e">exists</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">os</span>.<span style="color:#a6e22e">LookupEnv</span>(<span style="color:#e6db74">&#34;FUNCTIONS_CUSTOMHANDLER_PORT&#34;</span>)
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> !<span style="color:#a6e22e">exists</span> {
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">port</span> = <span style="color:#e6db74">&#34;8080&#34;</span>
+</span></span><span style="display:flex;"><span>	}
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">http</span>.<span style="color:#a6e22e">HandleFunc</span>(<span style="color:#e6db74">&#34;/api/funcy&#34;</span>, <span style="color:#a6e22e">function</span>.<span style="color:#a6e22e">Funcy</span>)
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">log</span>.<span style="color:#a6e22e">Fatal</span>(<span style="color:#a6e22e">http</span>.<span style="color:#a6e22e">ListenAndServe</span>(<span style="color:#e6db74">&#34;:&#34;</span><span style="color:#f92672">+</span><span style="color:#a6e22e">port</span>, <span style="color:#66d9ef">nil</span>))
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>All the heavy lifting is done in <code>function/function.go</code>.</p>
+<p>The first part is to read the request body (from Slack) and ensure its integrity via a signature validation process based on <a href="https://api.slack.com/docs/verifying-requests-from-slack#a_recipe_for_security">this recipe defined by Slack</a>.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span>	<span style="color:#a6e22e">signingSecret</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">os</span>.<span style="color:#a6e22e">Getenv</span>(<span style="color:#e6db74">&#34;SLACK_SIGNING_SECRET&#34;</span>)
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">apiKey</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">os</span>.<span style="color:#a6e22e">Getenv</span>(<span style="color:#e6db74">&#34;GIPHY_API_KEY&#34;</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> <span style="color:#a6e22e">signingSecret</span> <span style="color:#f92672">==</span> <span style="color:#e6db74">&#34;&#34;</span> <span style="color:#f92672">||</span> <span style="color:#a6e22e">apiKey</span> <span style="color:#f92672">==</span> <span style="color:#e6db74">&#34;&#34;</span> {
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">http</span>.<span style="color:#a6e22e">Error</span>(<span style="color:#a6e22e">w</span>, <span style="color:#e6db74">&#34;Failed to process request. Please contact the admin&#34;</span>, <span style="color:#a6e22e">http</span>.<span style="color:#a6e22e">StatusUnauthorized</span>)
+</span></span><span style="display:flex;"><span>		<span style="color:#66d9ef">return</span>
+</span></span><span style="display:flex;"><span>	}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">slackTimestamp</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">r</span>.<span style="color:#a6e22e">Header</span>.<span style="color:#a6e22e">Get</span>(<span style="color:#e6db74">&#34;X-Slack-Request-Timestamp&#34;</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">b</span>, <span style="color:#a6e22e">err</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">ioutil</span>.<span style="color:#a6e22e">ReadAll</span>(<span style="color:#a6e22e">r</span>.<span style="color:#a6e22e">Body</span>)
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> <span style="color:#a6e22e">err</span> <span style="color:#f92672">!=</span> <span style="color:#66d9ef">nil</span> {
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">http</span>.<span style="color:#a6e22e">Error</span>(<span style="color:#a6e22e">w</span>, <span style="color:#e6db74">&#34;Failed to process request&#34;</span>, <span style="color:#a6e22e">http</span>.<span style="color:#a6e22e">StatusBadRequest</span>)
+</span></span><span style="display:flex;"><span>		<span style="color:#66d9ef">return</span>
+</span></span><span style="display:flex;"><span>	}
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">slackSigningBaseString</span> <span style="color:#f92672">:=</span> <span style="color:#e6db74">&#34;v0:&#34;</span> <span style="color:#f92672">+</span> <span style="color:#a6e22e">slackTimestamp</span> <span style="color:#f92672">+</span> <span style="color:#e6db74">&#34;:&#34;</span> <span style="color:#f92672">+</span> string(<span style="color:#a6e22e">b</span>)
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">slackSignature</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">r</span>.<span style="color:#a6e22e">Header</span>.<span style="color:#a6e22e">Get</span>(<span style="color:#e6db74">&#34;X-Slack-Signature&#34;</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> !<span style="color:#a6e22e">matchSignature</span>(<span style="color:#a6e22e">slackSignature</span>, <span style="color:#a6e22e">signingSecret</span>, <span style="color:#a6e22e">slackSigningBaseString</span>) {
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">http</span>.<span style="color:#a6e22e">Error</span>(<span style="color:#a6e22e">w</span>, <span style="color:#e6db74">&#34;Function was not invoked by Slack&#34;</span>, <span style="color:#a6e22e">http</span>.<span style="color:#a6e22e">StatusForbidden</span>)
+</span></span><span style="display:flex;"><span>		<span style="color:#66d9ef">return</span>
+</span></span><span style="display:flex;"><span>	}
+</span></span></code></pre></div><p>Once we&rsquo;ve confirmed that the function has indeed being invoked via Slack, the next part is to extract the search term entered by the (Slack) user</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span>	<span style="color:#a6e22e">vals</span>, <span style="color:#a6e22e">err</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">parse</span>(<span style="color:#a6e22e">b</span>)
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> <span style="color:#a6e22e">err</span> <span style="color:#f92672">!=</span> <span style="color:#66d9ef">nil</span> {
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">http</span>.<span style="color:#a6e22e">Error</span>(<span style="color:#a6e22e">w</span>, <span style="color:#e6db74">&#34;Failed to process request&#34;</span>, <span style="color:#a6e22e">http</span>.<span style="color:#a6e22e">StatusBadRequest</span>)
+</span></span><span style="display:flex;"><span>		<span style="color:#66d9ef">return</span>
+</span></span><span style="display:flex;"><span>	}
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">giphyTag</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">vals</span>.<span style="color:#a6e22e">Get</span>(<span style="color:#e6db74">&#34;text&#34;</span>)
+</span></span></code></pre></div><p>Look up for GIFs with the search term by invoking the GIPHY REST API</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span>	<span style="color:#a6e22e">giphyResp</span>, <span style="color:#a6e22e">err</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">http</span>.<span style="color:#a6e22e">Get</span>(<span style="color:#e6db74">&#34;http://api.giphy.com/v1/gifs/random?tag=&#34;</span> <span style="color:#f92672">+</span> <span style="color:#a6e22e">giphyTag</span> <span style="color:#f92672">+</span> <span style="color:#e6db74">&#34;&amp;api_key=&#34;</span> <span style="color:#f92672">+</span> <span style="color:#a6e22e">apiKey</span>)
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> <span style="color:#a6e22e">err</span> <span style="color:#f92672">!=</span> <span style="color:#66d9ef">nil</span> {
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">http</span>.<span style="color:#a6e22e">Error</span>(<span style="color:#a6e22e">w</span>, <span style="color:#e6db74">&#34;Failed to process request&#34;</span>, <span style="color:#a6e22e">http</span>.<span style="color:#a6e22e">StatusFailedDependency</span>)
+</span></span><span style="display:flex;"><span>		<span style="color:#66d9ef">return</span>
+</span></span><span style="display:flex;"><span>	}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">resp</span>, <span style="color:#a6e22e">err</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">ioutil</span>.<span style="color:#a6e22e">ReadAll</span>(<span style="color:#a6e22e">giphyResp</span>.<span style="color:#a6e22e">Body</span>)
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> <span style="color:#a6e22e">err</span> <span style="color:#f92672">!=</span> <span style="color:#66d9ef">nil</span> {
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">http</span>.<span style="color:#a6e22e">Error</span>(<span style="color:#a6e22e">w</span>, <span style="color:#e6db74">&#34;Failed to process request&#34;</span>, <span style="color:#a6e22e">http</span>.<span style="color:#a6e22e">StatusInternalServerError</span>)
+</span></span><span style="display:flex;"><span>		<span style="color:#66d9ef">return</span>
+</span></span><span style="display:flex;"><span>	}
+</span></span></code></pre></div><p>Un-marshal the response sent back by the GIPHY API, convert it into a form which Slack can make sense of and return it. That&rsquo;s it !</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span>	<span style="color:#66d9ef">var</span> <span style="color:#a6e22e">gr</span> <span style="color:#a6e22e">GiphyResponse</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">json</span>.<span style="color:#a6e22e">Unmarshal</span>(<span style="color:#a6e22e">resp</span>, <span style="color:#f92672">&amp;</span><span style="color:#a6e22e">gr</span>)
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">title</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">gr</span>.<span style="color:#a6e22e">Data</span>.<span style="color:#a6e22e">Title</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">url</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">gr</span>.<span style="color:#a6e22e">Data</span>.<span style="color:#a6e22e">Images</span>.<span style="color:#a6e22e">Downsized</span>.<span style="color:#a6e22e">URL</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">slackResponse</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">SlackResponse</span>{<span style="color:#a6e22e">Text</span>: <span style="color:#a6e22e">slackResponseStaticText</span>, <span style="color:#a6e22e">Attachments</span>: []<span style="color:#a6e22e">Attachment</span>{{<span style="color:#a6e22e">Text</span>: <span style="color:#a6e22e">title</span>, <span style="color:#a6e22e">ImageURL</span>: <span style="color:#a6e22e">url</span>}}}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">w</span>.<span style="color:#a6e22e">Header</span>().<span style="color:#a6e22e">Set</span>(<span style="color:#e6db74">&#34;Content-Type&#34;</span>, <span style="color:#e6db74">&#34;application/json&#34;</span>)
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">json</span>.<span style="color:#a6e22e">NewEncoder</span>(<span style="color:#a6e22e">w</span>).<span style="color:#a6e22e">Encode</span>(<span style="color:#a6e22e">slackResponse</span>)
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">fmt</span>.<span style="color:#a6e22e">Println</span>(<span style="color:#e6db74">&#34;Sent response to Slack&#34;</span>)
+</span></span></code></pre></div><blockquote>
+<p>Check the <code>matchSignature</code> function if you&rsquo;re interested in checking the signature validation process and look at slack.go, giphy.go (in the <code>function</code> directory) to see the Go structs used represent information (JSON) being exchanged between various components. These have not been included here to keep this post concise.</p></blockquote>
+<p>Alright! So far, we have covered lots of theory and background info. It&rsquo;s time to get things done! Before you proceed, ensure that you take care of the below mentioned pre-requisites.</p>
+<h2 id="pre-requisites">Pre-requisites</h2>
+<ul>
+<li><a href="https://golang.org/dl/">Download and install Go</a> if you don&rsquo;t have it already</li>
+<li>Install <a href="https://docs.microsoft.com/azure/azure-functions/functions-run-local?tabs=macos%2Ccsharp%2Cbash&amp;WT.mc_id=data-9656-abhishgu#v2">Azure functions Core Tools</a> - this will allow you to deploy the function using a CLI (and also run it test and debug it locally)</li>
+<li><a href="https://slack.com/create">Create a Slack workspace</a> if you don&rsquo;t have one.</li>
+<li>Get a GIPHY API key - You need to create a GIHPY account (it&rsquo;s free!) and <a href="https://developers.giphy.com/dashboard/?create=true">create an app</a>. Each application you create will have its own API Key.</li>
+</ul>
+<blockquote>
+<p>Please note down your GIPHY API key as you will be using it later</p></blockquote>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/i/kijksl9qv7hcvp49bi9v.png" alt=""></p>
+<p>The upcoming sections will guide you through the process of deploying the Azure Function and configuring the Slack for the Slash command.</p>
+<h2 id="azure-functions-setup">Azure Functions setup</h2>
+<p>Start by creating a <a href="https://docs.microsoft.com/azure/azure-resource-manager/management/manage-resource-groups-portal?WT.mc_id=data-9656-abhishgu">Resource Group</a> to host all the components of the solution.</p>
+<h3 id="create-a-function-app">Create a Function App</h3>
+<p>Start by searching for <strong>Function App</strong> in the Azure Portal and click <strong>Add</strong></p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/i/845rjcq0z4mh05zynwm2.png" alt=""></p>
+<p>Enter the required details: you should select <strong>Custom Handler</strong> as the <strong>Runtime stack</strong></p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/i/845rjcq0z4mh05zynwm2.png" alt=""></p>
+<p>In the <strong>Hosting</strong> section, choose <strong>Linux</strong> and <strong>Consumption (Serverless)</strong> for <strong>Operating system</strong> and <strong>Plan type</strong> respectively.</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/i/2xtucmcbnnwh7lz582w4.png" alt=""></p>
+<p>Enable Application Insights (if you need to)</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/i/i891wq6i4wowvd42e3zo.png" alt=""></p>
+<p>Review the final settings and click <strong>Create</strong> to proceed</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/i/0v8g9q3jzxi4bvp7354a.png" alt=""></p>
+<p>Once the process is complete, the following resource will also be created along with the Function App:</p>
+<ul>
+<li><a href="https://docs.microsoft.com/azure/app-service/overview-hosting-plans?WT.mc_id=data-9656-abhishgu">App Service plan</a> (a Consumption/Serverless plan in this case)</li>
+<li>An <a href="https://docs.microsoft.com/azure/storage/common/storage-account-overview?WT.mc_id=data-9656-abhishgu">Azure Storage account</a></li>
+<li>An <a href="https://docs.microsoft.com/azure/azure-monitor/app/app-insights-overview?WT.mc_id=data-9656-abhishgu">Azure Application Insights</a> function)</li>
+</ul>
+<h3 id="deploy-the-function">Deploy the function</h3>
+<p>Clone the GitHub repo and build the function</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>git clone https://github.com/abhirockzz/serverless-go-slack-app
+</span></span><span style="display:flex;"><span>cd serverless-go-slack-app
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>GOOS<span style="color:#f92672">=</span>linux go build -o go_funcy cmd/main.go
+</span></span></code></pre></div><blockquote>
+<p><code>GOOS=linux</code> is used to build a <code>Linux</code> executable since we chose a <code>Linux</code> OS for our Function App</p></blockquote>
+<p>To deploy, use the Azure Functions core tools CLI</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>func azure functionapp publish &lt;enter name of the <span style="color:#66d9ef">function</span> app&gt;
+</span></span></code></pre></div><p>Once you&rsquo;ve deployed, copy the function URL that&rsquo;s returned by the command - you will use it in subsequent steps</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/i/g3bzcsufzko8u2id41zh.png" alt=""></p>
+<h2 id="configure-slack">Configure Slack</h2>
+<p>This section will cover the steps you need to execute to setup the Slack application (Slash command) in your workspace:</p>
+<ul>
+<li>Create a Slack app</li>
+<li>Create a Slash Command</li>
+<li>Install the app to your workspace</li>
+</ul>
+<h3 id="create-a-slack-app-and-slash-command">Create a Slack App and Slash command</h3>
+<p>Sign into your <a href="https://slack.com/signin">Slack Workspace</a> and start by <a href="https://api.slack.com/apps/new">creating a new Slack App</a></p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/i/n8y20g55ust6jc5okfku.jpg" alt=""></p>
+<p>Click on <em>Create New Command</em> to define your new <em>Slash Command</em> with the required information. Please note that the <strong>Request URL</strong> field is the one where you will enter the HTTP endpoint of function which is nothing but the URL you obtained after deploying the function in the previous section. Once you&rsquo;re done, hit <strong>Save</strong> to finish.</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/i/0v70kbuov7byr27xnen9.png" alt=""></p>
+<h3 id="install-the-app-to-your-workspace">Install the app to your workspace</h3>
+<p>Once you&rsquo;re done creating the Slash Command, head to your app&rsquo;s settings page, click the <em>Basic Information</em> feature in the navigation menu, choose <em>Install your app to your workspace</em> and click <em>Install App to Workspace</em> - this will install the app to your Slack workspace to test your app and generate the tokens you need to interact with the Slack API. As soon as you finish installing the app, the <em>App Credentials</em> will show up on the same page.</p>
+<blockquote>
+<p>Make a note of your app <strong>Signing Secret</strong> as you&rsquo;ll be using it later</p></blockquote>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/i/ctoc8uf4joiy5z8vm3by.jpg" alt=""></p>
+<h3 id="before-moving-on-to-the-fun-part-">Before moving on to the fun part &hellip;</h3>
+<p>&hellip; make sure to update the Function App configuration to add the Slack Signing Secret (<code>SLACK_SIGNING_SECRET</code>) and Giphy API key (<code>GIPHY_API_KEY</code>) - they will be available as environment variables inside the function.</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/i/r7bhpno3yomi3y8fg0pz.png" alt=""></p>
+<h2 id="funcy-time">fun(cy) time!</h2>
+<p>From your Slack workspace, invoke the command <code>/funcy &lt;search term&gt;</code>. For e.g. try <code>/funcy dog</code>.
+You should get back a random GIF in return!</p>
+<p><img src="https://media.giphy.com/media/RQSuZfuylVNAY/giphy.gif" alt=""></p>
+<p>Just a recap of what&rsquo;s going on: When you invoke the <code>/funcy</code> command in Slack, it calls the function, which then interacts Giphy API and finally returning the GIF to the user (if all goes well!)</p>
+<p>You may see <code>timeout error</code> from Slack after the first invocation. This is most likely due to the <code>cold start</code> where the function takes a few seconds to bootstrap when you invoke it for the very first time. This is combined with the fact that <a href="https://api.slack.com/slash-commands#responding_basic_receipt">Slack expects a response in 3 seconds</a> - hence the error message.</p>
+<p>There is nothing to worry about. All you need is to retry again and things should be fine!</p>
+<blockquote>
+<p>Clean up: Once you&rsquo;re done, don&rsquo;t forget to <a href="https://docs.microsoft.com/azure/azure-resource-manager/management/delete-resource-group?tabs=azure-powershell&amp;WT.mc_id=data-9656-abhishgu#delete-resource-group">delete the resource group</a> which in turn will delete all the resources created before (Function app, App Service Plan etc.)</p></blockquote>
+<p>There is nothing stopping you from using Go for your serverless functions on Azure! I hope this turns out to be a fun way to try out Custom Handlers. Let us know what you think!</p>
+
+
+        
+
+        
+
+        
+      </article>
+
+      
+        <ul class="pager blog-pager">
+          
+            <li class="previous">
+              <a href="https://abhirockzz.github.io/posts/create-data/" data-toggle="tooltip" data-placement="top" title="Picking the Right Distributed Database">&larr; Previous Post</a>
+            </li>
+          
+          
+            <li class="next">
+              <a href="https://abhirockzz.github.io/posts/kafka-cassandra-ingestion/" data-toggle="tooltip" data-placement="top" title="Integrate Kafka and Cassandra using Kafka Connect">Next Post &rarr;</a>
+            </li>
+          
+        </ul>
+      
+
+
+      
+
+    </div>
+  </div>
+</div>
+
+    
+<footer>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+        <ul class="list-inline text-center footer-links">
+          
+          
+          <li>
+            <a href="" title="RSS">
+              <span class="fa-stack fa-lg">
+                <i class="fas fa-circle fa-stack-2x"></i>
+                <i class="fas fa-rss fa-stack-1x fa-inverse"></i>
+              </span>
+            </a>
+          </li>
+          
+        </ul>
+        <p class="credits copyright text-muted">
+          
+
+          &nbsp;&bull;&nbsp;&copy;
+          
+          2025
+          
+
+          
+          &nbsp;&bull;&nbsp;
+          <a href="https://abhirockzz.github.io/">Abhishek&#39;s blog</a>
+          
+        </p>
+        
+        <p class="credits theme-by text-muted">
+          <a href="https://gohugo.io">Hugo v0.145.0</a> powered &nbsp;&bull;&nbsp; Theme <a href="https://github.com/halogenica/beautifulhugo">Beautiful Hugo</a> adapted from <a href="https://deanattali.com/beautiful-jekyll/">Beautiful Jekyll</a>
+          
+        </p>
+      </div>
+    </div>
+  </div>
+</footer><script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.js"
+  integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/contrib/auto-render.min.js"
+  integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
+<script src="https://code.jquery.com/jquery-1.12.4.min.js"
+  integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"
+  integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+<script src="https://abhirockzz.github.io/%20js/main.js"></script><script> renderMathInElement(document.body); </script><script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.js"
+  integrity="sha384-QELNnmcmU8IR9ZAykt67vGr9/rZJdHbiWi64V88fCPaOohUlHCqUD/unNN0BXSqy" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe-ui-default.min.js"
+  integrity="sha384-m67o7SkQ1ALzKZIFh4CiTA8tmadaujiTa9Vu+nqPSwDOqHrDmxLezTdFln8077+q" crossorigin="anonymous"></script><script src="https://abhirockzz.github.io/%20js/load-photoswipe.js"></script>
+
+
+
+
+
+
+
+
+    
+  </body>
+</html>
+

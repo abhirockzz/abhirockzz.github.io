@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en" itemscope itemtype="http://schema.org/WebPage">
+  <head>
+    
+
+<meta charset="utf-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+
+<title>Change Data Capture from PostgreSQL to Azure Data Explorer using Kafka Connect - Abhishek&#39;s blog</title>
+<meta name="description" content="This blog post demonstrates how you can use Change Data Capture to stream database modifications from PostgreSQL to Azure Data Explorer (Kusto) using Apache Kafka.
+Change Data Capture (CDC) can be used to track row-level changes in database tables in response to create, update and delete operations. It is a powerful technique, but useful only when there is a way to leverage these events and make them available to other services.
+Introduction
+Using Apache Kafka, it is possible to convert traditional batched ETL processes into real-time, streaming mode. You can do-it-yourself (DIY) and write good old Kafka producer/consumer using a client SDK of your choice. But why would you do that when you&rsquo;ve Kafka Connect and it&rsquo;s suite of ready-to-use connectors?"><script type="application/ld+json">
+{
+    "@context": "http://schema.org",
+    "@type": "WebSite",
+    "name": "Abhishek\u0027s blog",
+    
+    "url": "https:\/\/abhirockzz.github.io\/"
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Organization",
+  "name": "",
+  "url": "https:\/\/abhirockzz.github.io\/"
+  
+  
+  
+  
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [{
+        "@type": "ListItem",
+        "position": 1,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io\/",
+          "name": "home"
+        }
+    },{
+        "@type": "ListItem",
+        "position": 3,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io\/posts\/postgres-azure-data-explorer-cdc\/",
+          "name": "Change data capture from postgre SQL to azure data explorer using kafka connect"
+        }
+    }]
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Article",
+  "author": {
+    "name" : ""
+  },
+  "headline": "Change Data Capture from PostgreSQL to Azure Data Explorer using Kafka Connect",
+  "description" : "This blog post demonstrates how you can use Change Data Capture to stream database modifications from PostgreSQL to Azure Data Explorer (Kusto) using Apache Kafka.\nChange Data Capture (CDC) can be used to track row-level changes in database tables in response to create, update and delete operations. It is a powerful technique, but useful only when there is a way to leverage these events and make them available to other services.\nIntroduction Using Apache Kafka, it is possible to convert traditional batched ETL processes into real-time, streaming mode. You can do-it-yourself (DIY) and write good old Kafka producer\/consumer using a client SDK of your choice. But why would you do that when you\u0026rsquo;ve Kafka Connect and it\u0026rsquo;s suite of ready-to-use connectors?\n",
+  "inLanguage" : "en",
+  "wordCount":  3226 ,
+  "datePublished" : "2020-11-02T00:00:00",
+  "dateModified" : "2020-11-02T00:00:00",
+  "image" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+  "keywords" : [ "" ],
+  "mainEntityOfPage" : "https:\/\/abhirockzz.github.io\/posts\/postgres-azure-data-explorer-cdc\/",
+  "publisher" : {
+    "@type": "Organization",
+    "name" : "https:\/\/abhirockzz.github.io\/",
+    "logo" : {
+        "@type" : "ImageObject",
+        "url" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+        "height" :  60 ,
+        "width" :  60
+    }
+  }
+}
+</script>
+
+<meta property="og:title" content="Change Data Capture from PostgreSQL to Azure Data Explorer using Kafka Connect" />
+<meta property="og:description" content="This blog post demonstrates how you can use Change Data Capture to stream database modifications from PostgreSQL to Azure Data Explorer (Kusto) using Apache Kafka.
+Change Data Capture (CDC) can be used to track row-level changes in database tables in response to create, update and delete operations. It is a powerful technique, but useful only when there is a way to leverage these events and make them available to other services.
+Introduction
+Using Apache Kafka, it is possible to convert traditional batched ETL processes into real-time, streaming mode. You can do-it-yourself (DIY) and write good old Kafka producer/consumer using a client SDK of your choice. But why would you do that when you&rsquo;ve Kafka Connect and it&rsquo;s suite of ready-to-use connectors?">
+<meta property="og:image" content="https://abhirockzz.github.io/icon.jpg" />
+<meta property="og:url" content="https://abhirockzz.github.io/posts/postgres-azure-data-explorer-cdc/" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Abhishek&#39;s blog" />
+
+<meta name="twitter:title" content="Change Data Capture from PostgreSQL to Azure Data Explorer using Kafka …" />
+<meta name="twitter:description" content="This blog post demonstrates how you can use Change Data Capture to stream database modifications from PostgreSQL to Azure Data Explorer (Kusto) using Apache Kafka.
+Change Data Capture (CDC) can be …">
+<meta name="twitter:image" content="https://abhirockzz.github.io/icon.jpg" />
+<meta name="twitter:card" content="summary" />
+<link href='https://abhirockzz.github.io/icons/myicon.png' rel='icon' type='image/x-icon' />
+<meta name="generator" content="Hugo 0.145.0">
+<link rel="alternate" href="https://abhirockzz.github.io/%20index.xml" type="application/rss+xml" title="Abhishek&#39;s blog"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css"
+  integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.5.0/css/all.css"
+  integrity="sha384-B4dIYHKNBt8Bc12p+WXckhzcICo0wtJAoU8YZTY5qE0Id1GSseTk6S+L3BlXeVIU" crossorigin="anonymous">
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+  integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous"><link rel="stylesheet" href="https://abhirockzz.github.io/%20css/main.css" /><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic" />
+<link rel="stylesheet"
+  href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800" /><link rel="stylesheet" href="https://abhirockzz.github.io/%20css/syntax.css" /><link rel="stylesheet" href="https://abhirockzz.github.io/%20css/codeblock.css" /><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.css"
+  integrity="sha384-h/L2W9KefUClHWaty3SLE5F/qvc4djlyR4qY3NUV5HGQBBW7stbcfff1+I/vmsHh" crossorigin="anonymous">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/default-skin/default-skin.min.css"
+  integrity="sha384-iD0dNku6PYSIQLyfTOpB06F2KCZJAKLOThS5HRe8b3ibhdEQ6eKsFf/EeFxdOt5R" crossorigin="anonymous">
+
+
+  </head>
+  <body>
+    <nav class="navbar navbar-default navbar-fixed-top navbar-custom">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#main-navbar">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="https://abhirockzz.github.io/">Abhishek&#39;s blog</a>
+    </div>
+
+    <div class="collapse navbar-collapse" id="main-navbar">
+      <ul class="nav navbar-nav navbar-right">
+        
+        
+        <li>
+          <a title="Blog" href="/">Blog</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="About" href="/about">About</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Open-Source" href="/projects">Open-Source</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Presentations" href="/presentations">Presentations</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Publications" href="/publications">Publications</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Tags" href="/tags">Tags</a>
+        </li>
+        
+        
+
+        
+        <li>
+          
+          
+          
+        </li>
+        
+
+        
+      </ul>
+    </div>
+
+    
+    <div class="avatar-container">
+      <div class="avatar-img-border">
+        <a title="Abhishek&#39;s blog" href="https://abhirockzz.github.io/">
+          <img class="avatar-img" src="https://abhirockzz.github.io/icon.jpg" alt="Abhishek&#39;s blog" />
+        </a>
+      </div>
+    </div>
+    
+
+  </div>
+</nav>
+
+
+
+    
+
+
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+<div class="pswp__bg"></div>
+
+<div class="pswp__scroll-wrap">
+    
+    <div class="pswp__container">
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+    </div>
+    
+    <div class="pswp__ui pswp__ui--hidden">
+    <div class="pswp__top-bar">
+      
+      <div class="pswp__counter"></div>
+      <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+      <button class="pswp__button pswp__button--share" title="Share"></button>
+      <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+      <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+      
+      
+      <div class="pswp__preloader">
+        <div class="pswp__preloader__icn">
+          <div class="pswp__preloader__cut">
+            <div class="pswp__preloader__donut"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+      <div class="pswp__share-tooltip"></div>
+    </div>
+    <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+    </button>
+    <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+    </button>
+    <div class="pswp__caption">
+      <div class="pswp__caption__center"></div>
+    </div>
+    </div>
+    </div>
+</div>
+
+
+  
+  
+  
+
+
+
+
+
+
+  
+
+  <header class="header-section ">
+    
+    <div class="intro-header no-img">
+      <div class="container">
+        <div class="row">
+          <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+            <div class="posts-heading">
+              
+                <h1>Change Data Capture from PostgreSQL to Azure Data Explorer using Kafka Connect</h1>
+              
+              
+                <hr class="small">
+              
+              
+              
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+
+    
+<div class="container" role="main">
+  <div class="row">
+    <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+      <article role="main" class="blog-post">
+        <p>This blog post demonstrates how you can use Change Data Capture to stream database modifications from PostgreSQL to <a href="https://docs.microsoft.com/en-us/azure/data-explorer/">Azure Data Explorer</a> (Kusto) using <a href="https://kafka.apache.org/">Apache Kafka</a>.</p>
+<p>Change Data Capture (CDC) can be used to track row-level changes in database tables in response to create, update and delete operations. It is a powerful technique, but useful only when there is a way to leverage these events and make them available to other services.</p>
+<h2 id="introduction">Introduction</h2>
+<p>Using Apache Kafka, it is possible to convert traditional batched ETL processes into real-time, streaming mode. You can do-it-yourself (DIY) and write good old Kafka producer/consumer using a client SDK of your choice. But why would you do that when you&rsquo;ve Kafka Connect and it&rsquo;s suite of ready-to-use connectors?</p>
+<p>Once you opt for Kafka Connect, you have a couple of options. One is the JDBC connector which basically polls the target database table(s) to get the information. There is a better (albeit, a little more complex) way based on change data capture. Enter <a href="https://debezium.io/">Debezium</a>, which is a distributed platform that builds on top of Change Data Capture features available in different databases. It provides a set of <a href="https://debezium.io/documentation/reference/1.2/connectors/index.html">Kafka Connect connectors</a> which tap into row-level changes in database table(s) and convert them into event streams that are sent to Apache Kafka. Once the change log events are in Kafka, they will be available to all the downstream applications.</p>
+<p>Here is a high-level overview of the use-case presented in this post. It has been kept simplified for demonstration purposes.</p>
+<h2 id="overview">Overview</h2>
+<p>Data related to <code>Orders</code> is stored in the PostgreSQL database and contains information such as order ID, customer ID, city, transaction amount. time etc. This data is picked up the <a href="https://debezium.io/documentation/reference/1.2/connectors/postgresql.html">Debezium connector for PostgreSQL</a> and sent to a Kafka topic. Once the data is in Kafka, another (sink) connector sends them to Azure Data Explorer allow or further querying and analysis.</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/i/wttiquhcg9y82of7zmvm.jpg" alt=""></p>
+<p>The individual components used in the end to end solution are as follows:</p>
+<h3 id="source-and-destination">Source and Destination</h3>
+<p>Data pipelines can be pretty complex! This blog post provides a simplified example where a PostgreSQL database will be used as the source of data and a Big Data analytics engine acts as the final destination (sink). Both these components run in Azure: <a href="https://docs.microsoft.com/azure/postgresql/?WT.mc_id=devto-blog-abhishgu">Azure Database for PostgreSQL</a> (the <em>Source</em>) is a relational database service based on the open-source <a href="https://www.postgresql.org/">Postgres</a> database engine and <a href="https://docs.microsoft.com/azure/data-explorer/?WT.mc_id=devto-blog-abhishgu">Azure Data Explorer</a> (the <em>Sink</em>) is a fast and scalable data exploration service that lets you collect, store, and analyze large volumes of data from any diverse sources, such as websites, applications, IoT devices, and more.</p>
+<blockquote>
+<p>Although Azure PostgreSQL DB has been used in this blog, the instructions should work for any Postgres database. So feel free to use alternate options if you&rsquo;d like!</p></blockquote>
+<blockquote>
+<p>The code and configuration associated with this blog post is available in this <a href="https://github.com/abhirockzz/kafka-adx-postgres-cdc-demo">GitHub repository</a></p></blockquote>
+<h3 id="kafka-and-kafka-connect">Kafka and Kafka Connect</h3>
+<p>Apache Kafka along with Kafka Connect acts as a scalable platform for streaming data pipeline - the key components here are the source and sink connectors.</p>
+<p>The Debezium connector for PostgreSQL captures row-level changes that insert, update, and delete database content and that were committed to a PostgreSQL database, generates data change event records and streams them to Kafka topics. Behind the scenes, it uses a combination of a Postgres output plugin (e.g. <code>wal2json</code>, <code>pgoutput</code> etc.) and the (Java) connector itself reads the changes produced by the output plug-in using the <a href="https://www.postgresql.org/docs/current/static/logicaldecoding-walsender.html">PostgreSQL’s streaming replication protocol</a> and the <a href="https://github.com/pgjdbc/pgjdbc">JDBC driver</a>.</p>
+<p>The <a href="https://github.com/Azure/kafka-sink-azure-kusto">Azure Data Explorer sink connector</a> picks up data from the configured Kafka topic, batches and sends them to Azure Data Explorer where they are queued up ingestion and eventually written to a table in Azure Data Explorer. The connector leverages the <a href="https://github.com/Azure/azure-kusto-java">Java SDK for Azure Data Explorer</a>.</p>
+<p>Most of the components (except Azure Data Explorer and Azure PostgreSQL DB) run as Docker containers (using Docker Compose) - Kafka (and Zookeeper), Kafka Connect workers and the data generator application. Having said that, the instructions would work with any Kafka cluster and Kafka Connect workers, provided all the components are configured to access and communicate with each other as required. For example, you could have a Kafka cluster on <a href="https://docs.microsoft.com/azure/hdinsight/?WT.mc_id=devto-blog-abhishgu">Azure HD Insight</a> or <a href="https://www.confluent.io/blog/confluent-cloud-managed-kafka-service-azure-marketplace/">Confluent Cloud on Azure Marketplace</a>.</p>
+<blockquote>
+<p>Check out these <a href="https://github.com/Azure/azure-kusto-labs/tree/master/kafka-integration">hands-on labs</a> if you&rsquo;re interested in these scenarios</p></blockquote>
+<p>Here is a breakdown of the components and their service definitions - you can refer to the complete <code>docker-compose</code> file <a href="https://github.com/abhirockzz/kafka-adx-postgres-cdc-demo/blob/master/docker-compose.yaml">in the GitHub repo</a></p>
+<h3 id="docker-compose-services">Docker Compose services</h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-yaml" data-lang="yaml"><span style="display:flex;"><span>  <span style="color:#f92672">zookeeper</span>:
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">image</span>: <span style="color:#ae81ff">debezium/zookeeper:1.2</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">ports</span>:
+</span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">2181</span>:<span style="color:#ae81ff">2181</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">kafka</span>:
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">image</span>: <span style="color:#ae81ff">debezium/kafka:1.2</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">ports</span>:
+</span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">9092</span>:<span style="color:#ae81ff">9092</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">links</span>:
+</span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">zookeeper</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">depends_on</span>:
+</span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">zookeeper</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">environment</span>:
+</span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">ZOOKEEPER_CONNECT=zookeeper:2181</span>
+</span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092</span>
+</span></span></code></pre></div><p>The Kafka and Zookeeper run using the <a href="https://hub.docker.com/r/debezium/kafka/">debezium</a> images - they just work and are great for iterative development with quick feedback loop, demos etc.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-yaml" data-lang="yaml"><span style="display:flex;"><span><span style="color:#f92672">dataexplorer-connector</span>:
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">build</span>:
+</span></span><span style="display:flex;"><span>      <span style="color:#f92672">context</span>: <span style="color:#ae81ff">./connector</span>
+</span></span><span style="display:flex;"><span>      <span style="color:#f92672">args</span>:
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">KUSTO_KAFKA_SINK_VERSION</span>: <span style="color:#ae81ff">1.0.1</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">ports</span>:
+</span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">8080</span>:<span style="color:#ae81ff">8083</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">links</span>:
+</span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">kafka</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">depends_on</span>:
+</span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">kafka</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">environment</span>:
+</span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">BOOTSTRAP_SERVERS=kafka:9092</span>
+</span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">GROUP_ID=adx</span>
+</span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">CONFIG_STORAGE_TOPIC=adx_connect_configs</span>
+</span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">OFFSET_STORAGE_TOPIC=adx_connect_offsets</span>
+</span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">STATUS_STORAGE_TOPIC=adx_connect_statuses</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">postgres-connector</span>:
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">image</span>: <span style="color:#ae81ff">debezium/connect:1.2</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">ports</span>:
+</span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">9090</span>:<span style="color:#ae81ff">8083</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">links</span>:
+</span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">kafka</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">depends_on</span>:
+</span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">kafka</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">environment</span>:
+</span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">BOOTSTRAP_SERVERS=kafka:9092</span>
+</span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">GROUP_ID=pg</span>
+</span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">CONFIG_STORAGE_TOPIC=pg_connect_configs</span>
+</span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">OFFSET_STORAGE_TOPIC=pg_connect_offsets</span>
+</span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">STATUS_STORAGE_TOPIC=pg_connect_statuses</span>
+</span></span></code></pre></div><p>The Kafka Connect source and sink connectors run as separate containers, just to make it easier for you to understand and reason about them - it is possible to run both the connectors in a single container as well.</p>
+<p>Notice that, while the PostgreSQL connector is built into <a href="https://hub.docker.com/r/debezium/connect">debezium/connect</a> image, the Azure Data Explorer connector is setup using custom image. The <a href="https://github.com/abhirockzz/kafka-adx-postgres-cdc-demo/blob/master/connector/Dockerfile">Dockerfile</a> is quite compact:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-dockerfile" data-lang="dockerfile"><span style="display:flex;"><span><span style="color:#66d9ef">FROM</span><span style="color:#e6db74"> debezium/connect:1.2</span><span style="color:#960050;background-color:#1e0010">
+</span></span></span><span style="display:flex;"><span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">WORKDIR</span><span style="color:#e6db74"> $KAFKA_HOME/connect</span><span style="color:#960050;background-color:#1e0010">
+</span></span></span><span style="display:flex;"><span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">ARG</span> KUSTO_KAFKA_SINK_VERSION<span style="color:#960050;background-color:#1e0010">
+</span></span></span><span style="display:flex;"><span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">RUN</span> curl -L -O https://github.com/Azure/kafka-sink-azure-kusto/releases/download/v$KUSTO_KAFKA_SINK_VERSION/kafka-sink-azure-kusto-$KUSTO_KAFKA_SINK_VERSION-jar-with-dependencies.jar<span style="color:#960050;background-color:#1e0010">
+</span></span></span></code></pre></div><p>Finally, the <code>orders-gen</code> service just <a href="https://golang.org/">Go</a> application to seed random orders data into PostgreSQL. You can refer to the Dockerfile in <a href="https://github.com/abhirockzz/kafka-adx-postgres-cdc-demo/blob/master/orders-generator/Dockerfile">the GitHub repo</a></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-yaml" data-lang="yaml"><span style="display:flex;"><span>  <span style="color:#f92672">orders-gen</span>:
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">build</span>:
+</span></span><span style="display:flex;"><span>      <span style="color:#f92672">context</span>: <span style="color:#ae81ff">./orders-generator</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">environment</span>:
+</span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">PG_HOST=&lt;postgres host&gt;</span>
+</span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">PG_USER=&lt;postgres username&gt;</span>
+</span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">PG_PASSWORD=&lt;postgres password&gt;</span>
+</span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">PG_DB=&lt;postgres db name&gt;</span>
+</span></span></code></pre></div><p>Hopefully, by now you have a reasonable understanding of architecture and the components involved. Before diving into the practical aspects, you need take care of a few things.</p>
+<h2 id="pre-requisites">Pre-requisites</h2>
+<ul>
+<li>You will need a <a href="https://docs.microsoft.com/azure/?product=featured&amp;WT.mc_id=devto-blog-abhishgu">Microsoft Azure account</a>. Don&rsquo;t worry, you can get it <a href="https://azure.microsoft.com/free/?WT.mc_id=devto-blog-abhishgu">for free</a> if you don&rsquo;t have one already!</li>
+<li>Install <a href="https://docs.microsoft.com/cli/azure/install-azure-cli?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu">Azure CLI</a></li>
+<li>Install <a href="https://docs.docker.com/get-docker/">Docker</a> and <a href="https://docs.docker.com/compose/install">Docker Compose</a></li>
+</ul>
+<p>Finally, clone this GitHub repo:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-shell" data-lang="shell"><span style="display:flex;"><span>git clone https://github.com/abhirockzz/kafka-adx-postgres-cdc-demo
+</span></span><span style="display:flex;"><span>cd kafka-adx-postgres-cdc-demo
+</span></span></code></pre></div><p>To begin with, let&rsquo;s make sure you have setup and configured Azure Data Explorer and PostgreSQL database.</p>
+<h2 id="setup-and-configure-azure-data-explorer">Setup and configure Azure Data Explorer</h2>
+<ol>
+<li>
+<p>Create an Azure Data Explorer cluster and a database - <a href="https://docs.microsoft.com/azure/data-explorer/create-cluster-database-portal?WT.mc_id=devto-blog-abhishgu">this quickstart</a> will guide you through the process.</p>
+</li>
+<li>
+<p>Create a table (<code>Orders</code>) and the mapping (<code>OrdersEventMapping</code>) using the <a href="https://docs.microsoft.com/azure/data-explorer/kql-quick-reference?WT.mc_id=devto-blog-abhishgu">KQL</a> queries below:</p>
+</li>
+</ol>
+<pre tabindex="0"><code class="language-kusto" data-lang="kusto">.create table Orders (orderid: string, custid: string, city: string, amount: int, purchase_time: datetime)
+
+.create table Orders ingestion json mapping &#39;OrdersEventMapping&#39; &#39;[{&#34;column&#34;:&#34;orderid&#34;,&#34;Properties&#34;:{&#34;path&#34;:&#34;$.orderid&#34;}},{&#34;column&#34;:&#34;custid&#34;,&#34;Properties&#34;:{&#34;path&#34;:&#34;$.custid&#34;}},{&#34;column&#34;:&#34;city&#34;,&#34;Properties&#34;:{&#34;path&#34;:&#34;$.city&#34;}},{&#34;column&#34;:&#34;amount&#34;,&#34;Properties&#34;:{&#34;path&#34;:&#34;$.amount&#34;}},{&#34;column&#34;:&#34;purchase_time&#34;,&#34;Properties&#34;:{&#34;path&#34;:&#34;$.purchase_time&#34;}}]&#39;
+</code></pre><p>During the ingestion process, Azure Data Explorer attempts to optimize for throughput by batching small ingress data chunks together as they await ingestion - the <a href="https://docs.microsoft.com/azure/data-explorer/kusto/management/batchingpolicy?WT.mc_id=devto-blog-abhishgu">IngestionBatching policy</a> can be used to fine tune this process. Optionally, for the purposes of this demo, you can update the policy as such:</p>
+<pre tabindex="0"><code class="language-kusto" data-lang="kusto">.alter table Orders policy ingestionbatching @&#39;{&#34;MaximumBatchingTimeSpan&#34;:&#34;00:00:30&#34;, &#34;MaximumNumberOfItems&#34;: 500, &#34;MaximumRawDataSizeMB&#34;: 1024}&#39;
+
+.show table &lt;enter database name&gt;.Orders policy ingestionbatching
+</code></pre><blockquote>
+<p>Refer to the <a href="https://docs.microsoft.com/azure/data-explorer/kusto/management/batching-policy?WT.mc_id=devto-blog-abhishgu">IngestionBatching policy command reference</a> for details</p></blockquote>
+<ol start="3">
+<li>Create a Service Principal in order for the connector to authenticate and connect to Azure Data Explorer service. If you want to use the Azure Portal to do this, please refer to <a href="https://docs.microsoft.com/azure/active-directory/develop/howto-create-service-principal-portal?WT.mc_id=devto-blog-abhishgu">How to: Use the portal to create an Azure AD application and service principal that can access resources</a>. The below example makes use of Azure CLI <a href="https://docs.microsoft.com/cli/azure/ad/sp?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az_ad_sp_create_for_rbac">az ad sp create-for-rbac</a> command. For example, to create a service principal with the name <code>adx-sp</code>:</li>
+</ol>
+<pre tabindex="0"><code class="language-azurecli" data-lang="azurecli">az ad sp create-for-rbac -n &#34;adx-sp&#34;
+</code></pre><p>You will get a JSON response:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&#34;appId&#34;</span>: <span style="color:#e6db74">&#34;fe7280c7-5705-4789-b17f-71a472340429&#34;</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&#34;displayName&#34;</span>: <span style="color:#e6db74">&#34;kusto-sp&#34;</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&#34;name&#34;</span>: <span style="color:#e6db74">&#34;http://kusto-sp&#34;</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&#34;password&#34;</span>: <span style="color:#e6db74">&#34;29c719dd-f2b3-46de-b71c-4004fb6116ee&#34;</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&#34;tenant&#34;</span>: <span style="color:#e6db74">&#34;42f988bf-86f1-42af-91ab-2d7cd011db42&#34;</span>
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><blockquote>
+<p>Please note down the <code>appId</code>, <code>password</code> and <code>tenant</code> as you will be using them in subsequent steps</p></blockquote>
+<ol start="4">
+<li>Add permissions to your database</li>
+</ol>
+<p>Provide appropriate role to the Service principal you just created. To assign the <code>admin</code> role, <a href="https://docs.microsoft.com/azure/data-explorer/manage-database-permissions?WT.mc_id=devto-blog-abhishgu#manage-permissions-in-the-azure-portal">follow this guide</a> to use the Azure portal or use the following command in your Data Explorer cluster</p>
+<pre tabindex="0"><code class="language-kusto" data-lang="kusto">.add database &lt;enter database name&gt; admins  (&#39;aadapp=&lt;enter service principal appId&gt;;&lt;enter service principal tenant&gt;&#39;) &#39;AAD App&#39;
+</code></pre><h2 id="setup-and-configure-azure-postgresql-db">Setup and configure Azure PostgreSQL DB</h2>
+<p>You can setup PostgreSQL on Azure using a variety of options including, the <a href="https://docs.microsoft.com/azure/postgresql/quickstart-create-server-database-portal?WT.mc_id=devto-blog-abhishgu">Azure Portal</a>, <a href="https://docs.microsoft.com/azure/postgresql/quickstart-create-server-database-azure-cli?WT.mc_id=devto-blog-abhishgu">Azure CLI</a>, <a href="https://docs.microsoft.com/azure/postgresql/quickstart-create-postgresql-server-database-using-azure-powershell?WT.mc_id=devto-blog-abhishgu">Azure PowerShell</a>, <a href="https://docs.microsoft.com/azure/postgresql/quickstart-create-postgresql-server-database-using-arm-template?tabs=azure-portal&amp;WT.mc_id=devto-blog-abhishgu">ARM template</a>. Once you&rsquo;ve done that, you can easily connect to the database using you favourite programming language such as <a href="https://docs.microsoft.com/azure/postgresql/connect-java?WT.mc_id=devto-blog-abhishgu">Java</a>, <a href="https://docs.microsoft.com/azure/postgresql/connect-csharp?WT.mc_id=devto-blog-abhishgu">.NET</a>, <a href="https://docs.microsoft.com/azure/postgresql/connect-nodejs?WT.mc_id=devto-blog-abhishgu">Node.js</a>, <a href="https://docs.microsoft.com/azure/postgresql/connect-python?WT.mc_id=devto-blog-abhishgu">Python</a>, <a href="https://docs.microsoft.com/azure/postgresql/connect-go?WT.mc_id=devto-blog-abhishgu">Go</a> etc.</p>
+<blockquote>
+<p>Although the above references are for Single Server deployment mode, please note that <a href="https://docs.microsoft.com/azure/postgresql/overview?WT.mc_id=devto-blog-abhishgu#azure-database-for-postgresql---hyperscale-citus">Hyperscale (Citus) is another deployment mode you can use</a> for &ldquo;workloads that are approaching &ndash; or already exceed &ndash; 100 GB of data.&rdquo;</p></blockquote>
+<p>Please ensure that you keep the following PostgreSQL related information handy since you will need them to configure the Debezium Connector in the subsequent sections - database hostname (and port), username, password</p>
+<p>For the end-to-end solution to work as expected, we need to:</p>
+<ul>
+<li>Ensure that the PostgreSQL instance in Azure is accessible from the local Kafka Connect workers (containers)</li>
+<li>Ensure appropriate PostrgeSQL replication setting (&ldquo;Logical&rdquo;)</li>
+<li>Create the <code>Orders</code> table which you will use to try out the change data capture feature</li>
+</ul>
+<p>If you&rsquo;re using Azure DB for PostgreSQL, create a firewall rule using <a href="https://docs.microsoft.com/azure/postgresql/howto-manage-firewall-using-cli?WT.mc_id=devto-blog-abhishgu#create-firewall-rule">az postgres server firewall-rule create</a> command to whitelist your host. Since we&rsquo;re running Kafka Connect in Docker locally, simply navigate to the Azure portal (<strong>Connection security</strong> section of my PostrgreSQL instance) and choose <strong>Add current client IP address</strong> to make sure that your local IP is added to the firewall rule as such:</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/i/j0pocc5xlf82eaxfmzhg.png" alt=""></p>
+<p>To change the replication mode for Azure DB for PostgreSQL, you can use the <a href="https://docs.microsoft.com/cli/azure/postgres/server/configuration?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az-postgres-server-configuration-set">az postgres server configuration</a> command:</p>
+<pre tabindex="0"><code class="language-azurecli" data-lang="azurecli">az postgres server configuration set --resource-group &lt;name of resource group&gt; --server-name &lt;name of server&gt; --name azure.replication_support --value logical
+</code></pre><p>.. or use the <strong>Replication</strong> menu of your PostgreSQL instance in the Azure Portal:</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/i/nasgv52afr15hqzqzyyc.png" alt=""></p>
+<p>After updating the configuration, you will need to re-start the server which you can do using the CLI (<a href="https://docs.microsoft.com/cli/azure/postgres/server?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az-postgres-server-restart">az postgres server restart</a>) or the portal.</p>
+<p>Once the database is up and running, create the table. I have used <code>psql</code> CLI in this example, but feel free to use any other tool. For example, to connect to your PostgreSQL database on Azure over SSL (you will be prompted for the password):</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>psql -h &lt;POSTGRESQL_INSTANCE_NAME&gt;.postgres.database.azure.com -p <span style="color:#ae81ff">5432</span> -U &lt;POSTGRES_USER_NAME&gt; -W -d &lt;POSTGRES_DB_NAME&gt; --set<span style="color:#f92672">=</span>sslmode<span style="color:#f92672">=</span>require
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>//example
+</span></span><span style="display:flex;"><span>psql -h my-pgsql.postgres.database.azure.com -p <span style="color:#ae81ff">5432</span> -U foo@my-pgsql -W -d postgres --set<span style="color:#f92672">=</span>sslmode<span style="color:#f92672">=</span>require
+</span></span></code></pre></div><p>Use the below SQL to create the table:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-sql" data-lang="sql"><span style="display:flex;"><span><span style="color:#66d9ef">CREATE</span> <span style="color:#66d9ef">SCHEMA</span> retail;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">CREATE</span> <span style="color:#66d9ef">TABLE</span> retail.orders_info (
+</span></span><span style="display:flex;"><span>	orderid SERIAL <span style="color:#66d9ef">NOT</span> <span style="color:#66d9ef">NULL</span> <span style="color:#66d9ef">PRIMARY</span> <span style="color:#66d9ef">KEY</span>,
+</span></span><span style="display:flex;"><span>	custid INTEGER <span style="color:#66d9ef">NOT</span> <span style="color:#66d9ef">NULL</span>,
+</span></span><span style="display:flex;"><span>	amount INTEGER <span style="color:#66d9ef">NOT</span> <span style="color:#66d9ef">NULL</span>,
+</span></span><span style="display:flex;"><span>	city VARCHAR(<span style="color:#ae81ff">255</span>) <span style="color:#66d9ef">NOT</span> <span style="color:#66d9ef">NULL</span>,
+</span></span><span style="display:flex;"><span>	purchase_time VARCHAR(<span style="color:#ae81ff">20</span>) <span style="color:#66d9ef">NOT</span> <span style="color:#66d9ef">NULL</span>
+</span></span><span style="display:flex;"><span>);
+</span></span></code></pre></div><blockquote>
+<p>The <code>purchase_time</code> captures the time when the purchase was executed, but it uses <code>VARCHAR</code> instead of a <code>TIMESTAMP</code> type (ideally) to reduce the overall complexity. This is because of the way <a href="https://debezium.io/documentation/reference/1.2/connectors/postgresql.html#postgresql-timestamp-type">Debezium Postgres connector treats TIMESTAMP data type</a> (and rightly so!)</p></blockquote>
+<p>Over the course of the next few sections, you will setup the source (PostgreSQL), sink (Azure Data Explorer) connectors and validate the end to end pipeline.</p>
+<h2 id="start-docker-containers">Start Docker containers</h2>
+<p>Starting up our local environment is very easy, thanks to Docker Compose - all we need is a single command:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-shell" data-lang="shell"><span style="display:flex;"><span>docker-compose --project-name adx-kafka-cdc up --build
+</span></span></code></pre></div><p>This will build (and start) the order generator application container along with Kafka, Zookeeper and Kafka Connect workers.</p>
+<blockquote>
+<p>It might take a while to download and start the containers: this is just a one time process.</p></blockquote>
+<p>To confirm whether all the containers have started:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-shell" data-lang="shell"><span style="display:flex;"><span>docker-compose -p adx-kafka-cdc ps
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>//output
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>                 Name                              Command             State                      Ports                   
+</span></span><span style="display:flex;"><span>--------------------------------------------------------------------------------------------------------------------------
+</span></span><span style="display:flex;"><span>adx-kafka-cdc_dataexplorer-connector_1   /docker-entrypoint.sh start   Up      0.0.0.0:8080-&gt;8083/tcp, 8778/tcp, 9092/tcp,
+</span></span><span style="display:flex;"><span>                                                                               9779/tcp                                   
+</span></span><span style="display:flex;"><span>adx-kafka-cdc_kafka_1                    /docker-entrypoint.sh start   Up      8778/tcp, 0.0.0.0:9092-&gt;9092/tcp, 9779/tcp 
+</span></span><span style="display:flex;"><span>adx-kafka-cdc_orders-gen_1               /orders-gen                   Up                                                 
+</span></span><span style="display:flex;"><span>adx-kafka-cdc_postgres-connector_1       /docker-entrypoint.sh start   Up      0.0.0.0:9090-&gt;8083/tcp, 8778/tcp, 9092/tcp,
+</span></span><span style="display:flex;"><span>                                                                               9779/tcp                                   
+</span></span><span style="display:flex;"><span>adx-kafka-cdc_zookeeper_1                /docker-entrypoint.sh start   Up      0.0.0.0:2181-&gt;2181/tcp, 2888/tcp, 3888/tcp,
+</span></span><span style="display:flex;"><span>                                                                               8778/tcp, 9779/tcp
+</span></span></code></pre></div><p>The orders generator app will start inserting random order events to the <code>orders_info</code> table in PostgreSQL. At this point you can also do quick sanity check to confirm that the order information is being persisted - I have used <a href="https://www.postgresql.org/docs/13/app-psql.html">psql</a> in the example below:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-sql" data-lang="sql"><span style="display:flex;"><span>psql <span style="color:#f92672">-</span>h <span style="color:#f92672">&lt;</span>POSTGRESQL_INSTANCE_NAME<span style="color:#f92672">&gt;</span>.postgres.<span style="color:#66d9ef">database</span>.azure.com <span style="color:#f92672">-</span>p <span style="color:#ae81ff">5432</span> <span style="color:#f92672">-</span>U <span style="color:#f92672">&lt;</span>POSTGRES_USER_NAME<span style="color:#f92672">&gt;</span> <span style="color:#f92672">-</span>W <span style="color:#f92672">-</span>d <span style="color:#f92672">&lt;</span>POSTGRES_DB_NAME<span style="color:#f92672">&gt;</span> <span style="color:#75715e">--set=sslmode=require
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">select</span> <span style="color:#f92672">*</span> <span style="color:#66d9ef">from</span> retail.orders_info <span style="color:#66d9ef">order</span> <span style="color:#66d9ef">by</span> orderid <span style="color:#66d9ef">desc</span> <span style="color:#66d9ef">limit</span> <span style="color:#ae81ff">5</span>;
+</span></span></code></pre></div><p>This will give you the five most recent orders:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-sql" data-lang="sql"><span style="display:flex;"><span> orderid <span style="color:#f92672">|</span> custid <span style="color:#f92672">|</span> amount <span style="color:#f92672">|</span>   city    <span style="color:#f92672">|</span>    purchase_time    
+</span></span><span style="display:flex;"><span><span style="color:#75715e">---------+--------+--------+-----------+---------------------
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>      <span style="color:#ae81ff">10</span> <span style="color:#f92672">|</span>     <span style="color:#ae81ff">77</span> <span style="color:#f92672">|</span>    <span style="color:#ae81ff">140</span> <span style="color:#f92672">|</span> Seattle   <span style="color:#f92672">|</span> <span style="color:#ae81ff">2020</span><span style="color:#f92672">-</span><span style="color:#ae81ff">10</span><span style="color:#f92672">-</span><span style="color:#ae81ff">09</span> <span style="color:#ae81ff">07</span>:<span style="color:#ae81ff">10</span>:<span style="color:#ae81ff">49</span>
+</span></span><span style="display:flex;"><span>      <span style="color:#ae81ff">9</span>  <span style="color:#f92672">|</span>    <span style="color:#ae81ff">541</span> <span style="color:#f92672">|</span>    <span style="color:#ae81ff">186</span> <span style="color:#f92672">|</span> Cleveland <span style="color:#f92672">|</span> <span style="color:#ae81ff">2020</span><span style="color:#f92672">-</span><span style="color:#ae81ff">10</span><span style="color:#f92672">-</span><span style="color:#ae81ff">09</span> <span style="color:#ae81ff">07</span>:<span style="color:#ae81ff">10</span>:<span style="color:#ae81ff">46</span>
+</span></span><span style="display:flex;"><span>      <span style="color:#ae81ff">8</span>  <span style="color:#f92672">|</span>    <span style="color:#ae81ff">533</span> <span style="color:#f92672">|</span>    <span style="color:#ae81ff">116</span> <span style="color:#f92672">|</span> Cleveland <span style="color:#f92672">|</span> <span style="color:#ae81ff">2020</span><span style="color:#f92672">-</span><span style="color:#ae81ff">10</span><span style="color:#f92672">-</span><span style="color:#ae81ff">09</span> <span style="color:#ae81ff">07</span>:<span style="color:#ae81ff">10</span>:<span style="color:#ae81ff">42</span>
+</span></span><span style="display:flex;"><span>      <span style="color:#ae81ff">7</span>  <span style="color:#f92672">|</span>    <span style="color:#ae81ff">225</span> <span style="color:#f92672">|</span>    <span style="color:#ae81ff">147</span> <span style="color:#f92672">|</span> Chicago   <span style="color:#f92672">|</span> <span style="color:#ae81ff">2020</span><span style="color:#f92672">-</span><span style="color:#ae81ff">10</span><span style="color:#f92672">-</span><span style="color:#ae81ff">09</span> <span style="color:#ae81ff">07</span>:<span style="color:#ae81ff">10</span>:<span style="color:#ae81ff">39</span>
+</span></span><span style="display:flex;"><span>      <span style="color:#ae81ff">6</span>  <span style="color:#f92672">|</span>    <span style="color:#ae81ff">819</span> <span style="color:#f92672">|</span>    <span style="color:#ae81ff">184</span> <span style="color:#f92672">|</span> Austin    <span style="color:#f92672">|</span> <span style="color:#ae81ff">2020</span><span style="color:#f92672">-</span><span style="color:#ae81ff">10</span><span style="color:#f92672">-</span><span style="color:#ae81ff">09</span> <span style="color:#ae81ff">07</span>:<span style="color:#ae81ff">10</span>:<span style="color:#ae81ff">36</span>
+</span></span><span style="display:flex;"><span>(<span style="color:#ae81ff">5</span> <span style="color:#66d9ef">rows</span>)
+</span></span></code></pre></div><p>To stream the <code>orders</code> data to Kafka, we need to configure and start an instance of the Debezium PostgreSQL source connector.</p>
+<h2 id="debezium-postgresql-source-connector-setup">Debezium PostgreSQL source connector setup</h2>
+<p>Copy the JSON contents below to a file (you can name it <code>pg-source-config.json</code>). Please ensure that you update the following attributes with the values corresponding to your PostgreSQL instance: <code>database.hostname</code>, <code>database.user</code>, <code>database.password</code>.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;name&#34;</span>: <span style="color:#e6db74">&#34;pg-orders-source&#34;</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;config&#34;</span>: {
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;connector.class&#34;</span>: <span style="color:#e6db74">&#34;io.debezium.connector.postgresql.PostgresConnector&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;database.hostname&#34;</span>: <span style="color:#e6db74">&#34;&lt;enter database name&gt;.postgres.database.azure.com&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;database.port&#34;</span>: <span style="color:#e6db74">&#34;5432&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;database.user&#34;</span>: <span style="color:#e6db74">&#34;&lt;enter admin username&gt;@&lt;enter database name&gt;&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;database.password&#34;</span>: <span style="color:#e6db74">&#34;&lt;enter admin password&gt;&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;database.dbname&#34;</span>: <span style="color:#e6db74">&#34;postgres&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;database.server.name&#34;</span>: <span style="color:#e6db74">&#34;myserver&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;plugin.name&#34;</span>: <span style="color:#e6db74">&#34;wal2json&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;table.whitelist&#34;</span>: <span style="color:#e6db74">&#34;retail.orders_info&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;value.converter&#34;</span>: <span style="color:#e6db74">&#34;org.apache.kafka.connect.json.JsonConverter&#34;</span>
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>At the time of writing, Debezium supports the following plugins: <code>decoderbufs</code>, <code>wal2json</code>, <code>wal2json_rds</code>, <code>wal2json_streaming</code>, <code>wal2json_rds_streaming</code> and <code>pgoutput</code>. I have used <code>wal2json</code> in this example, and it&rsquo;s <a href="https://docs.microsoft.com/azure/postgresql/concepts-logical?WT.mc_id=devto-blog-abhishgu">supported on Azure as well</a>.</p>
+<p>To start the connector, simply use the Kafka Connect REST endpoint to submit the configuration.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-shell" data-lang="shell"><span style="display:flex;"><span>curl -X POST -H <span style="color:#e6db74">&#34;Content-Type: application/json&#34;</span> --data @pg-source-config.json http://localhost:9090/connectors
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># to confirm</span>
+</span></span><span style="display:flex;"><span>curl http://localhost:9090/connectors/pg-orders-source
+</span></span></code></pre></div><blockquote>
+<p>Notice that port for the REST endpoint is <code>9090</code> - this is per service port mapping defined in <code>docker-compose.yaml</code></p></blockquote>
+<p>Let&rsquo;s peek into the Kafka topic and take a look at the change data capture events produced by the source connector.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-shell" data-lang="shell"><span style="display:flex;"><span>docker exec -it adx-kafka-cdc_kafka_1 bash
+</span></span></code></pre></div><p>You will be dropped into a shell (inside the container). Execute the below command to consume the change data events from Kafka:</p>
+<pre tabindex="0"><code>cd bin &amp;&amp; ./kafka-console-consumer.sh --topic myserver.retail.orders_info --bootstrap-server kafka:9092 --from-beginning
+</code></pre><blockquote>
+<p>Note that the topic name <code>myserver.retail.orders_info</code> is as a result of the convention used by the Debezium connector</p></blockquote>
+<p>Each event in topic is corresponding to a specific order. It is in a JSON format that looks like what&rsquo;s depicted below. Please note that the payload also contains the entire <code>schema</code> which has been removed for brevity.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;schema&#34;</span>: {<span style="color:#960050;background-color:#1e0010">....</span>},
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;payload&#34;</span>: {
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;before&#34;</span>: <span style="color:#66d9ef">null</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;after&#34;</span>: {
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;orderid&#34;</span>: <span style="color:#ae81ff">51</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;custid&#34;</span>: <span style="color:#ae81ff">306</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;amount&#34;</span>: <span style="color:#ae81ff">183</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;city&#34;</span>: <span style="color:#e6db74">&#34;Austin&#34;</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;purchase_time&#34;</span>:<span style="color:#e6db74">&#34;2020-10-09 07:23:10&#34;</span>
+</span></span><span style="display:flex;"><span>        },
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;source&#34;</span>: {
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;version&#34;</span>: <span style="color:#e6db74">&#34;1.2.1.Final&#34;</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;connector&#34;</span>: <span style="color:#e6db74">&#34;postgresql&#34;</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;name&#34;</span>: <span style="color:#e6db74">&#34;myserver&#34;</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;ts_ms&#34;</span>: <span style="color:#ae81ff">1602057392691</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;snapshot&#34;</span>: <span style="color:#e6db74">&#34;false&#34;</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;db&#34;</span>: <span style="color:#e6db74">&#34;postgres&#34;</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;schema&#34;</span>: <span style="color:#e6db74">&#34;retail&#34;</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;table&#34;</span>: <span style="color:#e6db74">&#34;orders_info&#34;</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;txId&#34;</span>: <span style="color:#ae81ff">653</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;lsn&#34;</span>: <span style="color:#ae81ff">34220200</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;xmin&#34;</span>: <span style="color:#66d9ef">null</span>
+</span></span><span style="display:flex;"><span>        },
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;op&#34;</span>: <span style="color:#e6db74">&#34;c&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;ts_ms&#34;</span>: <span style="color:#ae81ff">1602057392818</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;transaction&#34;</span>: <span style="color:#66d9ef">null</span>
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>So far, we have the first half of our pipeline. Let&rsquo;s work on the second part!</p>
+<h2 id="azure-data-explorer-sink-connector-setup">Azure Data Explorer sink connector setup</h2>
+<p>Copy the JSON contents below to a file (you can name it <code>adx-sink-config.json</code>). Replace the values for the following attributes as per your Azure Data Explorer setup - <code>aad.auth.authority</code>, <code>aad.auth.appid</code>, <code>aad.auth.appkey</code>, <code>kusto.tables.topics.mapping</code> (the database name) and <code>kusto.url</code></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;name&#34;</span>: <span style="color:#e6db74">&#34;adx-orders-sink&#34;</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;config&#34;</span>: {
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;connector.class&#34;</span>: <span style="color:#e6db74">&#34;com.microsoft.azure.kusto.kafka.connect.sink.KustoSinkConnector&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;flush.size.bytes&#34;</span>: <span style="color:#ae81ff">10000</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;flush.interval.ms&#34;</span>: <span style="color:#ae81ff">30000</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;tasks.max&#34;</span>: <span style="color:#ae81ff">2</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;topics&#34;</span>: <span style="color:#e6db74">&#34;myserver.retail.orders_info&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;kusto.tables.topics.mapping&#34;</span>: <span style="color:#e6db74">&#34;[{&#39;topic&#39;: &#39;myserver.retail.orders_info&#39;,&#39;db&#39;: &#39;&lt;enter database name&gt;&#39;, &#39;table&#39;: &#39;Orders&#39;,&#39;format&#39;: &#39;json&#39;, &#39;mapping&#39;:&#39;OrdersEventMapping&#39;}]&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;aad.auth.authority&#34;</span>: <span style="color:#e6db74">&#34;&lt;enter tenant ID from service principal info&gt;&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;kusto.url&#34;</span>: <span style="color:#e6db74">&#34;https://ingest-&lt;enter cluster name&gt;.&lt;enter region&gt;.kusto.windows.net&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;aad.auth.appid&#34;</span>: <span style="color:#e6db74">&#34;&lt;enter app ID from service principal info&gt;&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;aad.auth.appkey&#34;</span>: <span style="color:#e6db74">&#34;&lt;enter password from service principal info&gt;&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;key.converter&#34;</span>: <span style="color:#e6db74">&#34;org.apache.kafka.connect.storage.StringConverter&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;transforms&#34;</span>: <span style="color:#e6db74">&#34;unwrap&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;transforms.unwrap.type&#34;</span>: <span style="color:#e6db74">&#34;io.debezium.transforms.ExtractNewRecordState&#34;</span>
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Notice that Kafka Connect <a href="https://kafka.apache.org/documentation/#connect_transforms">Single Message Transformation</a> (SMT) have been used here - this is the <code>ExtractNewRecordState</code> transformation that Debezium provides. You can read up on it <a href="https://debezium.io/documentation/reference/1.2/configuration/event-flattening.html">in the documentation</a></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span><span style="color:#e6db74">&#34;transforms&#34;</span><span style="color:#960050;background-color:#1e0010">:</span> <span style="color:#e6db74">&#34;unwrap&#34;</span><span style="color:#960050;background-color:#1e0010">,</span>
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;transforms.unwrap.type&#34;</span><span style="color:#960050;background-color:#1e0010">:</span> <span style="color:#e6db74">&#34;io.debezium.transforms.ExtractNewRecordState&#34;</span>
+</span></span></code></pre></div><p>It removes the <code>schema</code> and other parts from the JSON payload and keeps it down to only what&rsquo;s required. In this case, all we are looking for the order info from the <code>after</code> attribute (in the payload). For e.g.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;orderid&#34;</span>: <span style="color:#ae81ff">51</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;custid&#34;</span>: <span style="color:#ae81ff">306</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;amount&#34;</span>: <span style="color:#ae81ff">183</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;city&#34;</span>: <span style="color:#e6db74">&#34;Austin&#34;</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;purchase_time&#34;</span>:<span style="color:#e6db74">&#34;2020-10-09 07:23:10&#34;</span>
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>You could model this differently of course (apply transformation in the source connector itself), but there are a couple of benefits to this approach:</p>
+<ol>
+<li>Only the relevant data sent to Azure Data Explorer</li>
+<li>The Kafka topic contains the <em>entire</em> change data event (along with the schema) which can be leveraged by any downstream service</li>
+</ol>
+<p>To install the connector, just use the Kafka Connect REST endpoint like before:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-shell" data-lang="shell"><span style="display:flex;"><span>curl -X POST -H <span style="color:#e6db74">&#34;Content-Type: application/json&#34;</span> --data @adx-sink-config.json http://localhost:8080/connectors
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># check status</span>
+</span></span><span style="display:flex;"><span>curl http://localhost:8080/connectors/adx-orders-sink/status
+</span></span></code></pre></div><blockquote>
+<p>Notice that port for the REST endpoint is <code>8080</code> - this is per service port mapping defined in <code>docker-compose.yaml</code></p></blockquote>
+<p>The connector should spin into action, authenticate to Azure Data Explorer and start batching ingestion processes.</p>
+<blockquote>
+<p>Note that <code>flush.size.bytes</code> and <code>flush.interval.ms</code> are used to regulate the batching process. Please refer to the <a href="https://github.com/Azure/kafka-sink-azure-kusto/blob/master/README.md#5-sink-properties">connector documentation</a> for details on the individual properties.</p></blockquote>
+<p>Since the flush configuration for the connector and the batching policy for the <code>Orders</code> table in Azure Data Explorer is pretty aggressive (for demonstration purposes), you should see data flowing into Data Explorer quickly.</p>
+<h2 id="query-data-explorer">Query Data Explorer</h2>
+<p>You can query the Orders table in Data Explorer to slice and dice the data. Here are a few simple queries to start with.</p>
+<p>Get details for orders from New York city;</p>
+<pre tabindex="0"><code class="language-kusto" data-lang="kusto">Orders
+| where city == &#39;New York&#39;
+</code></pre><p><img src="https://dev-to-uploads.s3.amazonaws.com/i/bbeogxflc7l139h264kz.png" alt=""></p>
+<p>Get only the purchase amount and time for orders from New York city sorted by amount</p>
+<pre tabindex="0"><code class="language-kusto" data-lang="kusto">Orders
+| where city == &#39;New York&#39;
+| project amount, purchase_time
+| sort by amount
+</code></pre><p><img src="https://dev-to-uploads.s3.amazonaws.com/i/1tdj9trofkq5gf4qpgee.png" alt=""></p>
+<p>Find out the average sales per city and represent that as a column chart:</p>
+<pre tabindex="0"><code class="language-kusto" data-lang="kusto">Orders
+| summarize avg_sales = avg(amount) by city 
+| render columnchart
+</code></pre><p><img src="https://dev-to-uploads.s3.amazonaws.com/i/g7ktf2qc06xj043vpvt0.png" alt=""></p>
+<p>The total purchase amount per city, represented as a pie chart:</p>
+<pre tabindex="0"><code class="language-kusto" data-lang="kusto">Orders 
+| summarize total = sum(amount) by city 
+| sort by total
+| render piechart 
+</code></pre><p><img src="https://dev-to-uploads.s3.amazonaws.com/i/pnwqqoaj7gaucw430bjb.png" alt=""></p>
+<p>Number of orders per city, represented as a line chart:</p>
+<pre tabindex="0"><code class="language-kusto" data-lang="kusto">Orders
+| summarize orders = count() by city
+| sort by orders
+| render linechart   
+</code></pre><p><img src="https://dev-to-uploads.s3.amazonaws.com/i/26w5grliaubh5zopjlfx.png" alt=""></p>
+<p>How do purchases vary over a day?</p>
+<pre tabindex="0"><code class="language-kusto" data-lang="kusto">Orders
+| extend hour = floor(purchase_time % 1d , 10m)
+| summarize event_count=count() by hour
+| sort by hour asc
+| render timechart
+</code></pre><p><img src="https://dev-to-uploads.s3.amazonaws.com/i/dsiuyo44alyla8f58bw9.png" alt=""></p>
+<p>How does it vary over a day across different cities?</p>
+<pre tabindex="0"><code class="language-kusto" data-lang="kusto">Orders
+| extend hour= floor( purchase_time % 1d , 10m)
+| where city in (&#34;New Delhi&#34;, &#34;Seattle&#34;, &#34;New York&#34;, &#34;Austin&#34;, &#34;Chicago&#34;, &#34;Cleveland&#34;)
+| summarize event_count=count() by hour, city
+| render columnchart
+</code></pre><p><img src="https://dev-to-uploads.s3.amazonaws.com/i/eg3rrbot4n6kguwpwssx.png" alt=""></p>
+<h3 id="azure-data-explorer-dashboards">Azure Data Explorer Dashboards</h3>
+<ul>
+<li>Learn how to <a href="https://docs.microsoft.com/en-us/azure/data-explorer/azure-data-explorer-dashboards">visualize data with Azure Data Explorer dashboards</a></li>
+</ul>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/i/q8xymgrw1wx76wzgptt3.png" alt=""></p>
+<h2 id="clean-up">Clean up</h2>
+<p>To stop the containers, you can:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-shell" data-lang="shell"><span style="display:flex;"><span>docker-compose -p adx-kafka-cdc down -v
+</span></span></code></pre></div><p>To delete the Azure Data Explorer cluster/database, use <a href="https://docs.microsoft.com/cli/azure/kusto/cluster?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az-kusto-cluster-delete">az cluster delete</a> or <a href="https://docs.microsoft.com/cli/azure/kusto/database?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az-kusto-database-delete">az kusto database delete</a>. For PostgreSQL, simply use <a href="https://docs.microsoft.com/cli/azure/postgres/server?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu#az_postgres_server_delete">az postgres server delete</a></p>
+<pre tabindex="0"><code class="language-azurecli" data-lang="azurecli">az postgres server delete -g &lt;resource group name&gt; -n &lt;server name&gt;
+az kusto cluster delete -n &lt;cluster name&gt; -g &lt;resource group name&gt;
+az kusto database delete -n &lt;database name&gt; --cluster-name &lt;cluster name&gt; -g &lt;resource group name&gt;
+</code></pre><h2 id="conclusion">Conclusion</h2>
+<p>Kafka Connect helps you build scalable data pipelines without having to write custom plumbing code. You mostly need to setup, configure and of course operator the connectors. Remember that Kafka Connect worker instances are just JVM processes and depending on your scale and requirements you can use choose to operate them using <a href="https://docs.microsoft.com/azure/aks/?WT.mc_id=devto-blog-abhishgu">Azure Kubernetes Service</a>. Since Kafka Connect instances are stateless entities, you&rsquo;ve a lot of freedom in terms of the topology and sizing of your cluster workloads!</p>
+<h2 id="additional-resources">Additional resources</h2>
+<p>If you want to explore further, I would recommend</p>
+<ul>
+<li>Explore <a href="https://debezium.io/documentation/reference/1.2/connectors/index.html">Debezium connectors</a></li>
+<li>Azure Data Explorer <a href="https://docs.microsoft.com/en-us/azure/data-explorer/ingest-data-overview">Ingestion overview</a></li>
+<li>Explore <a href="https://docs.microsoft.com/en-us/azure/data-explorer/kusto/query/samples">what you can do with Kusto Query Language</a></li>
+<li><a href="https://github.com/Azure/kafka-sink-azure-kusto/blob/master/README.md#3-features-supported">Data Explorer connector features</a></li>
+<li>What is <a href="https://docs.microsoft.com/azure/event-hubs/event-hubs-about?WT.mc_id=devto-blog-abhishgu">Azure Event Hubs</a>?</li>
+<li>Use Change Data Capture with <a href="https://docs.microsoft.com/azure/event-hubs/event-hubs-kafka-connect-debezium?WT.mc_id=devto-blog-abhishgu">Kafka Connect support on Azure Event Hubs (Preview)</a></li>
+</ul>
+
+
+        
+
+        
+
+        
+      </article>
+
+      
+        <ul class="pager blog-pager">
+          
+            <li class="previous">
+              <a href="https://abhirockzz.github.io/posts/kafka-azure-data-explorer-kubernetes/" data-toggle="tooltip" data-placement="top" title="Data Ingestion into Azure Data Explorer using Kafka Connect on Kubernetes">&larr; Previous Post</a>
+            </li>
+          
+          
+            <li class="next">
+              <a href="https://abhirockzz.github.io/posts/create-data/" data-toggle="tooltip" data-placement="top" title="Picking the Right Distributed Database">Next Post &rarr;</a>
+            </li>
+          
+        </ul>
+      
+
+
+      
+
+    </div>
+  </div>
+</div>
+
+    
+<footer>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+        <ul class="list-inline text-center footer-links">
+          
+          
+          <li>
+            <a href="" title="RSS">
+              <span class="fa-stack fa-lg">
+                <i class="fas fa-circle fa-stack-2x"></i>
+                <i class="fas fa-rss fa-stack-1x fa-inverse"></i>
+              </span>
+            </a>
+          </li>
+          
+        </ul>
+        <p class="credits copyright text-muted">
+          
+
+          &nbsp;&bull;&nbsp;&copy;
+          
+          2025
+          
+
+          
+          &nbsp;&bull;&nbsp;
+          <a href="https://abhirockzz.github.io/">Abhishek&#39;s blog</a>
+          
+        </p>
+        
+        <p class="credits theme-by text-muted">
+          <a href="https://gohugo.io">Hugo v0.145.0</a> powered &nbsp;&bull;&nbsp; Theme <a href="https://github.com/halogenica/beautifulhugo">Beautiful Hugo</a> adapted from <a href="https://deanattali.com/beautiful-jekyll/">Beautiful Jekyll</a>
+          
+        </p>
+      </div>
+    </div>
+  </div>
+</footer><script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.js"
+  integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/contrib/auto-render.min.js"
+  integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
+<script src="https://code.jquery.com/jquery-1.12.4.min.js"
+  integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"
+  integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+<script src="https://abhirockzz.github.io/%20js/main.js"></script><script> renderMathInElement(document.body); </script><script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.js"
+  integrity="sha384-QELNnmcmU8IR9ZAykt67vGr9/rZJdHbiWi64V88fCPaOohUlHCqUD/unNN0BXSqy" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe-ui-default.min.js"
+  integrity="sha384-m67o7SkQ1ALzKZIFh4CiTA8tmadaujiTa9Vu+nqPSwDOqHrDmxLezTdFln8077+q" crossorigin="anonymous"></script><script src="https://abhirockzz.github.io/%20js/load-photoswipe.js"></script>
+
+
+
+
+
+
+
+
+    
+  </body>
+</html>
+

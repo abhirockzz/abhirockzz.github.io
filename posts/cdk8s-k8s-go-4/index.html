@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en" itemscope itemtype="http://schema.org/WebPage">
+  <head>
+    
+
+<meta charset="utf-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+
+<title>Write your Kubernetes Infrastructure as Go code - Extend cdk8s with custom Constructs - Abhishek&#39;s blog</title>
+<meta name="description" content="Build a Wordpress deployment as a cdk8s construct
+Constructs are the fundamental building block of cdk8s (Cloud Development Kit for Kubernetes) - an open-source framework (part of CNCF) with which you can define your Kubernetes applications using regular programming languages (instead of yaml). In Getting started with cdk8s, you saw how to use the core cdk8s library.
+You can also use the cdk8s-plus library (also covered this a previous blog) to reduce the amount of boilerplate code you need to write. With cdk8s-plus, creating a Kubernetes Deployment, specifying it&rsquo;s container (and other properties) and exposing it via a Service is three function calls away."><script type="application/ld+json">
+{
+    "@context": "http://schema.org",
+    "@type": "WebSite",
+    "name": "Abhishek\u0027s blog",
+    
+    "url": "https:\/\/abhirockzz.github.io\/"
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Organization",
+  "name": "",
+  "url": "https:\/\/abhirockzz.github.io\/"
+  
+  
+  
+  
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [{
+        "@type": "ListItem",
+        "position": 1,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io\/",
+          "name": "home"
+        }
+    },{
+        "@type": "ListItem",
+        "position": 3,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io\/posts\/cdk8s-k8s-go-4\/",
+          "name": "Write your kubernetes infrastructure as go code extend cdk8s with custom constructs"
+        }
+    }]
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Article",
+  "author": {
+    "name" : ""
+  },
+  "headline": "Write your Kubernetes Infrastructure as Go code - Extend cdk8s with custom Constructs",
+  "description" : "Build a Wordpress deployment as a cdk8s construct\nConstructs are the fundamental building block of cdk8s (Cloud Development Kit for Kubernetes) - an open-source framework (part of CNCF) with which you can define your Kubernetes applications using regular programming languages (instead of yaml). In Getting started with cdk8s, you saw how to use the core cdk8s library.\nYou can also use the cdk8s-plus library (also covered this a previous blog) to reduce the amount of boilerplate code you need to write. With cdk8s-plus, creating a Kubernetes Deployment, specifying it\u0026rsquo;s container (and other properties) and exposing it via a Service is three function calls away.\n",
+  "inLanguage" : "en",
+  "wordCount":  998 ,
+  "datePublished" : "2022-08-11T00:00:00",
+  "dateModified" : "2022-08-11T00:00:00",
+  "image" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+  "keywords" : [ "golang, kubernetes, infrastructure-as-code, cdk8s, cdk, cncf, tutorial" ],
+  "mainEntityOfPage" : "https:\/\/abhirockzz.github.io\/posts\/cdk8s-k8s-go-4\/",
+  "publisher" : {
+    "@type": "Organization",
+    "name" : "https:\/\/abhirockzz.github.io\/",
+    "logo" : {
+        "@type" : "ImageObject",
+        "url" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+        "height" :  60 ,
+        "width" :  60
+    }
+  }
+}
+</script>
+
+<meta property="og:title" content="Write your Kubernetes Infrastructure as Go code - Extend cdk8s with custom Constructs" />
+<meta property="og:description" content="Build a Wordpress deployment as a cdk8s construct
+Constructs are the fundamental building block of cdk8s (Cloud Development Kit for Kubernetes) - an open-source framework (part of CNCF) with which you can define your Kubernetes applications using regular programming languages (instead of yaml). In Getting started with cdk8s, you saw how to use the core cdk8s library.
+You can also use the cdk8s-plus library (also covered this a previous blog) to reduce the amount of boilerplate code you need to write. With cdk8s-plus, creating a Kubernetes Deployment, specifying it&rsquo;s container (and other properties) and exposing it via a Service is three function calls away.">
+<meta property="og:image" content="https://abhirockzz.github.io/icon.jpg" />
+<meta property="og:url" content="https://abhirockzz.github.io/posts/cdk8s-k8s-go-4/" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Abhishek&#39;s blog" />
+
+<meta name="twitter:title" content="Write your Kubernetes Infrastructure as Go code - Extend cdk8s with …" />
+<meta name="twitter:description" content="Build a Wordpress deployment as a cdk8s construct
+Constructs are the fundamental building block of cdk8s (Cloud Development Kit for Kubernetes) - an open-source framework (part of CNCF) with which you …">
+<meta name="twitter:image" content="https://abhirockzz.github.io/icon.jpg" />
+<meta name="twitter:card" content="summary" />
+<link href='https://abhirockzz.github.io/icons/myicon.png' rel='icon' type='image/x-icon' />
+<meta name="generator" content="Hugo 0.145.0">
+<link rel="alternate" href="https://abhirockzz.github.io/%20index.xml" type="application/rss+xml" title="Abhishek&#39;s blog"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css"
+  integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.5.0/css/all.css"
+  integrity="sha384-B4dIYHKNBt8Bc12p+WXckhzcICo0wtJAoU8YZTY5qE0Id1GSseTk6S+L3BlXeVIU" crossorigin="anonymous">
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+  integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous"><link rel="stylesheet" href="https://abhirockzz.github.io/%20css/main.css" /><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic" />
+<link rel="stylesheet"
+  href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800" /><link rel="stylesheet" href="https://abhirockzz.github.io/%20css/syntax.css" /><link rel="stylesheet" href="https://abhirockzz.github.io/%20css/codeblock.css" /><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.css"
+  integrity="sha384-h/L2W9KefUClHWaty3SLE5F/qvc4djlyR4qY3NUV5HGQBBW7stbcfff1+I/vmsHh" crossorigin="anonymous">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/default-skin/default-skin.min.css"
+  integrity="sha384-iD0dNku6PYSIQLyfTOpB06F2KCZJAKLOThS5HRe8b3ibhdEQ6eKsFf/EeFxdOt5R" crossorigin="anonymous">
+
+
+  </head>
+  <body>
+    <nav class="navbar navbar-default navbar-fixed-top navbar-custom">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#main-navbar">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="https://abhirockzz.github.io/">Abhishek&#39;s blog</a>
+    </div>
+
+    <div class="collapse navbar-collapse" id="main-navbar">
+      <ul class="nav navbar-nav navbar-right">
+        
+        
+        <li>
+          <a title="Blog" href="/">Blog</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="About" href="/about">About</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Open-Source" href="/projects">Open-Source</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Presentations" href="/presentations">Presentations</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Publications" href="/publications">Publications</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Tags" href="/tags">Tags</a>
+        </li>
+        
+        
+
+        
+        <li>
+          
+          
+          
+        </li>
+        
+
+        
+      </ul>
+    </div>
+
+    
+    <div class="avatar-container">
+      <div class="avatar-img-border">
+        <a title="Abhishek&#39;s blog" href="https://abhirockzz.github.io/">
+          <img class="avatar-img" src="https://abhirockzz.github.io/icon.jpg" alt="Abhishek&#39;s blog" />
+        </a>
+      </div>
+    </div>
+    
+
+  </div>
+</nav>
+
+
+
+    
+
+
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+<div class="pswp__bg"></div>
+
+<div class="pswp__scroll-wrap">
+    
+    <div class="pswp__container">
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+    </div>
+    
+    <div class="pswp__ui pswp__ui--hidden">
+    <div class="pswp__top-bar">
+      
+      <div class="pswp__counter"></div>
+      <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+      <button class="pswp__button pswp__button--share" title="Share"></button>
+      <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+      <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+      
+      
+      <div class="pswp__preloader">
+        <div class="pswp__preloader__icn">
+          <div class="pswp__preloader__cut">
+            <div class="pswp__preloader__donut"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+      <div class="pswp__share-tooltip"></div>
+    </div>
+    <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+    </button>
+    <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+    </button>
+    <div class="pswp__caption">
+      <div class="pswp__caption__center"></div>
+    </div>
+    </div>
+    </div>
+</div>
+
+
+  
+  
+  
+
+
+
+
+
+
+  
+
+  <header class="header-section ">
+    
+    <div class="intro-header no-img">
+      <div class="container">
+        <div class="row">
+          <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+            <div class="posts-heading">
+              
+                <h1>Write your Kubernetes Infrastructure as Go code - Extend cdk8s with custom Constructs</h1>
+              
+              
+                <hr class="small">
+              
+              
+              
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+
+    
+<div class="container" role="main">
+  <div class="row">
+    <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+      <article role="main" class="blog-post">
+        <p><em>Build a Wordpress deployment as a cdk8s construct</em></p>
+<p><strong>Constructs</strong> are the fundamental building block of <a href="https://cdk8s.io/docs/latest/">cdk8s</a> (Cloud Development Kit for Kubernetes) - an open-source framework (part of CNCF) with which you can define your Kubernetes applications using regular programming languages (instead of <code>yaml</code>). In <a href="cdk8s-k8s-go-1.md">Getting started with cdk8s</a>, you saw how to use the core <code>cdk8s</code> library.</p>
+<p>You can also use the <code>cdk8s-plus</code> library (<a href="cdk8s-k8s-go-2.md">also covered this a previous blog</a>) to reduce the amount of boilerplate code you need to write. With <code>cdk8s-plus</code>, creating a Kubernetes <code>Deployment</code>, specifying it&rsquo;s container (and other properties) and exposing it via a <code>Service</code> is three function calls away.</p>
+<p>For example, to setup and access <code>Nginx</code>, you simply need this:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#75715e">//...</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">deployment</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">cdk8splus22</span>.<span style="color:#a6e22e">NewDeployment</span>(<span style="color:#a6e22e">chart</span>, <span style="color:#a6e22e">jsii</span>.<span style="color:#a6e22e">String</span>(<span style="color:#e6db74">&#34;deployment&#34;</span>), <span style="color:#f92672">&amp;</span><span style="color:#a6e22e">cdk8splus22</span>.<span style="color:#a6e22e">DeploymentProps</span>{<span style="color:#a6e22e">Metadata</span>: <span style="color:#f92672">&amp;</span><span style="color:#a6e22e">cdk8s</span>.<span style="color:#a6e22e">ApiObjectMetadata</span>{<span style="color:#a6e22e">Name</span>: <span style="color:#a6e22e">jsii</span>.<span style="color:#a6e22e">String</span>(<span style="color:#e6db74">&#34;nginx-deployment-cdk8s-plus&#34;</span>)}})
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">deployment</span>.<span style="color:#a6e22e">AddContainer</span>(<span style="color:#f92672">&amp;</span><span style="color:#a6e22e">cdk8splus22</span>.<span style="color:#a6e22e">ContainerProps</span>{
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">Name</span>:  <span style="color:#a6e22e">jsii</span>.<span style="color:#a6e22e">String</span>(<span style="color:#e6db74">&#34;nginx-container&#34;</span>),
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">Image</span>: <span style="color:#a6e22e">jsii</span>.<span style="color:#a6e22e">String</span>(<span style="color:#e6db74">&#34;nginx&#34;</span>),
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">Port</span>:  <span style="color:#a6e22e">jsii</span>.<span style="color:#a6e22e">Number</span>(<span style="color:#ae81ff">80</span>)})
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">deployment</span>.<span style="color:#a6e22e">ExposeViaService</span>(<span style="color:#f92672">&amp;</span><span style="color:#a6e22e">cdk8splus22</span>.<span style="color:#a6e22e">DeploymentExposeViaServiceOptions</span>{
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">Name</span>:        <span style="color:#a6e22e">jsii</span>.<span style="color:#a6e22e">String</span>(<span style="color:#e6db74">&#34;nginx-container-service&#34;</span>),
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">ServiceType</span>: <span style="color:#a6e22e">cdk8splus22</span>.<span style="color:#a6e22e">ServiceType_LOAD_BALANCER</span>,
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">Ports</span>:       <span style="color:#f92672">&amp;</span>[]<span style="color:#f92672">*</span><span style="color:#a6e22e">cdk8splus22</span>.<span style="color:#a6e22e">ServicePort</span>{{<span style="color:#a6e22e">Port</span>: <span style="color:#a6e22e">jsii</span>.<span style="color:#a6e22e">Number</span>(<span style="color:#ae81ff">9090</span>), <span style="color:#a6e22e">TargetPort</span>: <span style="color:#a6e22e">jsii</span>.<span style="color:#a6e22e">Number</span>(<span style="color:#ae81ff">80</span>)}}})
+</span></span><span style="display:flex;"><span><span style="color:#75715e">//...</span>
+</span></span></code></pre></div><p>But things can get even better!</p>
+<p>Instead of writing the same logic over and over, you can package it in the form of a reusable component that can be invoked just like other built-in <code>cdk8s</code> functions (e.g. <a href="https://pkg.go.dev/github.com/cdk8s-team/cdk8s-plus-go/cdk8splus22/v2#NewDeployment">NewDeployment</a>, <code>NewService</code> etc.). Although it might not sound as useful for the simple application(s), this approach is invaluable for a large project, team or organisation who want to scale their engineering efforts. In fact, there is already a pool of ready-to-use components available at <a href="https://constructs.dev/">constructs.dev</a>. These include constructs contributed by the community, AWS and others as well, across multiple programming languages.</p>
+<h3 id="to-better-understand-how-this-might-look-in-practice">To better understand how this might look in practice</h3>
+<p>&hellip; let&rsquo;s look at the code. I will continue to use <code>Wordpress</code> as an example, like I did in the previous blog post. Here is a code snippet that shows how everything is wired together (with implementation walk-through in the next section):</p>
+<blockquote>
+<p>You can refer to the <a href="https://github.com/abhirockzz/cdk8s-for-go-developers/tree/master/part4-custom-construct">complete code on Github</a></p></blockquote>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#75715e">//...</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">NewMyChart</span>(<span style="color:#a6e22e">scope</span> <span style="color:#a6e22e">constructs</span>.<span style="color:#a6e22e">Construct</span>, <span style="color:#a6e22e">id</span> <span style="color:#66d9ef">string</span>, <span style="color:#a6e22e">props</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">MyChartProps</span>) <span style="color:#a6e22e">cdk8s</span>.<span style="color:#a6e22e">Chart</span> {
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">//....</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">NewWordpressStack</span>(<span style="color:#a6e22e">chart</span>, <span style="color:#a6e22e">jsii</span>.<span style="color:#a6e22e">String</span>(<span style="color:#e6db74">&#34;wordpress-stack&#34;</span>), <span style="color:#f92672">&amp;</span><span style="color:#a6e22e">WordpressProps</span>{<span style="color:#75715e">//....)</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">return</span> <span style="color:#a6e22e">chart</span>
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">main</span>() {
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">app</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">cdk8s</span>.<span style="color:#a6e22e">NewApp</span>(<span style="color:#66d9ef">nil</span>)
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">NewMyChart</span>(<span style="color:#a6e22e">app</span>, <span style="color:#e6db74">&#34;wordpress-custom-stack&#34;</span>, <span style="color:#66d9ef">nil</span>)
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">app</span>.<span style="color:#a6e22e">Synth</span>()
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><ul>
+<li><code>NewWordpressStack</code> gives us a construct that represents an entire <code>Wordpress</code> installation (single line of code!)</li>
+<li>We simply configure it as per our requirements (with <code>WordpressProps</code>)</li>
+<li>Include this as part of a <a href="https://pkg.go.dev/github.com/cdk8s-team/cdk8s-core-go/cdk8s/v2#Chart">cdk8s.Chart</a> which is then included in the <a href="https://pkg.go.dev/github.com/cdk8s-team/cdk8s-core-go/cdk8s/v2#App">cdk8s.App</a> (as with any other <code>cdk8s</code> application)</li>
+</ul>
+<p>There is lot of flexibility in terms of how you want to build a custom construct, depending on your requirements. But, at its very core, the basic concept is to define a way to create a new <a href="https://pkg.go.dev/github.com/aws/constructs-go/constructs/v10#Construct">construct.Construct</a>. You would want to provide a way to add metadata to further configure/refine your <code>Construct</code> - typically, thats done through properties (<a href="https://pkg.go.dev/github.com/cdk8s-team/cdk8s-core-go/cdk8s/v2#ChartProps">cdk8s.ChartProps</a>).</p>
+<p>First we define <code>WordpressProps</code> - this encapsulates/externalises the attributes of the Wordpress installation. Since this is just an example, I have provided limited attributes such as MySQL/Wordpress Docker images,  MySQL password, and required storage.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">WordpressProps</span> <span style="color:#66d9ef">struct</span> {
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">MySQLImage</span>    <span style="color:#f92672">*</span><span style="color:#66d9ef">string</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">MySQLPassword</span> <span style="color:#f92672">*</span><span style="color:#66d9ef">string</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">MySQLStorage</span>  <span style="color:#f92672">*</span><span style="color:#66d9ef">float64</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">WordpressImage</span>   <span style="color:#f92672">*</span><span style="color:#66d9ef">string</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">WordpressStorage</span> <span style="color:#f92672">*</span><span style="color:#66d9ef">float64</span>
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Then we have a function that will allow <em>other</em> charts/constructs to instantiate Wordpress. This is where the entire implementation resides.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">NewWordpressStack</span>(<span style="color:#a6e22e">scope</span> <span style="color:#a6e22e">constructs</span>.<span style="color:#a6e22e">Construct</span>, <span style="color:#a6e22e">id</span> <span style="color:#f92672">*</span><span style="color:#66d9ef">string</span>, <span style="color:#a6e22e">props</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">WordpressProps</span>) <span style="color:#a6e22e">constructs</span>.<span style="color:#a6e22e">Construct</span> {
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>The <code>props *WordpressProps</code> parameter allows other constructs to influence the Wordpress stack creation e.g. you can define how much storage you need, maybe use a different Docker image for Wordpress/MySQL.  The actual code for this function is similar to the one you <a href="https://github.com/abhirockzz/cdk8s-for-go-developers/blob/master/part2-cdk8s-plus-in-action/wordpress/main.go">saw here</a> (with required adjustments), so there is no point repeating it here. I will simply highlight the important bits - specifically the ones that use the <code>props</code> to configure the required components.</p>
+<blockquote>
+<p>This sample construct used <code>cdk8splus22</code> library. The reason for this naming convention is because  each <code>cdk8s-plus</code> library is separately vended to target a specific Kubernetes version - the <code>22</code> at the end signifies that this dependency will work with Kubernetes <code>1.22</code>. You can use the library corresponding to your Kubernetes version and <a href="https://cdk8s.io/docs/latest/plus/#whats-the-difference-between-cdk8s-plus-20-cdk8s-plus-21-and-cdk8s-plus-22">refer to the FAQs</a> for more info.</p></blockquote>
+<p>We use the MySQL password from <code>props</code> and use that to create the <code>Secret</code>.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span>    <span style="color:#75715e">//...</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">password</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">props</span>.<span style="color:#a6e22e">MySQLPassword</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">mysqlSecret</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">cdk8splus22</span>.<span style="color:#a6e22e">NewSecret</span>(<span style="color:#a6e22e">wordpressConstruct</span>, <span style="color:#a6e22e">jsii</span>.<span style="color:#a6e22e">String</span>(<span style="color:#e6db74">&#34;mysql-secret&#34;</span>),
+</span></span><span style="display:flex;"><span>		<span style="color:#f92672">&amp;</span><span style="color:#a6e22e">cdk8splus22</span>.<span style="color:#a6e22e">SecretProps</span>{
+</span></span><span style="display:flex;"><span>			<span style="color:#a6e22e">Metadata</span>: <span style="color:#f92672">&amp;</span><span style="color:#a6e22e">cdk8s</span>.<span style="color:#a6e22e">ApiObjectMetadata</span>{<span style="color:#a6e22e">Name</span>: <span style="color:#a6e22e">jsii</span>.<span style="color:#a6e22e">String</span>(<span style="color:#a6e22e">secretName</span>)}}) 
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">secretKey</span> <span style="color:#f92672">:=</span> <span style="color:#e6db74">&#34;password&#34;</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">mysqlSecret</span>.<span style="color:#a6e22e">AddStringData</span>(<span style="color:#a6e22e">jsii</span>.<span style="color:#a6e22e">String</span>(<span style="color:#a6e22e">secretKey</span>), <span style="color:#a6e22e">password</span>)
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">//...</span>
+</span></span></code></pre></div><p>The container images for MySQL and Wordpress are referenced via their respective <code>Deployment</code>s:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#75715e">//...</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">containerImage</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">props</span>.<span style="color:#a6e22e">MySQLImage</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">mysqlContainer</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">dep</span>.<span style="color:#a6e22e">AddContainer</span>(<span style="color:#f92672">&amp;</span><span style="color:#a6e22e">cdk8splus22</span>.<span style="color:#a6e22e">ContainerProps</span>{
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">Name</span>:  <span style="color:#a6e22e">jsii</span>.<span style="color:#a6e22e">String</span>(<span style="color:#e6db74">&#34;mysql-container&#34;</span>),
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">Image</span>: <span style="color:#a6e22e">containerImage</span>,
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">Port</span>:  <span style="color:#a6e22e">jsii</span>.<span style="color:#a6e22e">Number</span>(<span style="color:#ae81ff">3306</span>),
+</span></span><span style="display:flex;"><span>	})
+</span></span><span style="display:flex;"><span><span style="color:#75715e">//...</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">wordpressContainer</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">wordPressDeployment</span>.<span style="color:#a6e22e">AddContainer</span>(<span style="color:#f92672">&amp;</span><span style="color:#a6e22e">cdk8splus22</span>.<span style="color:#a6e22e">ContainerProps</span>{
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">Name</span>:  <span style="color:#a6e22e">jsii</span>.<span style="color:#a6e22e">String</span>(<span style="color:#e6db74">&#34;wordpress-container&#34;</span>),
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">Image</span>: <span style="color:#a6e22e">props</span>.<span style="color:#a6e22e">WordpressImage</span>,
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">Port</span>:  <span style="color:#a6e22e">jsii</span>.<span style="color:#a6e22e">Number</span>(<span style="color:#ae81ff">80</span>),
+</span></span><span style="display:flex;"><span>	})
+</span></span></code></pre></div><p>We also use the passed in storage as well - this is used to configure the <code>PersistentVolumeClaim</code> request.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">mysqlPVC</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">cdk8splus22</span>.<span style="color:#a6e22e">NewPersistentVolumeClaim</span>(<span style="color:#a6e22e">wordpressConstruct</span>, <span style="color:#a6e22e">jsii</span>.<span style="color:#a6e22e">String</span>(<span style="color:#e6db74">&#34;mysql-pvc&#34;</span>), <span style="color:#f92672">&amp;</span><span style="color:#a6e22e">cdk8splus22</span>.<span style="color:#a6e22e">PersistentVolumeClaimProps</span>{
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">AccessModes</span>: <span style="color:#f92672">&amp;</span>[]<span style="color:#a6e22e">cdk8splus22</span>.<span style="color:#a6e22e">PersistentVolumeAccessMode</span>{<span style="color:#a6e22e">cdk8splus22</span>.<span style="color:#a6e22e">PersistentVolumeAccessMode_READ_WRITE_ONCE</span>},
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">Storage</span>:     <span style="color:#a6e22e">cdk8s</span>.<span style="color:#a6e22e">Size_Gibibytes</span>(<span style="color:#a6e22e">props</span>.<span style="color:#a6e22e">MySQLStorage</span>)})
+</span></span><span style="display:flex;"><span><span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">wordpressPVC</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">cdk8splus22</span>.<span style="color:#a6e22e">NewPersistentVolumeClaim</span>(<span style="color:#a6e22e">wordpressConstruct</span>, <span style="color:#a6e22e">jsii</span>.<span style="color:#a6e22e">String</span>(<span style="color:#e6db74">&#34;wordpress-pvc&#34;</span>), <span style="color:#f92672">&amp;</span><span style="color:#a6e22e">cdk8splus22</span>.<span style="color:#a6e22e">PersistentVolumeClaimProps</span>{
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">AccessModes</span>: <span style="color:#f92672">&amp;</span>[]<span style="color:#a6e22e">cdk8splus22</span>.<span style="color:#a6e22e">PersistentVolumeAccessMode</span>{<span style="color:#a6e22e">cdk8splus22</span>.<span style="color:#a6e22e">PersistentVolumeAccessMode_READ_WRITE_ONCE</span>},
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">Storage</span>:     <span style="color:#a6e22e">cdk8s</span>.<span style="color:#a6e22e">Size_Gibibytes</span>(<span style="color:#a6e22e">props</span>.<span style="color:#a6e22e">WordpressStorage</span>)})
+</span></span></code></pre></div><p>Finally, we call <code>NewWordpressStack</code> from another <code>cdk8s.Chart</code> and pass in the attributes we want to configure.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">NewMyChart</span>(<span style="color:#a6e22e">scope</span> <span style="color:#a6e22e">constructs</span>.<span style="color:#a6e22e">Construct</span>, <span style="color:#a6e22e">id</span> <span style="color:#66d9ef">string</span>, <span style="color:#a6e22e">props</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">MyChartProps</span>) <span style="color:#a6e22e">cdk8s</span>.<span style="color:#a6e22e">Chart</span> {
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">var</span> <span style="color:#a6e22e">cprops</span> <span style="color:#a6e22e">cdk8s</span>.<span style="color:#a6e22e">ChartProps</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> <span style="color:#a6e22e">props</span> <span style="color:#f92672">!=</span> <span style="color:#66d9ef">nil</span> {
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">cprops</span> = <span style="color:#a6e22e">props</span>.<span style="color:#a6e22e">ChartProps</span>
+</span></span><span style="display:flex;"><span>	}
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">chart</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">cdk8s</span>.<span style="color:#a6e22e">NewChart</span>(<span style="color:#a6e22e">scope</span>, <span style="color:#a6e22e">jsii</span>.<span style="color:#a6e22e">String</span>(<span style="color:#a6e22e">id</span>), <span style="color:#f92672">&amp;</span><span style="color:#a6e22e">cprops</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">NewWordpressStack</span>(<span style="color:#a6e22e">chart</span>, <span style="color:#a6e22e">jsii</span>.<span style="color:#a6e22e">String</span>(<span style="color:#e6db74">&#34;wordpress-stack&#34;</span>), <span style="color:#f92672">&amp;</span><span style="color:#a6e22e">WordpressProps</span>{
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">MySQLImage</span>:       <span style="color:#a6e22e">jsii</span>.<span style="color:#a6e22e">String</span>(<span style="color:#e6db74">&#34;mysql&#34;</span>),
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">MySQLPassword</span>:    <span style="color:#a6e22e">jsii</span>.<span style="color:#a6e22e">String</span>(<span style="color:#e6db74">&#34;Password123&#34;</span>),
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">MySQLStorage</span>:     <span style="color:#a6e22e">jsii</span>.<span style="color:#a6e22e">Number</span>(<span style="color:#ae81ff">3</span>),
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">WordpressImage</span>:   <span style="color:#a6e22e">jsii</span>.<span style="color:#a6e22e">String</span>(<span style="color:#e6db74">&#34;wordpress:4.8-apache&#34;</span>),
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">WordpressStorage</span>: <span style="color:#a6e22e">jsii</span>.<span style="color:#a6e22e">Number</span>(<span style="color:#ae81ff">2</span>)})
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">return</span> <span style="color:#a6e22e">chart</span>
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><h3 id="use-this-to-install-wordpress">Use this to install Wordpress</h3>
+<p><strong>To test it locally&hellip;</strong></p>
+<p>&hellip; you can use <a href="https://minikube.sigs.k8s.io/docs/start/">minikube</a>, <a href="https://kind.sigs.k8s.io/docs/user/quick-start/#installation">kind</a>, etc.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span><span style="color:#75715e"># make sure cluster is running</span>
+</span></span><span style="display:flex;"><span>minikube start
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>git clone https://github.com/abhirockzz/cdk8s-for-go-developers
+</span></span><span style="display:flex;"><span>cd part4-custom-construct
+</span></span></code></pre></div><p>Create manifest and inspect all the resources (see <code>dist</code> directory):</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>cdk8s synth
+</span></span></code></pre></div><p>To deploy them:</p>
+<pre tabindex="0"><code>kubectl apply -f dist/
+
+# output (might differ in your case)
+
+secret/mysql-pass created
+deployment.apps/mysql-mysql-deployment-cdk8splus-c83762d9 created
+persistentvolumeclaim/mysql-mysql-pvc-c8799bba created
+service/mysql-service created
+deployment.apps/wordpress-wordpress-deployment-cdk8splus-c8252da7 created
+service/wordpress-service created
+persistentvolumeclaim/wordpress-wordpress-pvc-c8334a29 created
+</code></pre><p>Check the Kubernetes <code>Service</code> (called <code>wordpress-service</code>) which exposes the wordpress <code>Deployment</code>.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>kubectl get svc wordpress-service
+</span></span></code></pre></div><p>If you&rsquo;re using <code>minikube</code>, in a different terminal run (if not already running):</p>
+<pre tabindex="0"><code>minikube tunnel
+</code></pre><p>Use your browser to navigate to http://localhost:80. You should see the familiar Wordpress installation screen.</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/z2npiok9mpye1bjcuq1n.png" alt="Image description"></p>
+<p>Go ahead, finish the installation and log into your Wordpress instance. Feel free to experiment with it.</p>
+<h2 id="conclusion">Conclusion</h2>
+<p><code>cdk8s</code> is a powerful tool itself but it also provides you the ability to extend and build other abstraction on top of it. You saw how to write a custom construct in <code>Go</code> and used it deploy Wordpress on Kubernetes. This can be further used as a foundation for other re-usable components.</p>
+<p>Happy coding!</p>
+
+
+        
+          <div class="blog-tags">
+            
+              <a href="https://abhirockzz.github.io//tags/golang/">golang</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/kubernetes/">kubernetes</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/infrastructure-as-code/">infrastructure-as-code</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/cdk8s/">cdk8s</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/cdk/">cdk</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/cncf/">cncf</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/tutorial/">tutorial</a>&nbsp;
+            
+          </div>
+        
+
+        
+
+        
+      </article>
+
+      
+        <ul class="pager blog-pager">
+          
+            <li class="previous">
+              <a href="https://abhirockzz.github.io/posts/url-shortener-dynamodb-lambda-go/" data-toggle="tooltip" data-placement="top" title="Build a Serverless URL shortener with Go">&larr; Previous Post</a>
+            </li>
+          
+          
+            <li class="next">
+              <a href="https://abhirockzz.github.io/posts/url-shortener-dynamodb-apprunner/" data-toggle="tooltip" data-placement="top" title="Use AWS App Runner, DynamoDB and CDK to deploy and run a Cloud native Go app">Next Post &rarr;</a>
+            </li>
+          
+        </ul>
+      
+
+
+      
+
+    </div>
+  </div>
+</div>
+
+    
+<footer>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+        <ul class="list-inline text-center footer-links">
+          
+          
+          <li>
+            <a href="" title="RSS">
+              <span class="fa-stack fa-lg">
+                <i class="fas fa-circle fa-stack-2x"></i>
+                <i class="fas fa-rss fa-stack-1x fa-inverse"></i>
+              </span>
+            </a>
+          </li>
+          
+        </ul>
+        <p class="credits copyright text-muted">
+          
+
+          &nbsp;&bull;&nbsp;&copy;
+          
+          2025
+          
+
+          
+          &nbsp;&bull;&nbsp;
+          <a href="https://abhirockzz.github.io/">Abhishek&#39;s blog</a>
+          
+        </p>
+        
+        <p class="credits theme-by text-muted">
+          <a href="https://gohugo.io">Hugo v0.145.0</a> powered &nbsp;&bull;&nbsp; Theme <a href="https://github.com/halogenica/beautifulhugo">Beautiful Hugo</a> adapted from <a href="https://deanattali.com/beautiful-jekyll/">Beautiful Jekyll</a>
+          
+        </p>
+      </div>
+    </div>
+  </div>
+</footer><script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.js"
+  integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/contrib/auto-render.min.js"
+  integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
+<script src="https://code.jquery.com/jquery-1.12.4.min.js"
+  integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"
+  integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+<script src="https://abhirockzz.github.io/%20js/main.js"></script><script> renderMathInElement(document.body); </script><script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.js"
+  integrity="sha384-QELNnmcmU8IR9ZAykt67vGr9/rZJdHbiWi64V88fCPaOohUlHCqUD/unNN0BXSqy" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe-ui-default.min.js"
+  integrity="sha384-m67o7SkQ1ALzKZIFh4CiTA8tmadaujiTa9Vu+nqPSwDOqHrDmxLezTdFln8077+q" crossorigin="anonymous"></script><script src="https://abhirockzz.github.io/%20js/load-photoswipe.js"></script>
+
+
+
+
+
+
+
+
+    
+  </body>
+</html>
+

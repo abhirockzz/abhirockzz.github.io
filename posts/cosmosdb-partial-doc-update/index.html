@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en" itemscope itemtype="http://schema.org/WebPage">
+  <head>
+    
+
+<meta charset="utf-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+
+<title>Now Generally Available – Partial Document Update in Azure Cosmos DB - Abhishek&#39;s blog</title>
+<meta name="description" content="Originally posted on https://devblogs.microsoft.com/cosmosdb/partial-document-update-ga/
+We’re excited to announce the general availability of partial document update for the Azure Cosmos DB Core (SQL) API, which was announced at Microsoft Ignite! This new feature makes it possible to perform path-level updates to specific fields/properties in a single document without needing to perform a full document read-replace operation. Partial document update is currently supported in Azure Cosmos DB .NET SDK, Java SDK, Node SDK, and stored procedures.
+Document updates – then and now
+To put things in context, here is a refresher on how one would typically use a document replace operation: Read the document, update it locally (client side) including any optimistic concurrency control (OCC) checks if necessary and, finally call the replace operation along with the updated document."><script type="application/ld+json">
+{
+    "@context": "http://schema.org",
+    "@type": "WebSite",
+    "name": "Abhishek\u0027s blog",
+    
+    "url": "https:\/\/abhirockzz.github.io\/"
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Organization",
+  "name": "",
+  "url": "https:\/\/abhirockzz.github.io\/"
+  
+  
+  
+  
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [{
+        "@type": "ListItem",
+        "position": 1,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io\/",
+          "name": "home"
+        }
+    },{
+        "@type": "ListItem",
+        "position": 3,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io\/posts\/cosmosdb-partial-doc-update\/",
+          "name": "Now generally available – partial document update in azure cosmos db"
+        }
+    }]
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Article",
+  "author": {
+    "name" : ""
+  },
+  "headline": "Now Generally Available – Partial Document Update in Azure Cosmos DB",
+  "description" : "Originally posted on https:\/\/devblogs.microsoft.com\/cosmosdb\/partial-document-update-ga\/\nWe’re excited to announce the general availability of partial document update for the Azure Cosmos DB Core (SQL) API, which was announced at Microsoft Ignite! This new feature makes it possible to perform path-level updates to specific fields\/properties in a single document without needing to perform a full document read-replace operation. Partial document update is currently supported in Azure Cosmos DB .NET SDK, Java SDK, Node SDK, and stored procedures.\nDocument updates – then and now To put things in context, here is a refresher on how one would typically use a document replace operation: Read the document, update it locally (client side) including any optimistic concurrency control (OCC) checks if necessary and, finally call the replace operation along with the updated document.\n",
+  "inLanguage" : "en",
+  "wordCount":  707 ,
+  "datePublished" : "2021-11-02T00:00:00",
+  "dateModified" : "2021-11-02T00:00:00",
+  "image" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+  "keywords" : [ "cosmosdb, azure, database, nosql" ],
+  "mainEntityOfPage" : "https:\/\/abhirockzz.github.io\/posts\/cosmosdb-partial-doc-update\/",
+  "publisher" : {
+    "@type": "Organization",
+    "name" : "https:\/\/abhirockzz.github.io\/",
+    "logo" : {
+        "@type" : "ImageObject",
+        "url" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+        "height" :  60 ,
+        "width" :  60
+    }
+  }
+}
+</script>
+
+<meta property="og:title" content="Now Generally Available – Partial Document Update in Azure Cosmos DB" />
+<meta property="og:description" content="Originally posted on https://devblogs.microsoft.com/cosmosdb/partial-document-update-ga/
+We’re excited to announce the general availability of partial document update for the Azure Cosmos DB Core (SQL) API, which was announced at Microsoft Ignite! This new feature makes it possible to perform path-level updates to specific fields/properties in a single document without needing to perform a full document read-replace operation. Partial document update is currently supported in Azure Cosmos DB .NET SDK, Java SDK, Node SDK, and stored procedures.
+Document updates – then and now
+To put things in context, here is a refresher on how one would typically use a document replace operation: Read the document, update it locally (client side) including any optimistic concurrency control (OCC) checks if necessary and, finally call the replace operation along with the updated document.">
+<meta property="og:image" content="https://abhirockzz.github.io/icon.jpg" />
+<meta property="og:url" content="https://abhirockzz.github.io/posts/cosmosdb-partial-doc-update/" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Abhishek&#39;s blog" />
+
+<meta name="twitter:title" content="Now Generally Available – Partial Document Update in Azure Cosmos DB" />
+<meta name="twitter:description" content="Originally posted on https://devblogs.microsoft.com/cosmosdb/partial-document-update-ga/
+We’re excited to announce the general availability of partial document update for the Azure Cosmos DB Core …">
+<meta name="twitter:image" content="https://abhirockzz.github.io/icon.jpg" />
+<meta name="twitter:card" content="summary" />
+<link href='https://abhirockzz.github.io/icons/myicon.png' rel='icon' type='image/x-icon' />
+<meta name="generator" content="Hugo 0.145.0">
+<link rel="alternate" href="https://abhirockzz.github.io/%20index.xml" type="application/rss+xml" title="Abhishek&#39;s blog"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css"
+  integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.5.0/css/all.css"
+  integrity="sha384-B4dIYHKNBt8Bc12p+WXckhzcICo0wtJAoU8YZTY5qE0Id1GSseTk6S+L3BlXeVIU" crossorigin="anonymous">
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+  integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous"><link rel="stylesheet" href="https://abhirockzz.github.io/%20css/main.css" /><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic" />
+<link rel="stylesheet"
+  href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800" /><link rel="stylesheet" href="https://abhirockzz.github.io/%20css/syntax.css" /><link rel="stylesheet" href="https://abhirockzz.github.io/%20css/codeblock.css" /><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.css"
+  integrity="sha384-h/L2W9KefUClHWaty3SLE5F/qvc4djlyR4qY3NUV5HGQBBW7stbcfff1+I/vmsHh" crossorigin="anonymous">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/default-skin/default-skin.min.css"
+  integrity="sha384-iD0dNku6PYSIQLyfTOpB06F2KCZJAKLOThS5HRe8b3ibhdEQ6eKsFf/EeFxdOt5R" crossorigin="anonymous">
+
+
+  </head>
+  <body>
+    <nav class="navbar navbar-default navbar-fixed-top navbar-custom">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#main-navbar">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="https://abhirockzz.github.io/">Abhishek&#39;s blog</a>
+    </div>
+
+    <div class="collapse navbar-collapse" id="main-navbar">
+      <ul class="nav navbar-nav navbar-right">
+        
+        
+        <li>
+          <a title="Blog" href="/">Blog</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="About" href="/about">About</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Open-Source" href="/projects">Open-Source</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Presentations" href="/presentations">Presentations</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Publications" href="/publications">Publications</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Tags" href="/tags">Tags</a>
+        </li>
+        
+        
+
+        
+        <li>
+          
+          
+          
+        </li>
+        
+
+        
+      </ul>
+    </div>
+
+    
+    <div class="avatar-container">
+      <div class="avatar-img-border">
+        <a title="Abhishek&#39;s blog" href="https://abhirockzz.github.io/">
+          <img class="avatar-img" src="https://abhirockzz.github.io/icon.jpg" alt="Abhishek&#39;s blog" />
+        </a>
+      </div>
+    </div>
+    
+
+  </div>
+</nav>
+
+
+
+    
+
+
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+<div class="pswp__bg"></div>
+
+<div class="pswp__scroll-wrap">
+    
+    <div class="pswp__container">
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+    </div>
+    
+    <div class="pswp__ui pswp__ui--hidden">
+    <div class="pswp__top-bar">
+      
+      <div class="pswp__counter"></div>
+      <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+      <button class="pswp__button pswp__button--share" title="Share"></button>
+      <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+      <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+      
+      
+      <div class="pswp__preloader">
+        <div class="pswp__preloader__icn">
+          <div class="pswp__preloader__cut">
+            <div class="pswp__preloader__donut"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+      <div class="pswp__share-tooltip"></div>
+    </div>
+    <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+    </button>
+    <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+    </button>
+    <div class="pswp__caption">
+      <div class="pswp__caption__center"></div>
+    </div>
+    </div>
+    </div>
+</div>
+
+
+  
+  
+  
+
+
+
+
+
+
+  
+
+  <header class="header-section ">
+    
+    <div class="intro-header no-img">
+      <div class="container">
+        <div class="row">
+          <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+            <div class="posts-heading">
+              
+                <h1>Now Generally Available – Partial Document Update in Azure Cosmos DB</h1>
+              
+              
+                <hr class="small">
+              
+              
+              
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+
+    
+<div class="container" role="main">
+  <div class="row">
+    <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+      <article role="main" class="blog-post">
+        <p><em>Originally posted on <a href="https://devblogs.microsoft.com/cosmosdb/partial-document-update-ga/">https://devblogs.microsoft.com/cosmosdb/partial-document-update-ga/</a></em></p>
+<p>We’re excited to announce the general availability of <a href="https://docs.microsoft.com/en-us/azure/cosmos-db/partial-document-update">partial document update</a> for the Azure Cosmos DB Core (SQL) API, which was announced at Microsoft Ignite! This new feature makes it possible to perform path-level updates to specific fields/properties in a single document without needing to perform a full document read-replace operation. Partial document update is currently supported in Azure Cosmos DB <a href="https://docs.microsoft.com/azure/cosmos-db/sql/sql-api-sdk-dotnet-standard">.NET SDK</a>, <a href="https://docs.microsoft.com/azure/cosmos-db/sql/sql-api-sdk-java-v4">Java SDK</a>, <a href="https://docs.microsoft.com/azure/cosmos-db/sql/sql-api-sdk-node">Node SDK</a>, and <a href="https://docs.microsoft.com/azure/cosmos-db/sql/how-to-write-stored-procedures-triggers-udfs?tabs=javascript">stored procedures</a>.</p>
+<h2 id="document-updates--then-and-now">Document updates – then and now</h2>
+<p>To put things in context, here is a refresher on how one would typically use a document replace operation: Read the document, update it locally (client side) including any <a href="https://docs.microsoft.com/azure/cosmos-db/sql/database-transactions-optimistic-concurrency#optimistic-concurrency-control">optimistic concurrency control</a> (OCC) checks if necessary and, finally call the replace operation along with the updated document.</p>
+<p>Here is a trimmed down example of how one would use partial document update (using the Java SDK):</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-java" data-lang="java"><span style="display:flex;"><span><span style="color:#75715e">//step 1</span>
+</span></span><span style="display:flex;"><span>UserInfo user <span style="color:#f92672">=</span> container.<span style="color:#a6e22e">readItem</span>(user.<span style="color:#a6e22e">getId</span>(), <span style="color:#66d9ef">new</span> PartitionKey(user.<span style="color:#a6e22e">getEmail</span>()), UserInfo.<span style="color:#a6e22e">class</span>); 
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">//step 2 </span>
+</span></span><span style="display:flex;"><span>CosmosPatchOperations patchOps <span style="color:#f92672">=</span> CosmosPatchOperations.<span style="color:#a6e22e">create</span>().<span style="color:#a6e22e">add</span>(<span style="color:#e6db74">&#34;/phone/2&#34;</span>,12345).<span style="color:#a6e22e">set</span>(<span style="color:#e6db74">&#34;/address&#34;</span>,<span style="color:#e6db74">&#34;123 Foobar&#34;</span>); 
+</span></span><span style="display:flex;"><span> 
+</span></span><span style="display:flex;"><span><span style="color:#75715e">//step 3 </span>
+</span></span><span style="display:flex;"><span>container.<span style="color:#a6e22e">patchItem</span>(user.<span style="color:#a6e22e">getId</span>(), <span style="color:#66d9ef">new</span> PartitionKey(user.<span style="color:#a6e22e">getEmail</span>()), patchOps, reqOps, UserInfo.<span style="color:#a6e22e">class</span>);
+</span></span></code></pre></div><ul>
+<li>Read the document (this is the same as replace) with readItem method.</li>
+<li>Define the updates you want to make (in form of a CosmosPatchOperations object – in this case we add a phone number (an array) and set the address to a different one.</li>
+<li>Invoke the patchItem method.</li>
+</ul>
+<h2 id="benefits-of-partial-document-update">Benefits of partial document update</h2>
+<p>When compared with the replace operation, the overhead of serializing the entire document is eliminated since the client application only needs to deal with properties to be updated (phone and address in this example). This becomes significant when your application makes frequent updates to only a few properties in your documents, such as incrementing counters, toggling true/false flags or similar types of changes.</p>
+<p>Not having to send the entire document over the wire impacts overall application performance – reduced network bandwidth usage, lower end-to end-latency and savings of CPU cycles on the Azure Cosmos DB SDK client hosts.</p>
+<p>Some of the other developer productivity benefits that are a by-product of the flexible programming model enabled by partial document update:</p>
+<ul>
+<li>Combining multiple operations: Partial document update supports different types of operations (see next section). Depending on your requirements, you can combine multiple such operations as part of a single invocation as opposed to incurring cost of round trips for separate operation type.</li>
+<li>Conditional update: If you want the partial update to depend on a pre-condition, you can define it using a SQL-like filter predicate (for example, from c where c.taskNum = 3). The partial update operation will fail if the pre-condition specified in the predicate is not satisfied.</li>
+<li>Transactions support: Partial document update works in the context of a <a href="https://docs.microsoft.com/en-us/azure/cosmos-db/sql/transactional-batch">Transactional batch</a> as well. This means that multiple documents within the same partition key can be patched (partially updated) as part of a transaction (along with other operations such as create). The transaction will be committed only if all the operations succeed. If any operation fails, the entire transaction is rolled back.</li>
+<li>Transparent conflict resolution: If your Azure Cosmos DB account is configured with multiple write regions, <a href="https://docs.microsoft.com/azure/cosmos-db/conflict-resolution-policies">conflicts and respective resolution policies</a> are applicable at the document level (with Last Write Wins being the default conflict resolution policy). This works differently in case of partial document updates – conflicts that occur due to concurrent patch operations to the same document across multiple regions will be detected and resolved at the path-level. This means that as long as you’re updating different properties (paths) in the same document, they will be merged successfully.</li>
+</ul>
+<h2 id="partial-document-update-operations">Partial document update operations</h2>
+<p>Although Partial document update is a top-level operation (just like Replace), it supports sub-operations (the code snippet above used add and set). You can <a href="https://docs.microsoft.com/azure/cosmos-db/partial-document-update#supported-operations">refer to the documentation</a> for details, but here is a summary:</p>
+<ul>
+<li>Add: Creates a new element (if it does not already exist).</li>
+<li>Set: Updates an element (creates one if it does not already exist).</li>
+<li>Replace: Updates an element only if it already exists.</li>
+<li>Remove: Deletes an existing element.</li>
+<li>Increment: Increases/decreases by specified value (use negative value to decrease).</li>
+</ul>
+<h2 id="learn-more">Learn more</h2>
+<p>Find out more about Azure Cosmos DB partial document update:</p>
+<ul>
+<li><a href="https://docs.microsoft.com/azure/cosmos-db/partial-document-update">Read the concepts</a></li>
+<li><a href="https://docs.microsoft.com/azure/cosmos-db/partial-document-update-getting-started">Code samples</a> to get you started</li>
+<li>Add/Set/Replace operations – <a href="https://docs.microsoft.com/azure/cosmos-db/partial-document-update#similarities-and-differences">how are they similar, yet different</a></li>
+<li><a href="https://docs.microsoft.com/azure/cosmos-db/partial-document-update-faq">Frequently asked questions</a></li>
+</ul>
+<p><a href="https://azure.microsoft.com/services/cosmos-db/#overview">Get started free</a> with Azure Cosmos DB.</p>
+
+
+        
+          <div class="blog-tags">
+            
+              <a href="https://abhirockzz.github.io//tags/cosmosdb/">cosmosdb</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/azure/">azure</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/database/">database</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/nosql/">nosql</a>&nbsp;
+            
+          </div>
+        
+
+        
+
+        
+      </article>
+
+      
+        <ul class="pager blog-pager">
+          
+            <li class="previous">
+              <a href="https://abhirockzz.github.io/posts/iot-cosmosdb-confluent/" data-toggle="tooltip" data-placement="top" title="Extracting Value from IoT Using Azure Cosmos DB, Azure Synapse Analytics, and Confluent Cloud">&larr; Previous Post</a>
+            </li>
+          
+          
+            <li class="next">
+              <a href="https://abhirockzz.github.io/posts/lambda-function-url-awsome-slack-backend/" data-toggle="tooltip" data-placement="top" title="Using AWS Lambda Function URL to build a Serverless backend for Slack">Next Post &rarr;</a>
+            </li>
+          
+        </ul>
+      
+
+
+      
+
+    </div>
+  </div>
+</div>
+
+    
+<footer>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+        <ul class="list-inline text-center footer-links">
+          
+          
+          <li>
+            <a href="" title="RSS">
+              <span class="fa-stack fa-lg">
+                <i class="fas fa-circle fa-stack-2x"></i>
+                <i class="fas fa-rss fa-stack-1x fa-inverse"></i>
+              </span>
+            </a>
+          </li>
+          
+        </ul>
+        <p class="credits copyright text-muted">
+          
+
+          &nbsp;&bull;&nbsp;&copy;
+          
+          2025
+          
+
+          
+          &nbsp;&bull;&nbsp;
+          <a href="https://abhirockzz.github.io/">Abhishek&#39;s blog</a>
+          
+        </p>
+        
+        <p class="credits theme-by text-muted">
+          <a href="https://gohugo.io">Hugo v0.145.0</a> powered &nbsp;&bull;&nbsp; Theme <a href="https://github.com/halogenica/beautifulhugo">Beautiful Hugo</a> adapted from <a href="https://deanattali.com/beautiful-jekyll/">Beautiful Jekyll</a>
+          
+        </p>
+      </div>
+    </div>
+  </div>
+</footer><script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.js"
+  integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/contrib/auto-render.min.js"
+  integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
+<script src="https://code.jquery.com/jquery-1.12.4.min.js"
+  integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"
+  integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+<script src="https://abhirockzz.github.io/%20js/main.js"></script><script> renderMathInElement(document.body); </script><script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.js"
+  integrity="sha384-QELNnmcmU8IR9ZAykt67vGr9/rZJdHbiWi64V88fCPaOohUlHCqUD/unNN0BXSqy" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe-ui-default.min.js"
+  integrity="sha384-m67o7SkQ1ALzKZIFh4CiTA8tmadaujiTa9Vu+nqPSwDOqHrDmxLezTdFln8077+q" crossorigin="anonymous"></script><script src="https://abhirockzz.github.io/%20js/load-photoswipe.js"></script>
+
+
+
+
+
+
+
+
+    
+  </body>
+</html>
+

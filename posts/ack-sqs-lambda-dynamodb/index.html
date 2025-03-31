@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en" itemscope itemtype="http://schema.org/WebPage">
+  <head>
+    
+
+<meta charset="utf-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+
+<title>Use AWS Controllers for Kubernetes to deploy a Serverless data processing solution with SQS, Lambda and DynamoDB - Abhishek&#39;s blog</title>
+<meta name="description" content="In this blog post, you will be using AWS Controllers for Kubernetes on an Amazon EKS cluster to put together a solution wherein data from an Amazon SQS queue is processed by an AWS Lambda function and persisted to a DynamoDB table.
+
+AWS Controllers for Kubernetes (also known as ACK) leverage Kubernetes Custom Resource and Custom Resource Definitions and give you the ability to manage and use AWS services directly from Kubernetes without needing to define resources outside of the cluster. The idea behind ACK is to enable Kubernetes users to describe the desired state of AWS resources using the Kubernetes API and configuration language. ACK will then take care of provisioning and managing the AWS resources to match the desired state. This is achieved by using Service controllers that are responsible for managing the lifecycle of a particular AWS service. Each ACK service controller is packaged into a separate container image that is published in a public repository corresponding to an individual ACK service controller."><script type="application/ld+json">
+{
+    "@context": "http://schema.org",
+    "@type": "WebSite",
+    "name": "Abhishek\u0027s blog",
+    
+    "url": "https:\/\/abhirockzz.github.io\/"
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Organization",
+  "name": "",
+  "url": "https:\/\/abhirockzz.github.io\/"
+  
+  
+  
+  
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [{
+        "@type": "ListItem",
+        "position": 1,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io\/",
+          "name": "home"
+        }
+    },{
+        "@type": "ListItem",
+        "position": 3,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io\/posts\/ack-sqs-lambda-dynamodb\/",
+          "name": "Use aws controllers for kubernetes to deploy a serverless data processing solution with sqs, lambda and dynamo db"
+        }
+    }]
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Article",
+  "author": {
+    "name" : ""
+  },
+  "headline": "Use AWS Controllers for Kubernetes to deploy a Serverless data processing solution with SQS, Lambda and DynamoDB",
+  "description" : "In this blog post, you will be using AWS Controllers for Kubernetes on an Amazon EKS cluster to put together a solution wherein data from an Amazon SQS queue is processed by an AWS Lambda function and persisted to a DynamoDB table.\nAWS Controllers for Kubernetes (also known as ACK) leverage Kubernetes Custom Resource and Custom Resource Definitions and give you the ability to manage and use AWS services directly from Kubernetes without needing to define resources outside of the cluster. The idea behind ACK is to enable Kubernetes users to describe the desired state of AWS resources using the Kubernetes API and configuration language. ACK will then take care of provisioning and managing the AWS resources to match the desired state. This is achieved by using Service controllers that are responsible for managing the lifecycle of a particular AWS service. Each ACK service controller is packaged into a separate container image that is published in a public repository corresponding to an individual ACK service controller.\n",
+  "inLanguage" : "en",
+  "wordCount":  1966 ,
+  "datePublished" : "2023-03-20T00:00:00",
+  "dateModified" : "2023-03-20T00:00:00",
+  "image" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+  "keywords" : [ "go, aws, kubernetes, sqs, lambda, dynamodb" ],
+  "mainEntityOfPage" : "https:\/\/abhirockzz.github.io\/posts\/ack-sqs-lambda-dynamodb\/",
+  "publisher" : {
+    "@type": "Organization",
+    "name" : "https:\/\/abhirockzz.github.io\/",
+    "logo" : {
+        "@type" : "ImageObject",
+        "url" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+        "height" :  60 ,
+        "width" :  60
+    }
+  }
+}
+</script>
+
+<meta property="og:title" content="Use AWS Controllers for Kubernetes to deploy a Serverless data processing solution with SQS, Lambda and DynamoDB" />
+<meta property="og:description" content="In this blog post, you will be using AWS Controllers for Kubernetes on an Amazon EKS cluster to put together a solution wherein data from an Amazon SQS queue is processed by an AWS Lambda function and persisted to a DynamoDB table.
+
+AWS Controllers for Kubernetes (also known as ACK) leverage Kubernetes Custom Resource and Custom Resource Definitions and give you the ability to manage and use AWS services directly from Kubernetes without needing to define resources outside of the cluster. The idea behind ACK is to enable Kubernetes users to describe the desired state of AWS resources using the Kubernetes API and configuration language. ACK will then take care of provisioning and managing the AWS resources to match the desired state. This is achieved by using Service controllers that are responsible for managing the lifecycle of a particular AWS service. Each ACK service controller is packaged into a separate container image that is published in a public repository corresponding to an individual ACK service controller.">
+<meta property="og:image" content="https://abhirockzz.github.io/icon.jpg" />
+<meta property="og:url" content="https://abhirockzz.github.io/posts/ack-sqs-lambda-dynamodb/" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Abhishek&#39;s blog" />
+
+<meta name="twitter:title" content="Use AWS Controllers for Kubernetes to deploy a Serverless data …" />
+<meta name="twitter:description" content="In this blog post, you will be using AWS Controllers for Kubernetes on an Amazon EKS cluster to put together a solution wherein data from an Amazon SQS queue is processed by an AWS Lambda function and …">
+<meta name="twitter:image" content="https://abhirockzz.github.io/icon.jpg" />
+<meta name="twitter:card" content="summary" />
+<link href='https://abhirockzz.github.io/icons/myicon.png' rel='icon' type='image/x-icon' />
+<meta name="generator" content="Hugo 0.145.0">
+<link rel="alternate" href="https://abhirockzz.github.io/%20index.xml" type="application/rss+xml" title="Abhishek&#39;s blog"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css"
+  integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.5.0/css/all.css"
+  integrity="sha384-B4dIYHKNBt8Bc12p+WXckhzcICo0wtJAoU8YZTY5qE0Id1GSseTk6S+L3BlXeVIU" crossorigin="anonymous">
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+  integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous"><link rel="stylesheet" href="https://abhirockzz.github.io/%20css/main.css" /><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic" />
+<link rel="stylesheet"
+  href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800" /><link rel="stylesheet" href="https://abhirockzz.github.io/%20css/syntax.css" /><link rel="stylesheet" href="https://abhirockzz.github.io/%20css/codeblock.css" /><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.css"
+  integrity="sha384-h/L2W9KefUClHWaty3SLE5F/qvc4djlyR4qY3NUV5HGQBBW7stbcfff1+I/vmsHh" crossorigin="anonymous">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/default-skin/default-skin.min.css"
+  integrity="sha384-iD0dNku6PYSIQLyfTOpB06F2KCZJAKLOThS5HRe8b3ibhdEQ6eKsFf/EeFxdOt5R" crossorigin="anonymous">
+
+
+  </head>
+  <body>
+    <nav class="navbar navbar-default navbar-fixed-top navbar-custom">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#main-navbar">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="https://abhirockzz.github.io/">Abhishek&#39;s blog</a>
+    </div>
+
+    <div class="collapse navbar-collapse" id="main-navbar">
+      <ul class="nav navbar-nav navbar-right">
+        
+        
+        <li>
+          <a title="Blog" href="/">Blog</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="About" href="/about">About</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Open-Source" href="/projects">Open-Source</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Presentations" href="/presentations">Presentations</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Publications" href="/publications">Publications</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Tags" href="/tags">Tags</a>
+        </li>
+        
+        
+
+        
+        <li>
+          
+          
+          
+        </li>
+        
+
+        
+      </ul>
+    </div>
+
+    
+    <div class="avatar-container">
+      <div class="avatar-img-border">
+        <a title="Abhishek&#39;s blog" href="https://abhirockzz.github.io/">
+          <img class="avatar-img" src="https://abhirockzz.github.io/icon.jpg" alt="Abhishek&#39;s blog" />
+        </a>
+      </div>
+    </div>
+    
+
+  </div>
+</nav>
+
+
+
+    
+
+
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+<div class="pswp__bg"></div>
+
+<div class="pswp__scroll-wrap">
+    
+    <div class="pswp__container">
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+    </div>
+    
+    <div class="pswp__ui pswp__ui--hidden">
+    <div class="pswp__top-bar">
+      
+      <div class="pswp__counter"></div>
+      <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+      <button class="pswp__button pswp__button--share" title="Share"></button>
+      <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+      <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+      
+      
+      <div class="pswp__preloader">
+        <div class="pswp__preloader__icn">
+          <div class="pswp__preloader__cut">
+            <div class="pswp__preloader__donut"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+      <div class="pswp__share-tooltip"></div>
+    </div>
+    <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+    </button>
+    <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+    </button>
+    <div class="pswp__caption">
+      <div class="pswp__caption__center"></div>
+    </div>
+    </div>
+    </div>
+</div>
+
+
+  
+  
+  
+
+
+
+
+
+
+  
+
+  <header class="header-section ">
+    
+    <div class="intro-header no-img">
+      <div class="container">
+        <div class="row">
+          <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+            <div class="posts-heading">
+              
+                <h1>Use AWS Controllers for Kubernetes to deploy a Serverless data processing solution with SQS, Lambda and DynamoDB</h1>
+              
+              
+                <hr class="small">
+              
+              
+              
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+
+    
+<div class="container" role="main">
+  <div class="row">
+    <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+      <article role="main" class="blog-post">
+        <p>In this blog post, you will be using <a href="https://aws-controllers-k8s.github.io/community/docs/community/overview/">AWS Controllers for Kubernetes</a> on an Amazon EKS cluster to put together a solution wherein data from an <a href="https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-queue-types.html">Amazon SQS queue</a> is processed by an AWS <a href="https://docs.aws.amazon.com/lambda/latest/dg/welcome.html">Lambda function</a> and persisted to a <a href="https://docs.aws.amazon.com/dynamodb/index.html">DynamoDB</a> table.</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/b2gq6nd1laz1akl9yiod.png" alt="Image description"></p>
+<p>AWS Controllers for Kubernetes (also known as <strong>ACK</strong>) leverage <a href="https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/#custom-resources">Kubernetes Custom Resource and Custom Resource Definitions</a> and give you the ability to manage and use AWS services directly from Kubernetes without needing to define resources outside of the cluster. The idea behind <code>ACK</code> is to enable Kubernetes users to describe the desired state of AWS resources using the Kubernetes API and configuration language. <code>ACK</code> will then take care of provisioning and managing the AWS resources to match the desired state. This is achieved by using Service controllers that are responsible for managing the lifecycle of a particular AWS service. Each <code>ACK</code> service controller is packaged into a separate container image that is published in a public repository corresponding to an individual <code>ACK</code> service controller.</p>
+<p>There is no single ACK container image. Instead, there are container images for each individual ACK service controller that manages resources for a particular AWS API.</p>
+<p><em>This blog post will walk you through how to use the SQS, DynamoDB and Lambda service controllers for ACK.</em></p>
+<h2 id="prerequisites">Prerequisites</h2>
+<p>To follow along step-by-step, in addition to an AWS account, you will need to have <a href="https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html">AWS CLI</a>, <a href="https://kubernetes.io/docs/tasks/tools/#kubectl">kubectl</a> and <a href="https://helm.sh/docs/intro/install/">helm</a> installed.</p>
+<p>There are a variety of ways in which you can create an <a href="https://docs.aws.amazon.com/eks/latest/userguide/create-cluster.html">Amazon EKS cluster</a>. I prefer using <a href="https://eksctl.io/">eksctl</a> CLI because of the convenience it offers. Creating an an EKS cluster using <code>eksctl</code>, can be as easy as this:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>eksctl create cluster --name my-cluster --region region-code
+</span></span></code></pre></div><p>For details, refer to the <a href="https://docs.aws.amazon.com/eks/latest/userguide/getting-started-eksctl.html">Getting started with Amazon EKS – eksctl</a>.</p>
+<p>Clone this GitHub repository and change to the right directory:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>git clone https://github.com/abhirockzz/k8s-ack-sqs-lambda
+</span></span><span style="display:flex;"><span>cd k8s-ack-sqs-lambda
+</span></span></code></pre></div><p>Ok let&rsquo;s get started!</p>
+<h2 id="setup-the-ack-service-controllers-for-aws-lambda-sqs-and-dynamodb">Setup the ACK service controllers for AWS Lambda, SQS and DynamoDB</h2>
+<h3 id="install-ack-controllers">Install ACK controllers</h3>
+<p>Log into the Helm registry that stores the ACK charts:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>aws ecr-public get-login-password --region us-east-1 | helm registry login --username AWS --password-stdin public.ecr.aws
+</span></span></code></pre></div><p>Deploy the ACK service controller for Amazon Lambda using the <code>lambda-chart</code> Helm chart:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>RELEASE_VERSION_LAMBDA_ACK<span style="color:#f92672">=</span><span style="color:#66d9ef">$(</span>curl -sL <span style="color:#e6db74">&#34;https://api.github.com/repos/aws-controllers-k8s/lambda-controller/releases/latest&#34;</span> | grep <span style="color:#e6db74">&#39;&#34;tag_name&#34;:&#39;</span> | cut -d<span style="color:#e6db74">&#39;&#34;&#39;</span> -f4<span style="color:#66d9ef">)</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>helm install --create-namespace -n ack-system oci://public.ecr.aws/aws-controllers-k8s/lambda-chart <span style="color:#e6db74">&#34;--version=</span><span style="color:#e6db74">${</span>RELEASE_VERSION_LAMBDA_ACK<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span> --generate-name --set<span style="color:#f92672">=</span>aws.region<span style="color:#f92672">=</span>us-east-1
+</span></span></code></pre></div><p>Deploy the ACK service controller for SQS using the <code>sqs-chart</code> Helm chart:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>RELEASE_VERSION_SQS_ACK<span style="color:#f92672">=</span><span style="color:#66d9ef">$(</span>curl -sL <span style="color:#e6db74">&#34;https://api.github.com/repos/aws-controllers-k8s/sqs-controller/releases/latest&#34;</span> | grep <span style="color:#e6db74">&#39;&#34;tag_name&#34;:&#39;</span> | cut -d<span style="color:#e6db74">&#39;&#34;&#39;</span> -f4<span style="color:#66d9ef">)</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>helm install --create-namespace -n ack-system oci://public.ecr.aws/aws-controllers-k8s/sqs-chart <span style="color:#e6db74">&#34;--version=</span><span style="color:#e6db74">${</span>RELEASE_VERSION_SQS_ACK<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span> --generate-name --set<span style="color:#f92672">=</span>aws.region<span style="color:#f92672">=</span>us-east-1
+</span></span></code></pre></div><p>Deploy the ACK service controller for DynamoDB using the <code>dynamodb-chart</code> Helm chart:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>RELEASE_VERSION_DYNAMODB_ACK<span style="color:#f92672">=</span><span style="color:#66d9ef">$(</span>curl -sL <span style="color:#e6db74">&#34;https://api.github.com/repos/aws-controllers-k8s/dynamodb-controller/releases/latest&#34;</span> | grep <span style="color:#e6db74">&#39;&#34;tag_name&#34;:&#39;</span> | cut -d<span style="color:#e6db74">&#39;&#34;&#39;</span> -f4<span style="color:#66d9ef">)</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>helm install --create-namespace -n ack-system oci://public.ecr.aws/aws-controllers-k8s/dynamodb-chart <span style="color:#e6db74">&#34;--version=</span><span style="color:#e6db74">${</span>RELEASE_VERSION_DYNAMODB_ACK<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span> --generate-name --set<span style="color:#f92672">=</span>aws.region<span style="color:#f92672">=</span>us-east-1
+</span></span></code></pre></div><p>Now, it&rsquo;s time to configure the IAM permissions for the controller to invoke Lambda, DynamoDB and SQS.</p>
+<h3 id="configure-iam-permissions">Configure IAM permissions</h3>
+<p><strong>Create an OIDC identity provider for your cluster</strong></p>
+<blockquote>
+<p>For the below steps, replace the <code>EKS_CLUSTER_NAME</code> and <code>AWS_REGION</code> variables with your cluster name and region.</p></blockquote>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>export EKS_CLUSTER_NAME<span style="color:#f92672">=</span>demo-eks-cluster	
+</span></span><span style="display:flex;"><span>export AWS_REGION<span style="color:#f92672">=</span>us-east-1
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>eksctl utils associate-iam-oidc-provider --cluster $EKS_CLUSTER_NAME --region $AWS_REGION --approve
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>OIDC_PROVIDER<span style="color:#f92672">=</span><span style="color:#66d9ef">$(</span>aws eks describe-cluster --name $EKS_CLUSTER_NAME --query <span style="color:#e6db74">&#34;cluster.identity.oidc.issuer&#34;</span> --output text | cut -d <span style="color:#e6db74">&#39;/&#39;</span> -f2- | cut -d <span style="color:#e6db74">&#39;/&#39;</span> -f2-<span style="color:#66d9ef">)</span>
+</span></span></code></pre></div><h3 id="create-iam-roles-for-lambda-sqs-and-dynamodb-ack-service-controllers">Create IAM roles for Lambda, SQS and DynamoDB ACK service controllers</h3>
+<p><strong>ACK Lambda controller</strong></p>
+<p>Set the following environment variables:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>ACK_K8S_SERVICE_ACCOUNT_NAME<span style="color:#f92672">=</span>ack-lambda-controller
+</span></span><span style="display:flex;"><span>ACK_K8S_NAMESPACE<span style="color:#f92672">=</span>ack-system
+</span></span><span style="display:flex;"><span>AWS_ACCOUNT_ID<span style="color:#f92672">=</span><span style="color:#66d9ef">$(</span>aws sts get-caller-identity --query <span style="color:#e6db74">&#34;Account&#34;</span> --output text<span style="color:#66d9ef">)</span>
+</span></span></code></pre></div><p>Create the trust policy for the IAM role:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>read -r -d <span style="color:#e6db74">&#39;&#39;</span> TRUST_RELATIONSHIP <span style="color:#e6db74">&lt;&lt;EOF
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">{
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">  &#34;Version&#34;: &#34;2012-10-17&#34;,
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">  &#34;Statement&#34;: [
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    {
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">      &#34;Effect&#34;: &#34;Allow&#34;,
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">      &#34;Principal&#34;: {
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">        &#34;Federated&#34;: &#34;arn:aws:iam::${AWS_ACCOUNT_ID}:oidc-provider/${OIDC_PROVIDER}&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">      },
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">      &#34;Action&#34;: &#34;sts:AssumeRoleWithWebIdentity&#34;,
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">      &#34;Condition&#34;: {
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">        &#34;StringEquals&#34;: {
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">          &#34;${OIDC_PROVIDER}:sub&#34;: &#34;system:serviceaccount:${ACK_K8S_NAMESPACE}:${ACK_K8S_SERVICE_ACCOUNT_NAME}&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">        }
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">      }
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    }
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">  ]
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">}
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">EOF</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>echo <span style="color:#e6db74">&#34;</span><span style="color:#e6db74">${</span>TRUST_RELATIONSHIP<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span> &gt; trust_lambda.json
+</span></span></code></pre></div><p>Create the IAM role:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>ACK_CONTROLLER_IAM_ROLE<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;ack-lambda-controller&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>ACK_CONTROLLER_IAM_ROLE_DESCRIPTION<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;IRSA role for ACK lambda controller deployment on EKS cluster using Helm charts&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>aws iam create-role --role-name <span style="color:#e6db74">&#34;</span><span style="color:#e6db74">${</span>ACK_CONTROLLER_IAM_ROLE<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span> --assume-role-policy-document file://trust_lambda.json --description <span style="color:#e6db74">&#34;</span><span style="color:#e6db74">${</span>ACK_CONTROLLER_IAM_ROLE_DESCRIPTION<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span>
+</span></span></code></pre></div><p>Attach IAM policy to the IAM role:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span><span style="color:#75715e"># we are getting the policy directly from the ACK repo</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>INLINE_POLICY<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;</span><span style="color:#66d9ef">$(</span>curl https://raw.githubusercontent.com/aws-controllers-k8s/lambda-controller/main/config/iam/recommended-inline-policy<span style="color:#66d9ef">)</span><span style="color:#e6db74">&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>aws iam put-role-policy <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>        --role-name <span style="color:#e6db74">&#34;</span><span style="color:#e6db74">${</span>ACK_CONTROLLER_IAM_ROLE<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span> <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>        --policy-name <span style="color:#e6db74">&#34;ack-recommended-policy&#34;</span> <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>        --policy-document <span style="color:#e6db74">&#34;</span><span style="color:#e6db74">${</span>INLINE_POLICY<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span>
+</span></span></code></pre></div><p>Attach ECR permissions to the controller IAM role - these are required since Lambda functions will be pulling images from ECR.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>aws iam put-role-policy <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>        --role-name <span style="color:#e6db74">&#34;</span><span style="color:#e6db74">${</span>ACK_CONTROLLER_IAM_ROLE<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span> <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>        --policy-name <span style="color:#e6db74">&#34;ecr-permissions&#34;</span> <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>        --policy-document file://ecr-permissions.json
+</span></span></code></pre></div><p>Associate the IAM role to a Kubernetes service account:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>ACK_CONTROLLER_IAM_ROLE_ARN<span style="color:#f92672">=</span><span style="color:#66d9ef">$(</span>aws iam get-role --role-name<span style="color:#f92672">=</span>$ACK_CONTROLLER_IAM_ROLE --query Role.Arn --output text<span style="color:#66d9ef">)</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>export IRSA_ROLE_ARN<span style="color:#f92672">=</span>eks.amazonaws.com/role-arn<span style="color:#f92672">=</span>$ACK_CONTROLLER_IAM_ROLE_ARN
+</span></span><span style="display:flex;"><span>kubectl annotate serviceaccount -n $ACK_K8S_NAMESPACE $ACK_K8S_SERVICE_ACCOUNT_NAME $IRSA_ROLE_ARN
+</span></span></code></pre></div><p>Repeat the steps for the SQS controller.</p>
+<p><strong>ACK SQS controller</strong></p>
+<p>Set the following environment variables:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>ACK_K8S_SERVICE_ACCOUNT_NAME<span style="color:#f92672">=</span>ack-sqs-controller
+</span></span><span style="display:flex;"><span>ACK_K8S_NAMESPACE<span style="color:#f92672">=</span>ack-system
+</span></span><span style="display:flex;"><span>AWS_ACCOUNT_ID<span style="color:#f92672">=</span><span style="color:#66d9ef">$(</span>aws sts get-caller-identity --query <span style="color:#e6db74">&#34;Account&#34;</span> --output text<span style="color:#66d9ef">)</span>
+</span></span></code></pre></div><p>Create the trust policy for the IAM role:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>read -r -d <span style="color:#e6db74">&#39;&#39;</span> TRUST_RELATIONSHIP <span style="color:#e6db74">&lt;&lt;EOF
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">{
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">  &#34;Version&#34;: &#34;2012-10-17&#34;,
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">  &#34;Statement&#34;: [
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    {
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">      &#34;Effect&#34;: &#34;Allow&#34;,
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">      &#34;Principal&#34;: {
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">        &#34;Federated&#34;: &#34;arn:aws:iam::${AWS_ACCOUNT_ID}:oidc-provider/${OIDC_PROVIDER}&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">      },
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">      &#34;Action&#34;: &#34;sts:AssumeRoleWithWebIdentity&#34;,
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">      &#34;Condition&#34;: {
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">        &#34;StringEquals&#34;: {
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">          &#34;${OIDC_PROVIDER}:sub&#34;: &#34;system:serviceaccount:${ACK_K8S_NAMESPACE}:${ACK_K8S_SERVICE_ACCOUNT_NAME}&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">        }
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">      }
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    }
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">  ]
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">}
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">EOF</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>echo <span style="color:#e6db74">&#34;</span><span style="color:#e6db74">${</span>TRUST_RELATIONSHIP<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span> &gt; trust_sqs.json
+</span></span></code></pre></div><p>Create the IAM role:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>ACK_CONTROLLER_IAM_ROLE<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;ack-sqs-controller&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>ACK_CONTROLLER_IAM_ROLE_DESCRIPTION<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;IRSA role for ACK sqs controller deployment on EKS cluster using Helm charts&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>aws iam create-role --role-name <span style="color:#e6db74">&#34;</span><span style="color:#e6db74">${</span>ACK_CONTROLLER_IAM_ROLE<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span> --assume-role-policy-document file://trust_sqs.json --description <span style="color:#e6db74">&#34;</span><span style="color:#e6db74">${</span>ACK_CONTROLLER_IAM_ROLE_DESCRIPTION<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span>
+</span></span></code></pre></div><p>Attach IAM policy to the IAM role:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span><span style="color:#75715e"># for sqs controller, we use the managed policy ARN instead of the inline policy (unlike the Lambda controller)</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>POLICY_ARN<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;</span><span style="color:#66d9ef">$(</span>curl https://raw.githubusercontent.com/aws-controllers-k8s/sqs-controller/main/config/iam/recommended-policy-arn<span style="color:#66d9ef">)</span><span style="color:#e6db74">&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>aws iam attach-role-policy --role-name <span style="color:#e6db74">&#34;</span><span style="color:#e6db74">${</span>ACK_CONTROLLER_IAM_ROLE<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span> --policy-arn <span style="color:#e6db74">&#34;</span><span style="color:#e6db74">${</span>POLICY_ARN<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span>
+</span></span></code></pre></div><p>Associate the IAM role to a Kubernetes service account:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>ACK_CONTROLLER_IAM_ROLE_ARN<span style="color:#f92672">=</span><span style="color:#66d9ef">$(</span>aws iam get-role --role-name<span style="color:#f92672">=</span>$ACK_CONTROLLER_IAM_ROLE --query Role.Arn --output text<span style="color:#66d9ef">)</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>export IRSA_ROLE_ARN<span style="color:#f92672">=</span>eks.amazonaws.com/role-arn<span style="color:#f92672">=</span>$ACK_CONTROLLER_IAM_ROLE_ARN
+</span></span><span style="display:flex;"><span>kubectl annotate serviceaccount -n $ACK_K8S_NAMESPACE $ACK_K8S_SERVICE_ACCOUNT_NAME $IRSA_ROLE_ARN
+</span></span></code></pre></div><p>Repeat the steps for the DynamoDB controller.</p>
+<p><strong>ACK DynamoDB controller</strong></p>
+<p>Set the following environment variables:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>ACK_K8S_SERVICE_ACCOUNT_NAME<span style="color:#f92672">=</span>ack-dynamodb-controller
+</span></span><span style="display:flex;"><span>ACK_K8S_NAMESPACE<span style="color:#f92672">=</span>ack-system
+</span></span><span style="display:flex;"><span>AWS_ACCOUNT_ID<span style="color:#f92672">=</span><span style="color:#66d9ef">$(</span>aws sts get-caller-identity --query <span style="color:#e6db74">&#34;Account&#34;</span> --output text<span style="color:#66d9ef">)</span>
+</span></span></code></pre></div><p>Create the trust policy for the IAM role:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>read -r -d <span style="color:#e6db74">&#39;&#39;</span> TRUST_RELATIONSHIP <span style="color:#e6db74">&lt;&lt;EOF
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">{
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">  &#34;Version&#34;: &#34;2012-10-17&#34;,
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">  &#34;Statement&#34;: [
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    {
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">      &#34;Effect&#34;: &#34;Allow&#34;,
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">      &#34;Principal&#34;: {
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">        &#34;Federated&#34;: &#34;arn:aws:iam::${AWS_ACCOUNT_ID}:oidc-provider/${OIDC_PROVIDER}&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">      },
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">      &#34;Action&#34;: &#34;sts:AssumeRoleWithWebIdentity&#34;,
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">      &#34;Condition&#34;: {
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">        &#34;StringEquals&#34;: {
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">          &#34;${OIDC_PROVIDER}:sub&#34;: &#34;system:serviceaccount:${ACK_K8S_NAMESPACE}:${ACK_K8S_SERVICE_ACCOUNT_NAME}&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">        }
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">      }
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    }
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">  ]
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">}
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">EOF</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>echo <span style="color:#e6db74">&#34;</span><span style="color:#e6db74">${</span>TRUST_RELATIONSHIP<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span> &gt; trust_dynamodb.json
+</span></span></code></pre></div><p>Create the IAM role:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>ACK_CONTROLLER_IAM_ROLE<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;ack-dynamodb-controller&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>ACK_CONTROLLER_IAM_ROLE_DESCRIPTION<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;IRSA role for ACK dynamodb controller deployment on EKS cluster using Helm charts&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>aws iam create-role --role-name <span style="color:#e6db74">&#34;</span><span style="color:#e6db74">${</span>ACK_CONTROLLER_IAM_ROLE<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span> --assume-role-policy-document file://trust_dynamodb.json --description <span style="color:#e6db74">&#34;</span><span style="color:#e6db74">${</span>ACK_CONTROLLER_IAM_ROLE_DESCRIPTION<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span>
+</span></span></code></pre></div><p>Attach IAM policy to the IAM role:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span><span style="color:#75715e"># for dynamodb controller, we use the managed policy ARN instead of the inline policy (like we did for Lambda controller)</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>POLICY_ARN<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;</span><span style="color:#66d9ef">$(</span>curl https://raw.githubusercontent.com/aws-controllers-k8s/dynamodb-controller/main/config/iam/recommended-policy-arn<span style="color:#66d9ef">)</span><span style="color:#e6db74">&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>aws iam attach-role-policy --role-name <span style="color:#e6db74">&#34;</span><span style="color:#e6db74">${</span>ACK_CONTROLLER_IAM_ROLE<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span> --policy-arn <span style="color:#e6db74">&#34;</span><span style="color:#e6db74">${</span>POLICY_ARN<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span>
+</span></span></code></pre></div><p>Associate the IAM role to a Kubernetes service account:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>ACK_CONTROLLER_IAM_ROLE_ARN<span style="color:#f92672">=</span><span style="color:#66d9ef">$(</span>aws iam get-role --role-name<span style="color:#f92672">=</span>$ACK_CONTROLLER_IAM_ROLE --query Role.Arn --output text<span style="color:#66d9ef">)</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>export IRSA_ROLE_ARN<span style="color:#f92672">=</span>eks.amazonaws.com/role-arn<span style="color:#f92672">=</span>$ACK_CONTROLLER_IAM_ROLE_ARN
+</span></span><span style="display:flex;"><span>kubectl annotate serviceaccount -n $ACK_K8S_NAMESPACE $ACK_K8S_SERVICE_ACCOUNT_NAME $IRSA_ROLE_ARN
+</span></span></code></pre></div><h3 id="restart-ack-controller-deployments-and-verify-the-setup">Restart ACK controller Deployments and verify the setup</h3>
+<p>Restart ACK service controller <code>Deployment</code> using the following commands - it will update service controller <code>Pod</code>s with <code>IRSA</code> environment variables.
+Get list of <code>ACK</code> service controller deployments:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>export ACK_K8S_NAMESPACE<span style="color:#f92672">=</span>ack-system
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>kubectl get deployments -n $ACK_K8S_NAMESPACE
+</span></span></code></pre></div><p>Restart Lambda, SQS and DynamoDB controller <code>Deployment</code>s:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>DEPLOYMENT_NAME_LAMBDA<span style="color:#f92672">=</span>&lt;enter deployment name <span style="color:#66d9ef">for</span> lambda controller&gt;
+</span></span><span style="display:flex;"><span>kubectl -n $ACK_K8S_NAMESPACE rollout restart deployment $DEPLOYMENT_NAME_LAMBDA
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>DEPLOYMENT_NAME_SQS<span style="color:#f92672">=</span>&lt;enter deployment name <span style="color:#66d9ef">for</span> sqs controller&gt;
+</span></span><span style="display:flex;"><span>kubectl -n $ACK_K8S_NAMESPACE rollout restart deployment $DEPLOYMENT_NAME_SQS
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>DEPLOYMENT_NAME_DYNAMODB<span style="color:#f92672">=</span>&lt;enter deployment name <span style="color:#66d9ef">for</span> dynamodb controller&gt;
+</span></span><span style="display:flex;"><span>kubectl -n $ACK_K8S_NAMESPACE rollout restart deployment $DEPLOYMENT_NAME_DYNAMODB
+</span></span></code></pre></div><p>List <code>Pod</code>s for these <code>Deployment</code>s. Verify that the <code>AWS_WEB_IDENTITY_TOKEN_FILE</code> and <code>AWS_ROLE_ARN</code> environment variables exist for your Kubernetes <code>Pod</code> using the following commands:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>kubectl get pods -n $ACK_K8S_NAMESPACE
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>LAMBDA_POD_NAME<span style="color:#f92672">=</span>&lt;enter Pod name <span style="color:#66d9ef">for</span> lambda controller&gt;
+</span></span><span style="display:flex;"><span>kubectl describe pod -n $ACK_K8S_NAMESPACE $LAMBDA_POD_NAME | grep <span style="color:#e6db74">&#34;^\s*AWS_&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>SQS_POD_NAME<span style="color:#f92672">=</span>&lt;enter Pod name <span style="color:#66d9ef">for</span> sqs controller&gt;
+</span></span><span style="display:flex;"><span>kubectl describe pod -n $ACK_K8S_NAMESPACE $SQS_POD_NAME | grep <span style="color:#e6db74">&#34;^\s*AWS_&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>DYNAMODB_POD_NAME<span style="color:#f92672">=</span>&lt;enter Pod name <span style="color:#66d9ef">for</span> dynamodb controller&gt;
+</span></span><span style="display:flex;"><span>kubectl describe pod -n $ACK_K8S_NAMESPACE $DYNAMODB_POD_NAME | grep <span style="color:#e6db74">&#34;^\s*AWS_&#34;</span>
+</span></span></code></pre></div><p>Now that the ACK service controller have been setup and configured, you can create AWS resources!</p>
+<h2 id="create-sqs-queue-dynamodb-table-and-deploy-the-lambda-function">Create SQS queue, DynamoDB table and deploy the Lambda function</h2>
+<p><strong>Create SQS queue</strong></p>
+<p>In the file <code>sqs-queue.yaml</code>, replace the <code>us-east-1</code> region with your preferred region as well as the AWS account ID. This is what the <code>ACK</code> manifest for SQS queue looks like:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-yaml" data-lang="yaml"><span style="display:flex;"><span><span style="color:#f92672">apiVersion</span>: <span style="color:#ae81ff">sqs.services.k8s.aws/v1alpha1</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">kind</span>: <span style="color:#ae81ff">Queue</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">metadata</span>:
+</span></span><span style="display:flex;"><span> <span style="color:#f92672">name</span>: <span style="color:#ae81ff">sqs-queue-demo-ack</span>
+</span></span><span style="display:flex;"><span> <span style="color:#f92672">annotations</span>:
+</span></span><span style="display:flex;"><span>   <span style="color:#f92672">services.k8s.aws/region</span>: <span style="color:#ae81ff">us-east-1</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">spec</span>:
+</span></span><span style="display:flex;"><span> <span style="color:#f92672">queueName</span>: <span style="color:#ae81ff">sqs-queue-demo-ack</span>
+</span></span><span style="display:flex;"><span> <span style="color:#f92672">policy</span>: |<span style="color:#e6db74">
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    {
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">      &#34;Statement&#34;: [{
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">        &#34;Sid&#34;: &#34;__owner_statement&#34;,
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">        &#34;Effect&#34;: &#34;Allow&#34;,
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">        &#34;Principal&#34;: {
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">          &#34;AWS&#34;: &#34;AWS_ACCOUNT_ID&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">        },
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">        &#34;Action&#34;: &#34;sqs:SendMessage&#34;,
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">        &#34;Resource&#34;: &#34;arn:aws:sqs:us-east-1:AWS_ACCOUNT_ID:sqs-queue-demo-ack&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">      }]
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    }</span>
+</span></span></code></pre></div><p>Create the queue using the following command:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>kubectl apply -f sqs-queue.yaml
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># list the queue</span>
+</span></span><span style="display:flex;"><span>kubectl get queue
+</span></span></code></pre></div><p><strong>Create DynamoDB table</strong></p>
+<p>This is what the <code>ACK</code> manifest for <code>DynamoDB</code> table looks like:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-yaml" data-lang="yaml"><span style="display:flex;"><span><span style="color:#f92672">apiVersion</span>: <span style="color:#ae81ff">dynamodb.services.k8s.aws/v1alpha1</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">kind</span>: <span style="color:#ae81ff">Table</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">metadata</span>:
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">name</span>: <span style="color:#ae81ff">customer</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">annotations</span>:
+</span></span><span style="display:flex;"><span>   <span style="color:#f92672">services.k8s.aws/region</span>: <span style="color:#ae81ff">us-east-1</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">spec</span>:
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">attributeDefinitions</span>:
+</span></span><span style="display:flex;"><span>    - <span style="color:#f92672">attributeName</span>: <span style="color:#ae81ff">email</span>
+</span></span><span style="display:flex;"><span>      <span style="color:#f92672">attributeType</span>: <span style="color:#ae81ff">S</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">billingMode</span>: <span style="color:#ae81ff">PAY_PER_REQUEST</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">keySchema</span>:
+</span></span><span style="display:flex;"><span>    - <span style="color:#f92672">attributeName</span>: <span style="color:#ae81ff">email</span>
+</span></span><span style="display:flex;"><span>      <span style="color:#f92672">keyType</span>: <span style="color:#ae81ff">HASH</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">tableName</span>: <span style="color:#ae81ff">customer</span>
+</span></span></code></pre></div><blockquote>
+<p>You can replace the <code>us-east-1</code> region with your preferred region.</p></blockquote>
+<p>Create a table (named <code>customer</code>) using the following command:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>kubectl apply -f dynamodb-table.yaml
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># list the tables</span>
+</span></span><span style="display:flex;"><span>kubectl get tables
+</span></span></code></pre></div><p><strong>Build function binary and create Docker image</strong></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>GOARCH<span style="color:#f92672">=</span>amd64 GOOS<span style="color:#f92672">=</span>linux go build -o main main.go
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>docker build -t demo-sqs-dynamodb-func-ack .
+</span></span></code></pre></div><p>Create a private <code>ECR</code> repository, tag and push the Docker image to <code>ECR</code>:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>AWS_ACCOUNT_ID<span style="color:#f92672">=</span><span style="color:#66d9ef">$(</span>aws sts get-caller-identity --query <span style="color:#e6db74">&#34;Account&#34;</span> --output text<span style="color:#66d9ef">)</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>aws ecr create-repository --repository-name demo-sqs-dynamodb-func-ack --region us-east-1
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>docker tag demo-sqs-dynamodb-func-ack:latest $AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/demo-sqs-dynamodb-func-ack:latest
+</span></span><span style="display:flex;"><span>docker push $AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/demo-sqs-dynamodb-func-ack:latest
+</span></span></code></pre></div><p>Create an IAM execution Role for the Lambda function and attach the required policies:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>export ROLE_NAME<span style="color:#f92672">=</span>demo-sqs-dynamodb-func-ack-role
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>ROLE_ARN<span style="color:#f92672">=</span><span style="color:#66d9ef">$(</span>aws iam create-role <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>        --role-name $ROLE_NAME <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>        --assume-role-policy-document <span style="color:#e6db74">&#39;{&#34;Version&#34;: &#34;2012-10-17&#34;,&#34;Statement&#34;: [{ &#34;Effect&#34;: &#34;Allow&#34;, &#34;Principal&#34;: {&#34;Service&#34;: &#34;lambda.amazonaws.com&#34;}, &#34;Action&#34;: &#34;sts:AssumeRole&#34;}]}&#39;</span> <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>        --query <span style="color:#e6db74">&#39;Role.[Arn]&#39;</span> --output text<span style="color:#66d9ef">)</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>aws iam attach-role-policy --role-name $ROLE_NAME --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+</span></span></code></pre></div><p>Since the Lambda function needs to write data to <code>DynamoDB</code> and invoke SQS, let&rsquo;s add the following policies to the IAM role:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>aws iam put-role-policy <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>        --role-name <span style="color:#e6db74">&#34;</span><span style="color:#e6db74">${</span>ROLE_NAME<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span> <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>        --policy-name <span style="color:#e6db74">&#34;dynamodb-put&#34;</span> <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>        --policy-document file://dynamodb-put.json
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>aws iam put-role-policy <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>        --role-name <span style="color:#e6db74">&#34;</span><span style="color:#e6db74">${</span>ROLE_NAME<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span> <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>        --policy-name <span style="color:#e6db74">&#34;sqs-permissions&#34;</span> <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>        --policy-document file://sqs-permissions.json
+</span></span></code></pre></div><p><strong>Create the Lambda function</strong></p>
+<p>Update <code>function.yaml</code> file with the following info:</p>
+<ul>
+<li><code>imageURI</code> - the URI of the Docker image that you pushed to ECR e.g. <code>&lt;AWS_ACCOUNT_ID&gt;.dkr.ecr.us-east-1.amazonaws.com/demo-sqs-dynamodb-func-ack:latest</code></li>
+<li><code>role</code> - the ARN of the IAM role that you created for the Lambda function e.g. <code>arn:aws:iam::&lt;AWS_ACCOUNT_ID&gt;:role/demo-sqs-dynamodb-func-ack-role</code></li>
+</ul>
+<p>This is what the <code>ACK</code> manifest for the Lambda function looks like:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-yaml" data-lang="yaml"><span style="display:flex;"><span><span style="color:#f92672">apiVersion</span>: <span style="color:#ae81ff">lambda.services.k8s.aws/v1alpha1</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">kind</span>: <span style="color:#ae81ff">Function</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">metadata</span>:
+</span></span><span style="display:flex;"><span> <span style="color:#f92672">name</span>: <span style="color:#ae81ff">demo-sqs-dynamodb-func-ack</span>
+</span></span><span style="display:flex;"><span> <span style="color:#f92672">annotations</span>:
+</span></span><span style="display:flex;"><span>   <span style="color:#f92672">services.k8s.aws/region</span>: <span style="color:#ae81ff">us-east-1</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">spec</span>:
+</span></span><span style="display:flex;"><span> <span style="color:#f92672">architectures</span>:
+</span></span><span style="display:flex;"><span>  - <span style="color:#ae81ff">x86_64</span>
+</span></span><span style="display:flex;"><span> <span style="color:#f92672">name</span>: <span style="color:#ae81ff">demo-sqs-dynamodb-func-ack</span>
+</span></span><span style="display:flex;"><span> <span style="color:#f92672">packageType</span>: <span style="color:#ae81ff">Image</span>
+</span></span><span style="display:flex;"><span> <span style="color:#f92672">code</span>:
+</span></span><span style="display:flex;"><span>     <span style="color:#f92672">imageURI</span>: <span style="color:#ae81ff">AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/demo-sqs-dynamodb-func-ack:latest</span>
+</span></span><span style="display:flex;"><span> <span style="color:#f92672">environment</span>:
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">variables</span>:
+</span></span><span style="display:flex;"><span>      <span style="color:#f92672">TABLE_NAME</span>: <span style="color:#ae81ff">customer</span>
+</span></span><span style="display:flex;"><span> <span style="color:#f92672">role</span>: <span style="color:#ae81ff">arn:aws:iam::AWS_ACCOUNT_ID:role/demo-sqs-dynamodb-func-ack-role</span>
+</span></span><span style="display:flex;"><span> <span style="color:#f92672">description</span>: <span style="color:#ae81ff">A function created by ACK lambda-controller</span>
+</span></span></code></pre></div><p>To create the Lambda function, run the following command:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>kubectl create -f <span style="color:#66d9ef">function</span>.yaml
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># list the function</span>
+</span></span><span style="display:flex;"><span>kubectl get functions
+</span></span></code></pre></div><h3 id="add-sqs-trigger-configuration">Add SQS trigger configuration</h3>
+<p>Add SQS trigger which will invoke the Lambda function when event is sent to SQS queue.</p>
+<p>Here is an example using AWS Console - Open the Lambda function in the AWS Console and click on the <strong>Add trigger</strong> button. Select <strong>SQS</strong> as the trigger source, select the SQS queue and click on the <strong>Add</strong> button.</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/ayv4kkc9b3eg333ruma4.png" alt="Image description"></p>
+<p>Now you are ready to try out the end to end solution!</p>
+<h2 id="test-the-application">Test the application</h2>
+<p>Send few messages to the SQS queue. For the purposes of this demo, you can use the AWS CLI:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>export SQS_QUEUE_URL<span style="color:#f92672">=</span><span style="color:#66d9ef">$(</span>kubectl get queues/sqs-queue-demo-ack -o jsonpath<span style="color:#f92672">=</span><span style="color:#e6db74">&#39;{.status.queueURL}&#39;</span><span style="color:#66d9ef">)</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>aws sqs send-message --queue-url $SQS_QUEUE_URL --message-body user1@foo.com --message-attributes <span style="color:#e6db74">&#39;name={DataType=String, StringValue=&#34;user1&#34;}, city={DataType=String,StringValue=&#34;seattle&#34;}&#39;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>aws sqs send-message --queue-url $SQS_QUEUE_URL --message-body user2@foo.com --message-attributes <span style="color:#e6db74">&#39;name={DataType=String, StringValue=&#34;user2&#34;}, city={DataType=String,StringValue=&#34;tel aviv&#34;}&#39;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>aws sqs send-message --queue-url $SQS_QUEUE_URL --message-body user3@foo.com --message-attributes <span style="color:#e6db74">&#39;name={DataType=String, StringValue=&#34;user3&#34;}, city={DataType=String,StringValue=&#34;new delhi&#34;}&#39;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>aws sqs send-message --queue-url $SQS_QUEUE_URL --message-body user4@foo.com --message-attributes <span style="color:#e6db74">&#39;name={DataType=String, StringValue=&#34;user4&#34;}, city={DataType=String,StringValue=&#34;new york&#34;}&#39;</span>
+</span></span></code></pre></div><p>The Lambda function should be invoked and the data should be written to the DynamoDB table. Check the DynamoDB table using the CLI (or AWS console):</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>aws dynamodb scan --table-name customer
+</span></span></code></pre></div><h2 id="clean-up">Clean up</h2>
+<p>After you have explored the solution, you can clean up the resources by running the following commands:</p>
+<p>Delete SQS queue, <code>DynamoDB</code> table and the Lambda function:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>kubectl delete -f sqs-queue.yaml
+</span></span><span style="display:flex;"><span>kubectl delete -f <span style="color:#66d9ef">function</span>.yaml
+</span></span><span style="display:flex;"><span>kubectl delete -f dynamodb-table.yaml
+</span></span></code></pre></div><p>To uninstall the ACK service controllers, run the following commands:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>export ACK_SYSTEM_NAMESPACE<span style="color:#f92672">=</span>ack-system
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>helm ls -n $ACK_SYSTEM_NAMESPACE
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>helm uninstall -n $ACK_SYSTEM_NAMESPACE &lt;enter name of the sqs chart&gt;
+</span></span><span style="display:flex;"><span>helm uninstall -n $ACK_SYSTEM_NAMESPACE &lt;enter name of the lambda chart&gt;
+</span></span><span style="display:flex;"><span>helm uninstall -n $ACK_SYSTEM_NAMESPACE &lt;enter name of the dynamodb chart&gt;
+</span></span></code></pre></div><h2 id="conclusion-and-next-steps">Conclusion and next steps</h2>
+<p>In this post, we have seen how to use AWS Controllers for Kubernetes to create a Lambda function, SQS, <code>DynamoDB</code> table and wire them together to deploy a solution. All of this (almost) was done using Kubernetes! I encourage you to try out other AWS services supported by <code>ACK</code> - <a href="https://aws-controllers-k8s.github.io/community/docs/community/services/">here is a complete list</a>.</p>
+<p>Happy Building!</p>
+
+
+        
+          <div class="blog-tags">
+            
+              <a href="https://abhirockzz.github.io//tags/go/">go</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/aws/">aws</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/kubernetes/">kubernetes</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/sqs/">sqs</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/lambda/">lambda</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/dynamodb/">dynamodb</a>&nbsp;
+            
+          </div>
+        
+
+        
+
+        
+      </article>
+
+      
+        <ul class="pager blog-pager">
+          
+            <li class="previous">
+              <a href="https://abhirockzz.github.io/posts/lambda-events-kinesis-go/" data-toggle="tooltip" data-placement="top" title="Use Golang for data processing with Amazon Kinesis and AWS Lambda">&larr; Previous Post</a>
+            </li>
+          
+          
+            <li class="next">
+              <a href="https://abhirockzz.github.io/posts/aiml-lambda-polly-texttospeech-go/" data-toggle="tooltip" data-placement="top" title="Step-by-Step Guide to Building a Serverless Text to Speech Solution using Golang on AWS">Next Post &rarr;</a>
+            </li>
+          
+        </ul>
+      
+
+
+      
+
+    </div>
+  </div>
+</div>
+
+    
+<footer>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+        <ul class="list-inline text-center footer-links">
+          
+          
+          <li>
+            <a href="" title="RSS">
+              <span class="fa-stack fa-lg">
+                <i class="fas fa-circle fa-stack-2x"></i>
+                <i class="fas fa-rss fa-stack-1x fa-inverse"></i>
+              </span>
+            </a>
+          </li>
+          
+        </ul>
+        <p class="credits copyright text-muted">
+          
+
+          &nbsp;&bull;&nbsp;&copy;
+          
+          2025
+          
+
+          
+          &nbsp;&bull;&nbsp;
+          <a href="https://abhirockzz.github.io/">Abhishek&#39;s blog</a>
+          
+        </p>
+        
+        <p class="credits theme-by text-muted">
+          <a href="https://gohugo.io">Hugo v0.145.0</a> powered &nbsp;&bull;&nbsp; Theme <a href="https://github.com/halogenica/beautifulhugo">Beautiful Hugo</a> adapted from <a href="https://deanattali.com/beautiful-jekyll/">Beautiful Jekyll</a>
+          
+        </p>
+      </div>
+    </div>
+  </div>
+</footer><script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.js"
+  integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/contrib/auto-render.min.js"
+  integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
+<script src="https://code.jquery.com/jquery-1.12.4.min.js"
+  integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"
+  integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+<script src="https://abhirockzz.github.io/%20js/main.js"></script><script> renderMathInElement(document.body); </script><script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.js"
+  integrity="sha384-QELNnmcmU8IR9ZAykt67vGr9/rZJdHbiWi64V88fCPaOohUlHCqUD/unNN0BXSqy" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe-ui-default.min.js"
+  integrity="sha384-m67o7SkQ1ALzKZIFh4CiTA8tmadaujiTa9Vu+nqPSwDOqHrDmxLezTdFln8077+q" crossorigin="anonymous"></script><script src="https://abhirockzz.github.io/%20js/load-photoswipe.js"></script>
+
+
+
+
+
+
+
+
+    
+  </body>
+</html>
+

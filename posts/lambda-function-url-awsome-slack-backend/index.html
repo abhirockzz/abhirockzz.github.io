@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en" itemscope itemtype="http://schema.org/WebPage">
+  <head>
+    
+
+<meta charset="utf-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+
+<title>Using AWS Lambda Function URL to build a Serverless backend for Slack - Abhishek&#39;s blog</title>
+<meta name="description" content="A combination of AWS Lambda and Amazon API Gateway is a widely-used architecture for serverless microservices and API based solutions. They enable developers to focus on their applications, instead of spending time provisioning and managing servers.
+
+API Gateway is a feature rich offering that includes with support for different API types (HTTP, REST, WebSocket), multiple authentication schemes, API versioning, canary deployments and much more! However, if your requirements are simpler and all you need is an HTTP(S) endpoint for your Lambda function (for example, to serve as a webhook), you can use Lambda Function URLs! When you create a function URL, Lambda automatically generates a unique HTTP(S) endpoint that is dedicated for your Lambda function."><script type="application/ld+json">
+{
+    "@context": "http://schema.org",
+    "@type": "WebSite",
+    "name": "Abhishek\u0027s blog",
+    
+    "url": "https:\/\/abhirockzz.github.io\/"
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Organization",
+  "name": "",
+  "url": "https:\/\/abhirockzz.github.io\/"
+  
+  
+  
+  
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [{
+        "@type": "ListItem",
+        "position": 1,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io\/",
+          "name": "home"
+        }
+    },{
+        "@type": "ListItem",
+        "position": 3,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io\/posts\/lambda-function-url-awsome-slack-backend\/",
+          "name": "Using aws lambda function URL to build a serverless backend for slack"
+        }
+    }]
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Article",
+  "author": {
+    "name" : ""
+  },
+  "headline": "Using AWS Lambda Function URL to build a Serverless backend for Slack",
+  "description" : "A combination of AWS Lambda and Amazon API Gateway is a widely-used architecture for serverless microservices and API based solutions. They enable developers to focus on their applications, instead of spending time provisioning and managing servers.\nAPI Gateway is a feature rich offering that includes with support for different API types (HTTP, REST, WebSocket), multiple authentication schemes, API versioning, canary deployments and much more! However, if your requirements are simpler and all you need is an HTTP(S) endpoint for your Lambda function (for example, to serve as a webhook), you can use Lambda Function URLs! When you create a function URL, Lambda automatically generates a unique HTTP(S) endpoint that is dedicated for your Lambda function.\n",
+  "inLanguage" : "en",
+  "wordCount":  1645 ,
+  "datePublished" : "2022-04-28T00:00:00",
+  "dateModified" : "2022-04-28T00:00:00",
+  "image" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+  "keywords" : [ "aws, serverless, lambda, golang, tutorial" ],
+  "mainEntityOfPage" : "https:\/\/abhirockzz.github.io\/posts\/lambda-function-url-awsome-slack-backend\/",
+  "publisher" : {
+    "@type": "Organization",
+    "name" : "https:\/\/abhirockzz.github.io\/",
+    "logo" : {
+        "@type" : "ImageObject",
+        "url" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+        "height" :  60 ,
+        "width" :  60
+    }
+  }
+}
+</script>
+
+<meta property="og:title" content="Using AWS Lambda Function URL to build a Serverless backend for Slack" />
+<meta property="og:description" content="A combination of AWS Lambda and Amazon API Gateway is a widely-used architecture for serverless microservices and API based solutions. They enable developers to focus on their applications, instead of spending time provisioning and managing servers.
+
+API Gateway is a feature rich offering that includes with support for different API types (HTTP, REST, WebSocket), multiple authentication schemes, API versioning, canary deployments and much more! However, if your requirements are simpler and all you need is an HTTP(S) endpoint for your Lambda function (for example, to serve as a webhook), you can use Lambda Function URLs! When you create a function URL, Lambda automatically generates a unique HTTP(S) endpoint that is dedicated for your Lambda function.">
+<meta property="og:image" content="https://abhirockzz.github.io/icon.jpg" />
+<meta property="og:url" content="https://abhirockzz.github.io/posts/lambda-function-url-awsome-slack-backend/" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Abhishek&#39;s blog" />
+
+<meta name="twitter:title" content="Using AWS Lambda Function URL to build a Serverless backend for Slack" />
+<meta name="twitter:description" content="A combination of AWS Lambda and Amazon API Gateway is a widely-used architecture for serverless microservices and API based solutions. They enable developers to focus on their applications, instead of …">
+<meta name="twitter:image" content="https://abhirockzz.github.io/icon.jpg" />
+<meta name="twitter:card" content="summary" />
+<link href='https://abhirockzz.github.io/icons/myicon.png' rel='icon' type='image/x-icon' />
+<meta name="generator" content="Hugo 0.145.0">
+<link rel="alternate" href="https://abhirockzz.github.io/%20index.xml" type="application/rss+xml" title="Abhishek&#39;s blog"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css"
+  integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.5.0/css/all.css"
+  integrity="sha384-B4dIYHKNBt8Bc12p+WXckhzcICo0wtJAoU8YZTY5qE0Id1GSseTk6S+L3BlXeVIU" crossorigin="anonymous">
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+  integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous"><link rel="stylesheet" href="https://abhirockzz.github.io/%20css/main.css" /><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic" />
+<link rel="stylesheet"
+  href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800" /><link rel="stylesheet" href="https://abhirockzz.github.io/%20css/syntax.css" /><link rel="stylesheet" href="https://abhirockzz.github.io/%20css/codeblock.css" /><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.css"
+  integrity="sha384-h/L2W9KefUClHWaty3SLE5F/qvc4djlyR4qY3NUV5HGQBBW7stbcfff1+I/vmsHh" crossorigin="anonymous">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/default-skin/default-skin.min.css"
+  integrity="sha384-iD0dNku6PYSIQLyfTOpB06F2KCZJAKLOThS5HRe8b3ibhdEQ6eKsFf/EeFxdOt5R" crossorigin="anonymous">
+
+
+  </head>
+  <body>
+    <nav class="navbar navbar-default navbar-fixed-top navbar-custom">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#main-navbar">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="https://abhirockzz.github.io/">Abhishek&#39;s blog</a>
+    </div>
+
+    <div class="collapse navbar-collapse" id="main-navbar">
+      <ul class="nav navbar-nav navbar-right">
+        
+        
+        <li>
+          <a title="Blog" href="/">Blog</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="About" href="/about">About</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Open-Source" href="/projects">Open-Source</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Presentations" href="/presentations">Presentations</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Publications" href="/publications">Publications</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Tags" href="/tags">Tags</a>
+        </li>
+        
+        
+
+        
+        <li>
+          
+          
+          
+        </li>
+        
+
+        
+      </ul>
+    </div>
+
+    
+    <div class="avatar-container">
+      <div class="avatar-img-border">
+        <a title="Abhishek&#39;s blog" href="https://abhirockzz.github.io/">
+          <img class="avatar-img" src="https://abhirockzz.github.io/icon.jpg" alt="Abhishek&#39;s blog" />
+        </a>
+      </div>
+    </div>
+    
+
+  </div>
+</nav>
+
+
+
+    
+
+
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+<div class="pswp__bg"></div>
+
+<div class="pswp__scroll-wrap">
+    
+    <div class="pswp__container">
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+    </div>
+    
+    <div class="pswp__ui pswp__ui--hidden">
+    <div class="pswp__top-bar">
+      
+      <div class="pswp__counter"></div>
+      <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+      <button class="pswp__button pswp__button--share" title="Share"></button>
+      <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+      <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+      
+      
+      <div class="pswp__preloader">
+        <div class="pswp__preloader__icn">
+          <div class="pswp__preloader__cut">
+            <div class="pswp__preloader__donut"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+      <div class="pswp__share-tooltip"></div>
+    </div>
+    <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+    </button>
+    <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+    </button>
+    <div class="pswp__caption">
+      <div class="pswp__caption__center"></div>
+    </div>
+    </div>
+    </div>
+</div>
+
+
+  
+  
+  
+
+
+
+
+
+
+  
+
+  <header class="header-section ">
+    
+    <div class="intro-header no-img">
+      <div class="container">
+        <div class="row">
+          <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+            <div class="posts-heading">
+              
+                <h1>Using AWS Lambda Function URL to build a Serverless backend for Slack</h1>
+              
+              
+                <hr class="small">
+              
+              
+              
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+
+    
+<div class="container" role="main">
+  <div class="row">
+    <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+      <article role="main" class="blog-post">
+        <p>A combination of AWS Lambda and Amazon API Gateway is a widely-used architecture for serverless microservices and API based solutions. They enable developers to focus on their applications, instead of spending time provisioning and managing servers.</p>
+<p><img src="https://docs.aws.amazon.com/apigateway/latest/developerguide/images/getting-started-overview.png" alt=""></p>
+<p>API Gateway is a feature rich offering that includes with support for different API types (HTTP, REST, WebSocket), multiple authentication schemes, API versioning, canary deployments and much more! However, if your requirements are simpler and all you need is an HTTP(S) endpoint for your Lambda function (for example, to serve as a webhook), you can use <a href="https://docs.aws.amazon.com/lambda/latest/dg/lambda-urls.html">Lambda Function URLs</a>! When you create a function URL, Lambda automatically generates a unique HTTP(S) endpoint that is dedicated for your Lambda function.</p>
+<p>This blog post demonstrates how to use Lambda function URL with a practical example. You will build a <a href="https://docs.aws.amazon.com/lambda/latest/dg/lambda-golang.html">Go Lambda function</a> to serve as a serverless webhook backend for <a href="https://slack.com/">Slack</a>.</p>
+<p>It&rsquo;s a step-by-step guide that covers:</p>
+<ul>
+<li>Overview of the application</li>
+<li>Configure and deploy the function (along with some gotchas you need to watch out for!)</li>
+<li>How to configure Slack to enable the end to end integration</li>
+<li>Test the app and have fun!</li>
+</ul>
+<p>By the end of this blog, you would have configured, integrated and deployed a useful (and hopefully fun?) app using Lambda function URL. In the process, you will get an overview of this feature that you can utilise when building your own solutions!</p>
+<blockquote>
+<p>The code is <a href="https://github.com/abhirockzz/awsome-slack-backend">available on GitHub</a></p></blockquote>
+<h2 id="how-it-works">How it works</h2>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/8kqfu4ki5fcm1evviptl.png" alt=""></p>
+<p>The sample app presented in this blog is a trimmed down version of <a href="https://get.slack.help/hc/en-us/articles/204714258-Giphy-for-Slack">Giphy for Slack</a>. The (original) Giphy Slack app returns a bunch of GIFs for a search term and the user can pick one of them. To keep things simple, I&rsquo;ve tweaked things a bit such that the serverless backend simply returns a (single) random image for a search keyword using the <a href="https://developers.giphy.com/docs/#operation--gifs-random-get">Giphy Random API</a>.</p>
+<p>Since the solution will be integrated as a <a href="https://api.slack.com/interactivity/slash-commands">Slash Command</a> in Slack, the end user (you!) will invoke it from a Slack workspace using <code>/awsome &lt;your search term&gt;</code> (where <code>awsome</code> is nothing but the name of the slash command). This in turn invokes the Lambda function URL (the configuration is covered later in the blog), which takes care of the rest.</p>
+<p>For example, invoking it from your Slack workspace using <code>/awsome serverless</code> will return a random GIF (you will try this later!)</p>
+<p>Here is an overview of what the Lambda function does:</p>
+<ul>
+<li>Slack slash command invocation results in a <code>base64</code> encoded string payload being sent to the Lambda function URL - so the first step is to decode it.</li>
+<li>The function is only supposed to invoked by Slack and we need to make sure we confirm that. Slack makes this possible by allowing apps to verify requests using a signing secret - the function simply implements a Go version of the signature matching recipe presented <a href="https://api.slack.com/authentication/verifying-requests-from-slack">here</a></li>
+<li>If the signature match is successful (we return an error to the client if it fails), the Slack request is parsed to extract the search <code>text</code> that user sent.</li>
+<li>Then, the <a href="https://developers.giphy.com/docs/api/endpoint#random">Giphy Random API</a> is invoked with the search term. If we get a successful response, we parse it and send it back to Slack in it&rsquo;s desired format</li>
+</ul>
+<p>Finally, the user gets to see a GIF in their Slack workspace!</p>
+<p>I will skip the code walk-through in order to focus on other aspects of the solution, but the function signature deserves a mention - it is similar to what you would&rsquo;ve used in case of an API Gateway based solution:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">Funcy</span>(<span style="color:#a6e22e">r</span> <span style="color:#a6e22e">events</span>.<span style="color:#a6e22e">LambdaFunctionURLRequest</span>) (<span style="color:#a6e22e">events</span>.<span style="color:#a6e22e">LambdaFunctionURLResponse</span>, <span style="color:#66d9ef">error</span>) {
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>We are using <a href="https://pkg.go.dev/github.com/aws/aws-lambda-go/events#LambdaFunctionURLRequest">events.LambdaFunctionURLRequest</a> as input and returning <a href="https://pkg.go.dev/github.com/aws/aws-lambda-go/events#LambdaFunctionURLResponse">events.LambdaFunctionURLResponse</a>. Behind the scenes, Lambda maps the request to an event object before passing it to the function. Finally, the function response is then mapped to an HTTP response that Lambda sends back to the client through the function URL.</p>
+<blockquote>
+<p>You can read up on the details in the <a href="https://docs.aws.amazon.com/lambda/latest/dg/urls-invocation.html#urls-payloads">documentation</a></p></blockquote>
+<p>That&rsquo;s quite convenient right? You can use API Gateway conventions without actually having to setup and configure one!</p>
+<p>With that background info, let&rsquo;s move on to the part where you deploy the function and try it out with Slack. But, before that make sure you have the following ready:</p>
+<h2 id="pre-requisites">Pre-requisites</h2>
+<ul>
+<li><a href="https://portal.aws.amazon.com/gp/aws/developer/registration/index.html">Create an AWS account</a> (if you do not already have one) and log in. The IAM user that you use must have sufficient permissions to make necessary AWS service calls and manage AWS resources.</li>
+<li>Install and configure <a href="https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html">AWS CLI</a></li>
+<li><a href="https://go.dev/dl/">Install Go</a></li>
+<li><a href="https://git-scm.com/downloads">Install Git</a></li>
+<li><a href="https://slack.com/create">Create a Slack workspace</a> if you don&rsquo;t have one.</li>
+<li>Create a GIHPY account (it&rsquo;s free!) and <a href="https://developers.giphy.com/dashboard/?create=true">create an app</a>. Each application you create will have its own API Key.</li>
+</ul>
+<blockquote>
+<p>Please note down your GIPHY API key as you will be using it later</p></blockquote>
+<p>Clone the Github repo and move into the right directory:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>git clone https://github.com/abhirockzz/awsome-slack-backend
+</span></span><span style="display:flex;"><span>cd awsome-slack-backend/function
+</span></span></code></pre></div><blockquote>
+<p>The subsequent steps use AWS CLI - I&rsquo;ve purposely used the AWS CLI in order to highlight specific aspects of the process. Please check <a href="https://docs.aws.amazon.com/lambda/latest/dg/urls-tutorial.html">this tutorial</a> for CloudFormation and SAM</p></blockquote>
+<h2 id="build-zip-and-deploy-the-function">Build, zip and deploy the function!</h2>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>export FUNC_NAME<span style="color:#f92672">=</span>awsome-slack-backend
+</span></span><span style="display:flex;"><span>export FUNC_GO_BINARY_NAME<span style="color:#f92672">=</span>awsome
+</span></span><span style="display:flex;"><span>export ZIP_NAME<span style="color:#f92672">=</span><span style="color:#66d9ef">function</span>.zip
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>GOOS<span style="color:#f92672">=</span>linux go build -o $FUNC_GO_BINARY_NAME main.go
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>zip <span style="color:#66d9ef">function</span>.zip $FUNC_GO_BINARY_NAME
+</span></span></code></pre></div><p>First, create an IAM Role for Lambda and attach the <code>AWSLambdaBasicExecutionRole</code> policy:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>export ROLE_NAME<span style="color:#f92672">=</span>demo-lambda-role
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>ROLE_ARN<span style="color:#f92672">=</span><span style="color:#66d9ef">$(</span>aws iam create-role <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>        --role-name $ROLE_NAME <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>        --assume-role-policy-document <span style="color:#e6db74">&#39;{&#34;Version&#34;: &#34;2012-10-17&#34;,&#34;Statement&#34;: [{ &#34;Effect&#34;: &#34;Allow&#34;, &#34;Principal&#34;: {&#34;Service&#34;: &#34;lambda.amazonaws.com&#34;}, &#34;Action&#34;: &#34;sts:AssumeRole&#34;}]}&#39;</span> <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>        --query <span style="color:#e6db74">&#39;Role.[Arn]&#39;</span> --output text<span style="color:#66d9ef">)</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>aws iam attach-role-policy --role-name $ROLE_NAME --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+</span></span></code></pre></div><p>Create the function:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>aws lambda create-function <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>    --function-name $FUNC_NAME <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>    --runtime go1.x <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>    --zip-file fileb://$ZIP_NAME <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>    --handler $FUNC_GO_BINARY_NAME <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>    --role $ROLE_ARN
+</span></span></code></pre></div><p>After the function gets created, go ahead and add the Function URL:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>aws lambda create-function-url-config <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>    --function-name $FUNC_NAME <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>    --auth-type NONE
+</span></span></code></pre></div><blockquote>
+<p>For the purposes of this sample app, we&rsquo;re using <code>NONE</code> as the authentication type. This means that the Lambda function URL will be publicly accessible - more on this shortly</p></blockquote>
+<p>If you navigate to the AWS console and open the function you just created, you should see the Function URL associated with it:</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/7wu2ogjmxuxff8cr5uaq.png" alt="Image description"></p>
+<p>Let&rsquo;s invoke the function - copy the Function URL and paste it in a browser or use any other tool (e.g. <code>curl</code>)</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>curl -i &lt;FUNCTION_URL&gt;
+</span></span></code></pre></div><p>You should get a <code>{&quot;Message&quot;:&quot;Forbidden&quot;}</code> response with a <code>HTTP 403 Forbidden</code> status code</p>
+<blockquote>
+<p>Don&rsquo;t worry, this is expected - I wanted to make sure you encounter this issue and understand the root cause.</p></blockquote>
+<p>Even though we use <code>NONE</code> as the authentication scheme, users must still have <code>lambda:InvokeFunctionUrl</code> permissions in order to successfully invoke the function URL. The (slightly) tricky bit is that when you create a function URL (with auth type <code>NONE</code>) via the console or AWS Serverless Application Model (AWS SAM), Lambda <em>automatically</em> creates the resource-based policy statement for you (details in the <a href="https://docs.aws.amazon.com/lambda/latest/dg/urls-auth.html#urls-auth-none">documentation</a>). That&rsquo;s not the case if you&rsquo;re using the AWS CLI (as in this blog), AWS CloudFormation, or the Lambda API directly - you must add permissions yourself.</p>
+<p>Let&rsquo;s do that:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>aws lambda add-permission <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>    --function-name $FUNC_NAME <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>    --action lambda:InvokeFunctionUrl <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>    --statement-id FunctionURLAllowPublicAccess <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>    --principal <span style="color:#e6db74">&#34;*&#34;</span> <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>    --function-url-auth-type NONE
+</span></span></code></pre></div><blockquote>
+<p>To see the policy, navigate to your Function in the AWS console: Configuration &gt; Permissions</p></blockquote>
+<p>Invoke the function again:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>curl -i &lt;FUNCTION_URL&gt;
+</span></span></code></pre></div><p>This time, you will get a different error with a <code>HTTP 401 Unauthorized</code> status code. This is expected as well!</p>
+<p>Let&rsquo;s finish the rest of the configuration to get things working.</p>
+<h2 id="configure-slack">Configure Slack</h2>
+<blockquote>
+<p>Please note that most of the instructions in this section have been adapted from the <a href="https://api.slack.com/slash-commands#creating_commands">Slack documentation</a></p></blockquote>
+<p>Start by signing into your <a href="https://slack.com/signin">Slack Workspace</a> and <a href="https://api.slack.com/apps/new">creating a new Slack App</a>.</p>
+<p>Once that&rsquo;s done, create a Slash Command - head to your app&rsquo;s settings page, and then click the <em>Slash Commands</em> feature in the navigation menu. You&rsquo;ll be presented with a button marked <em>Create New Command</em>, and when you click on it, you&rsquo;ll see a screen where you&rsquo;ll be asked to define your new <em>Slash Command</em> with the required information.</p>
+<p>Enter the required information - Enter <code>/awsome</code> for the <strong>Command</strong> and enter the Lambda Function URL in <strong>Request URL</strong></p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/t6l42xqqicso2rr4htvs.png" alt="Image description"></p>
+<p>Finally, install the app to your workspace - click the <em>Basic Information</em> feature in the navigation menu, choose <em>Install your app to your workspace</em> and click <em>Install App to Workspace</em>. This will install the app to your Slack workspace to test your app and generate the tokens you need to interact with the Slack API.</p>
+<p>As soon as you finish installing the app, the <em>App Credentials</em> will show up on the same page. You need to grab your <em>Slack Signing Secret</em> from there</p>
+<blockquote>
+<p>Make a note of your app Signing Secret as you&rsquo;ll be using it later</p></blockquote>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/kqdlh0mbupiqb3ogfu78.png" alt="Image description"></p>
+<h2 id="update-the-function">Update the function</h2>
+<p>Now that you&rsquo;ve the Slack signing secret key, you need to make sure to configure it in the function as well. Also, don&rsquo;t forget the GIPHY API key since the function needs that to invoke GIPHY REST endpoint.</p>
+<p>Let&rsquo;s update the function to include these as environment variables:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>aws lambda update-function-configuration <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>    --function-name $FUNC_NAME <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span><span style="color:#ae81ff"></span>    --environment <span style="color:#e6db74">&#34;Variables={SLACK_SIGNING_SECRET=&lt;enter Slack signing secret&gt;,GIPHY_API_KEY=&lt;enter Giphy API key&gt;}&#34;</span>
+</span></span></code></pre></div><blockquote>
+<p>The sample app uses Lambda environment variables to store keys for Slack and GIPHY - this is just for demonstration purposes. You should use a solution such as <a href="https://aws.amazon.com/secrets-manager">AWS Secrets Manager</a> to securely store and manage credentials.</p></blockquote>
+<h2 id="youre-all-set">You&rsquo;re all set!</h2>
+<p>Head over to your Slack workspace and invoke the command. For example, to get a random cat GIF, just type:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>/awsome cat
+</span></span></code></pre></div><p>I got this response. How about you? :-)</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/rygtojf1uyts7flecr37.gif" alt="Image description"></p>
+<p>Feel free to play around with the app!</p>
+<h2 id="clean-up">Clean up</h2>
+<p>Once you&rsquo;re done, delete the function along with the IAM policy and role.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>aws lambda delete-function --function-name $FUNC_NAME
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>aws iam detach-role-policy  --role-name $ROLE_NAME --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>aws iam delete-role --role-name $ROLE_NAME
+</span></span></code></pre></div><h2 id="conclusion">Conclusion</h2>
+<p>You configured and deployed a serverless backend for Slack and in the process, learnt about some of the aspects of Lambda Function URLs through the lens of this sample app. I would encourage you to explore other capabilities such as <a href="https://docs.aws.amazon.com/lambda/latest/dg/urls-auth.html#urls-auth-iam">AWS_IAM authentication</a>, <a href="https://docs.aws.amazon.com/lambda/latest/dg/urls-configuration.html#urls-cors">CORS config</a>, <a href="https://docs.aws.amazon.com/lambda/latest/dg/urls-configuration.html#urls-throttling">throttling limits</a>, <a href="https://docs.aws.amazon.com/lambda/latest/dg/urls-monitoring.html">monitoring</a> etc.</p>
+<p>Happy coding!</p>
+
+
+        
+          <div class="blog-tags">
+            
+              <a href="https://abhirockzz.github.io//tags/aws/">aws</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/serverless/">serverless</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/lambda/">lambda</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/golang/">golang</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/tutorial/">tutorial</a>&nbsp;
+            
+          </div>
+        
+
+        
+
+        
+      </article>
+
+      
+        <ul class="pager blog-pager">
+          
+            <li class="previous">
+              <a href="https://abhirockzz.github.io/posts/cosmosdb-partial-doc-update/" data-toggle="tooltip" data-placement="top" title="Now Generally Available – Partial Document Update in Azure Cosmos DB">&larr; Previous Post</a>
+            </li>
+          
+          
+            <li class="next">
+              <a href="https://abhirockzz.github.io/posts/lambda-function-url-slack-backend-cdk/" data-toggle="tooltip" data-placement="top" title="Package and deploy a Lambda function as a Docker container with AWS CDK">Next Post &rarr;</a>
+            </li>
+          
+        </ul>
+      
+
+
+      
+
+    </div>
+  </div>
+</div>
+
+    
+<footer>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+        <ul class="list-inline text-center footer-links">
+          
+          
+          <li>
+            <a href="" title="RSS">
+              <span class="fa-stack fa-lg">
+                <i class="fas fa-circle fa-stack-2x"></i>
+                <i class="fas fa-rss fa-stack-1x fa-inverse"></i>
+              </span>
+            </a>
+          </li>
+          
+        </ul>
+        <p class="credits copyright text-muted">
+          
+
+          &nbsp;&bull;&nbsp;&copy;
+          
+          2025
+          
+
+          
+          &nbsp;&bull;&nbsp;
+          <a href="https://abhirockzz.github.io/">Abhishek&#39;s blog</a>
+          
+        </p>
+        
+        <p class="credits theme-by text-muted">
+          <a href="https://gohugo.io">Hugo v0.145.0</a> powered &nbsp;&bull;&nbsp; Theme <a href="https://github.com/halogenica/beautifulhugo">Beautiful Hugo</a> adapted from <a href="https://deanattali.com/beautiful-jekyll/">Beautiful Jekyll</a>
+          
+        </p>
+      </div>
+    </div>
+  </div>
+</footer><script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.js"
+  integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/contrib/auto-render.min.js"
+  integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
+<script src="https://code.jquery.com/jquery-1.12.4.min.js"
+  integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"
+  integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+<script src="https://abhirockzz.github.io/%20js/main.js"></script><script> renderMathInElement(document.body); </script><script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.js"
+  integrity="sha384-QELNnmcmU8IR9ZAykt67vGr9/rZJdHbiWi64V88fCPaOohUlHCqUD/unNN0BXSqy" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe-ui-default.min.js"
+  integrity="sha384-m67o7SkQ1ALzKZIFh4CiTA8tmadaujiTa9Vu+nqPSwDOqHrDmxLezTdFln8077+q" crossorigin="anonymous"></script><script src="https://abhirockzz.github.io/%20js/load-photoswipe.js"></script>
+
+
+
+
+
+
+
+
+    
+  </body>
+</html>
+

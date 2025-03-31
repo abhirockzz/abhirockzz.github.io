@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en" itemscope itemtype="http://schema.org/WebPage">
+  <head>
+    
+
+<meta charset="utf-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+
+<title>Data Ingestion into Azure Data Explorer using Kafka Connect on Kubernetes - Abhishek&#39;s blog</title>
+<meta name="description" content="In this blog, we will go over how to ingest data into Azure Data Explorer using the open source Kafka Connect Sink connector for Azure Data Explorer running on Kubernetes using Strimzi. Kafka Connect is a tool for scalably and reliably streaming data between Apache Kafka and other systems using source and sink connectors and Strimzi provides a &ldquo;Kubernetes-native&rdquo; way of running Kafka clusters as well as Kafka Connect workers.
+Azure Data Explorer is a fast and scalable data exploration service that lets you collect, store, and analyze large volumes of data from any diverse sources, such as websites, applications, IoT devices, and more. It has a rich connector ecosystem that supports ingestion into Azure Data Explorer as detailed here. One of the supported sources is Apache Kafka and the sink connector allows you to move data from Kafka topics into Azure Data Explorer tables which you can later query and analyse. The best part is that you can do so in a scalable and fault tolerant way using just configuration!"><script type="application/ld+json">
+{
+    "@context": "http://schema.org",
+    "@type": "WebSite",
+    "name": "Abhishek\u0027s blog",
+    
+    "url": "https:\/\/abhirockzz.github.io\/"
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Organization",
+  "name": "",
+  "url": "https:\/\/abhirockzz.github.io\/"
+  
+  
+  
+  
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [{
+        "@type": "ListItem",
+        "position": 1,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io\/",
+          "name": "home"
+        }
+    },{
+        "@type": "ListItem",
+        "position": 3,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io\/posts\/kafka-azure-data-explorer-kubernetes\/",
+          "name": "Data ingestion into azure data explorer using kafka connect on kubernetes"
+        }
+    }]
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Article",
+  "author": {
+    "name" : ""
+  },
+  "headline": "Data Ingestion into Azure Data Explorer using Kafka Connect on Kubernetes",
+  "description" : "In this blog, we will go over how to ingest data into Azure Data Explorer using the open source Kafka Connect Sink connector for Azure Data Explorer running on Kubernetes using Strimzi. Kafka Connect is a tool for scalably and reliably streaming data between Apache Kafka and other systems using source and sink connectors and Strimzi provides a \u0026ldquo;Kubernetes-native\u0026rdquo; way of running Kafka clusters as well as Kafka Connect workers.\nAzure Data Explorer is a fast and scalable data exploration service that lets you collect, store, and analyze large volumes of data from any diverse sources, such as websites, applications, IoT devices, and more. It has a rich connector ecosystem that supports ingestion into Azure Data Explorer as detailed here. One of the supported sources is Apache Kafka and the sink connector allows you to move data from Kafka topics into Azure Data Explorer tables which you can later query and analyse. The best part is that you can do so in a scalable and fault tolerant way using just configuration!\n",
+  "inLanguage" : "en",
+  "wordCount":  2030 ,
+  "datePublished" : "2020-09-25T00:00:00",
+  "dateModified" : "2020-09-25T00:00:00",
+  "image" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+  "keywords" : [ "" ],
+  "mainEntityOfPage" : "https:\/\/abhirockzz.github.io\/posts\/kafka-azure-data-explorer-kubernetes\/",
+  "publisher" : {
+    "@type": "Organization",
+    "name" : "https:\/\/abhirockzz.github.io\/",
+    "logo" : {
+        "@type" : "ImageObject",
+        "url" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+        "height" :  60 ,
+        "width" :  60
+    }
+  }
+}
+</script>
+
+<meta property="og:title" content="Data Ingestion into Azure Data Explorer using Kafka Connect on Kubernetes" />
+<meta property="og:description" content="In this blog, we will go over how to ingest data into Azure Data Explorer using the open source Kafka Connect Sink connector for Azure Data Explorer running on Kubernetes using Strimzi. Kafka Connect is a tool for scalably and reliably streaming data between Apache Kafka and other systems using source and sink connectors and Strimzi provides a &ldquo;Kubernetes-native&rdquo; way of running Kafka clusters as well as Kafka Connect workers.
+Azure Data Explorer is a fast and scalable data exploration service that lets you collect, store, and analyze large volumes of data from any diverse sources, such as websites, applications, IoT devices, and more. It has a rich connector ecosystem that supports ingestion into Azure Data Explorer as detailed here. One of the supported sources is Apache Kafka and the sink connector allows you to move data from Kafka topics into Azure Data Explorer tables which you can later query and analyse. The best part is that you can do so in a scalable and fault tolerant way using just configuration!">
+<meta property="og:image" content="https://abhirockzz.github.io/icon.jpg" />
+<meta property="og:url" content="https://abhirockzz.github.io/posts/kafka-azure-data-explorer-kubernetes/" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Abhishek&#39;s blog" />
+
+<meta name="twitter:title" content="Data Ingestion into Azure Data Explorer using Kafka Connect on …" />
+<meta name="twitter:description" content="In this blog, we will go over how to ingest data into Azure Data Explorer using the open source Kafka Connect Sink connector for Azure Data Explorer running on Kubernetes using Strimzi. Kafka Connect …">
+<meta name="twitter:image" content="https://abhirockzz.github.io/icon.jpg" />
+<meta name="twitter:card" content="summary" />
+<link href='https://abhirockzz.github.io/icons/myicon.png' rel='icon' type='image/x-icon' />
+<meta name="generator" content="Hugo 0.145.0">
+<link rel="alternate" href="https://abhirockzz.github.io/%20index.xml" type="application/rss+xml" title="Abhishek&#39;s blog"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css"
+  integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.5.0/css/all.css"
+  integrity="sha384-B4dIYHKNBt8Bc12p+WXckhzcICo0wtJAoU8YZTY5qE0Id1GSseTk6S+L3BlXeVIU" crossorigin="anonymous">
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+  integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous"><link rel="stylesheet" href="https://abhirockzz.github.io/%20css/main.css" /><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic" />
+<link rel="stylesheet"
+  href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800" /><link rel="stylesheet" href="https://abhirockzz.github.io/%20css/syntax.css" /><link rel="stylesheet" href="https://abhirockzz.github.io/%20css/codeblock.css" /><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.css"
+  integrity="sha384-h/L2W9KefUClHWaty3SLE5F/qvc4djlyR4qY3NUV5HGQBBW7stbcfff1+I/vmsHh" crossorigin="anonymous">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/default-skin/default-skin.min.css"
+  integrity="sha384-iD0dNku6PYSIQLyfTOpB06F2KCZJAKLOThS5HRe8b3ibhdEQ6eKsFf/EeFxdOt5R" crossorigin="anonymous">
+
+
+  </head>
+  <body>
+    <nav class="navbar navbar-default navbar-fixed-top navbar-custom">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#main-navbar">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="https://abhirockzz.github.io/">Abhishek&#39;s blog</a>
+    </div>
+
+    <div class="collapse navbar-collapse" id="main-navbar">
+      <ul class="nav navbar-nav navbar-right">
+        
+        
+        <li>
+          <a title="Blog" href="/">Blog</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="About" href="/about">About</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Open-Source" href="/projects">Open-Source</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Presentations" href="/presentations">Presentations</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Publications" href="/publications">Publications</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Tags" href="/tags">Tags</a>
+        </li>
+        
+        
+
+        
+        <li>
+          
+          
+          
+        </li>
+        
+
+        
+      </ul>
+    </div>
+
+    
+    <div class="avatar-container">
+      <div class="avatar-img-border">
+        <a title="Abhishek&#39;s blog" href="https://abhirockzz.github.io/">
+          <img class="avatar-img" src="https://abhirockzz.github.io/icon.jpg" alt="Abhishek&#39;s blog" />
+        </a>
+      </div>
+    </div>
+    
+
+  </div>
+</nav>
+
+
+
+    
+
+
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+<div class="pswp__bg"></div>
+
+<div class="pswp__scroll-wrap">
+    
+    <div class="pswp__container">
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+    </div>
+    
+    <div class="pswp__ui pswp__ui--hidden">
+    <div class="pswp__top-bar">
+      
+      <div class="pswp__counter"></div>
+      <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+      <button class="pswp__button pswp__button--share" title="Share"></button>
+      <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+      <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+      
+      
+      <div class="pswp__preloader">
+        <div class="pswp__preloader__icn">
+          <div class="pswp__preloader__cut">
+            <div class="pswp__preloader__donut"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+      <div class="pswp__share-tooltip"></div>
+    </div>
+    <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+    </button>
+    <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+    </button>
+    <div class="pswp__caption">
+      <div class="pswp__caption__center"></div>
+    </div>
+    </div>
+    </div>
+</div>
+
+
+  
+  
+  
+
+
+
+
+
+
+  
+
+  <header class="header-section ">
+    
+    <div class="intro-header no-img">
+      <div class="container">
+        <div class="row">
+          <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+            <div class="posts-heading">
+              
+                <h1>Data Ingestion into Azure Data Explorer using Kafka Connect on Kubernetes</h1>
+              
+              
+                <hr class="small">
+              
+              
+              
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+
+    
+<div class="container" role="main">
+  <div class="row">
+    <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+      <article role="main" class="blog-post">
+        <p>In this blog, we will go over how to ingest data into <a href="https://docs.microsoft.com/azure/data-explorer/?WT.mc_id=devto-blog-abhishgu">Azure Data Explorer</a> using the open source <a href="https://github.com/Azure/kafka-sink-azure-kusto">Kafka Connect Sink connector for Azure Data Explorer</a> running on Kubernetes using Strimzi. <a href="https://kafka.apache.org/documentation/#connect">Kafka Connect</a> is a tool for scalably and reliably streaming data between Apache Kafka and other systems using source and sink connectors and Strimzi provides a &ldquo;Kubernetes-native&rdquo; way of running Kafka clusters as well as Kafka Connect workers.</p>
+<p>Azure Data Explorer is a fast and scalable data exploration service that lets you collect, store, and analyze large volumes of data from any diverse sources, such as websites, applications, IoT devices, and more. It has a rich connector ecosystem that supports ingestion into Azure Data Explorer as <a href="https://docs.microsoft.com/azure/data-explorer/ingest-data-overview?WT.mc_id=devto-blog-abhishgu">detailed here</a>. One of the supported sources is Apache Kafka and the sink connector allows you to move data from Kafka topics into Azure Data Explorer tables which you can later query and analyse. The best part is that you can do so in a scalable and fault tolerant way using just configuration!</p>
+<p>Here is an overview of the scenario depicted in this blog post:</p>
+<p><img src="https://strimzi.io/assets/images/posts/2020-09-22-overview.jpg" alt="Overview"></p>
+<p>The Azure Data Explorer Kafka Connector picks up data from the configured Kafka topic and queues up ingestion processes (in batches) which eventually write data to a table in Azure Data Explorer. Behind the scenes, the connector leverages the <a href="https://github.com/Azure/azure-kusto-java">Java SDK for Azure Data Explorer</a>.</p>
+<blockquote>
+<p>Resources for this blog post are <a href="https://github.com/abhirockzz/kusto-kafka-connect-strimzi">available on GitHub</a></p></blockquote>
+<h2 id="prerequisites">Prerequisites</h2>
+<p>You will need an <a href="https://azure.microsoft.com/en-us/free/">Azure account</a> along with <a href="https://docs.microsoft.com/cli/azure/install-azure-cli?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu">Azure CLI</a> or <a href="https://docs.microsoft.com/azure/cloud-shell/quickstart?WT.mc_id=devto-blog-abhishgu">Azure Cloud Shell</a>.</p>
+<p>Here are some quick pointers to setting up a Azure Data Explorer cluster and a managed Kubernetes service on Azure. I recommend installing the below services as a part of a single <a href="https://docs.microsoft.com/azure/azure-resource-manager/management/overview?WT.mc_id=devto-blog-abhishgu">Azure Resource Group</a> which makes it easy to manage these services</p>
+<h3 id="azure-data-explorer">Azure Data Explorer</h3>
+<p>You can setup an Azure Data Explorer cluster and database <a href="https://docs.microsoft.com/azure/data-explorer/create-cluster-database-portal?WT.mc_id=devto-blog-abhishgu">using Azure Portal</a>, <a href="https://docs.microsoft.com/azure/data-explorer/create-cluster-database-cli?WT.mc_id=devto-blog-abhishgu">Azure CLI</a> or any of the client SDKs such as <a href="https://docs.microsoft.com/azure/data-explorer/create-cluster-database-python?WT.mc_id=devto-blog-abhishgu">Python</a>. Once that&rsquo;s done, create a table (named <code>Storms</code>) and respective mapping (named <code>Storms_CSV_Mapping</code>) using below queries:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-shell" data-lang="shell"><span style="display:flex;"><span>.create table Storms <span style="color:#f92672">(</span>StartTime: datetime, EndTime: datetime, EventId: int, State: string, EventType: string, Source: string<span style="color:#f92672">)</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>.create table Storms ingestion csv mapping <span style="color:#e6db74">&#39;Storms_CSV_Mapping&#39;</span> <span style="color:#e6db74">&#39;[{&#34;Name&#34;:&#34;StartTime&#34;,&#34;datatype&#34;:&#34;datetime&#34;,&#34;Ordinal&#34;:0}, {&#34;Name&#34;:&#34;EndTime&#34;,&#34;datatype&#34;:&#34;datetime&#34;,&#34;Ordinal&#34;:1},{&#34;Name&#34;:&#34;EventId&#34;,&#34;datatype&#34;:&#34;int&#34;,&#34;Ordinal&#34;:2},{&#34;Name&#34;:&#34;State&#34;,&#34;datatype&#34;:&#34;string&#34;,&#34;Ordinal&#34;:3},{&#34;Name&#34;:&#34;EventType&#34;,&#34;datatype&#34;:&#34;string&#34;,&#34;Ordinal&#34;:4},{&#34;Name&#34;:&#34;Source&#34;,&#34;datatype&#34;:&#34;string&#34;,&#34;Ordinal&#34;:5}]&#39;</span>
+</span></span></code></pre></div><h3 id="azure-kubernetes-service-optional">Azure Kubernetes Service (optional)</h3>
+<p>I have used <a href="https://docs.microsoft.com/azure/aks/?WT.mc_id=devto-blog-abhishgu">Azure Kubernetes Service</a> (AKS) but the instructions in this blog post should work for other options as well (e.g. with a local <code>minikube</code> cluster on your laptop). You can setup an AKS cluster using <a href="https://docs.microsoft.com/azure/aks/kubernetes-walkthrough?WT.mc_id=devto-blog-abhishgu">Azure CLI</a>, <a href="https://docs.microsoft.com/azure/aks/kubernetes-walkthrough-portal?WT.mc_id=devto-blog-abhishgu">Azure portal</a> or <a href="https://docs.microsoft.com/azure/aks/kubernetes-walkthrough-rm-template?WT.mc_id=devto-blog-abhishgu">ARM template</a></p>
+<h2 id="base-installation">Base installation</h2>
+<p>Start by installing the Strimzi Operator and use it to spin up a single-node Kafka Cluster on Kubernetes. Installing Strimzi using <code>Helm</code> is pretty easy:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-shell" data-lang="shell"><span style="display:flex;"><span>helm repo add strimzi https://strimzi.io/charts/
+</span></span><span style="display:flex;"><span>helm install strimzi-kafka strimzi/strimzi-kafka-operator
+</span></span></code></pre></div><p>To confirm successful installation:</p>
+<pre tabindex="0"><code>kubectl get pods -l=name=strimzi-cluster-operator
+</code></pre><p>You should see the cluster operator <code>Pod</code> in <code>Running</code> status</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-shell" data-lang="shell"><span style="display:flex;"><span>NAME                                        READY   STATUS    RESTARTS   AGE
+</span></span><span style="display:flex;"><span>strimzi-cluster-operator-5c66f679d5-69rgk   1/1     Running   <span style="color:#ae81ff">0</span>          43s
+</span></span></code></pre></div><p>To deploy a single-node kafka cluster (along with Zookeeper):</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-shell" data-lang="shell"><span style="display:flex;"><span>kubectl apply -f https://github.com/abhirockzz/kusto-kafka-connect-strimzi/raw/master/deploy/kafka.yaml
+</span></span></code></pre></div><p>Wait for the cluster to start:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-shell" data-lang="shell"><span style="display:flex;"><span>kubectl get pod my-kafka-cluster-kafka-0 -w
+</span></span></code></pre></div><p>The Kafka Pod should transition to <code>Running</code> status and both the containers should be in <code>READY</code> state</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-shell" data-lang="shell"><span style="display:flex;"><span>NAME                       READY   STATUS    RESTARTS   AGE
+</span></span><span style="display:flex;"><span>my-kafka-cluster-kafka-0   2/2     Running   <span style="color:#ae81ff">0</span>          1m
+</span></span></code></pre></div><h2 id="kafka-connect-cluster-setup">Kafka Connect cluster setup</h2>
+<p>The Strimzi container images for Kafka Connect include two built-in file connectors - <code>FileStreamSourceConnector</code> and <code>FileStreamSinkConnector</code>. For the purposes of this blog, a custom Docker image seeded with <a href="https://github.com/Azure/kafka-sink-azure-kusto/releases/tag/v1.0.1">Azure Data Explorer connector</a> (version <code>1.0.1</code>) is <a href="https://hub.docker.com/r/abhirockzz/adx-connector-strimzi">available on Docker Hub</a> and it is referenced in the <code>KafkaConnect</code> resource definition (<code>image: abhirockzz/adx-connector-strimzi:1.0.1</code>):</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-yaml" data-lang="yaml"><span style="display:flex;"><span><span style="color:#f92672">apiVersion</span>: <span style="color:#ae81ff">kafka.strimzi.io/v1beta1</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">kind</span>: <span style="color:#ae81ff">KafkaConnect</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">metadata</span>:
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">name</span>: <span style="color:#ae81ff">my-connect-cluster</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">spec</span>:
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">image</span>: <span style="color:#ae81ff">abhirockzz/adx-connector-strimzi:1.0.1</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">version</span>: <span style="color:#ae81ff">2.4.0</span>
+</span></span><span style="display:flex;"><span>...<span style="color:#ae81ff">.</span>
+</span></span></code></pre></div><p>If you want to build your own Docker image, use the <a href="https://hub.docker.com/r/strimzi/kafka">Strimzi Kafka Docker image</a> as a base and add the Azure Data Explorer connector JAR top to the plugin path. Start by downloading the connector JAR file:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-shell" data-lang="shell"><span style="display:flex;"><span>export KUSTO_KAFKA_SINK_VERSION<span style="color:#f92672">=</span>1.0.1
+</span></span><span style="display:flex;"><span>mkdir connector <span style="color:#f92672">&amp;&amp;</span> cd connector
+</span></span><span style="display:flex;"><span>curl -L -O https://github.com/Azure/kafka-sink-azure-kusto/releases/download/v$KUSTO_KAFKA_SINK_VERSION/kafka-sink-azure-kusto-$KUSTO_KAFKA_SINK_VERSION-jar-with-dependencies.jar
+</span></span></code></pre></div><p>Then, you can use this <code>Dockerfile</code> to build the Docker image:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-dockerfile" data-lang="dockerfile"><span style="display:flex;"><span><span style="color:#66d9ef">FROM</span><span style="color:#e6db74"> strimzi/kafka:0.19.0-kafka-2.4.0</span><span style="color:#960050;background-color:#1e0010">
+</span></span></span><span style="display:flex;"><span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">USER</span><span style="color:#e6db74"> root:root</span><span style="color:#960050;background-color:#1e0010">
+</span></span></span><span style="display:flex;"><span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">COPY</span> ./connector/ /opt/kafka/plugins/<span style="color:#960050;background-color:#1e0010">
+</span></span></span><span style="display:flex;"><span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">RUN</span> ls -lrt /opt/kafka/plugins/<span style="color:#960050;background-color:#1e0010">
+</span></span></span><span style="display:flex;"><span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">USER</span><span style="color:#e6db74"> 1001</span><span style="color:#960050;background-color:#1e0010">
+</span></span></span></code></pre></div><blockquote>
+<p>This technique has been illustrated in the <a href="https://strimzi.io/docs/operators/master/deploying.html#creating-new-image-from-base-str">Strimzi documentation</a></p></blockquote>
+<h3 id="authentication">Authentication</h3>
+<p>Before installing the connector, we need to create an <a href="https://docs.microsoft.com/en-us/azure/active-directory/develop/app-objects-and-service-principals?WT.mc_id=devto-blog-abhishgu">Azure Service Principal</a> in order for the connector to authenticate and connect to Azure Data Explorer service. You can use the <a href="https://docs.microsoft.com/cli/azure/ad/sp?view=azure-cli-latest&amp;WT.mc_id=devto-blog-abhishgu">az ad sp create-for-rbac</a> command:</p>
+<pre tabindex="0"><code>az ad sp create-for-rbac -n &#34;kusto-sp&#34;
+</code></pre><p>You will get a JSON response as below - please note down the <code>appId</code>, <code>password</code> and <code>tenant</code> as you will be using them in subsequent steps</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&#34;appId&#34;</span>: <span style="color:#e6db74">&#34;fe7280c7-5705-4789-b17f-71a472340429&#34;</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&#34;displayName&#34;</span>: <span style="color:#e6db74">&#34;kusto-sp&#34;</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&#34;name&#34;</span>: <span style="color:#e6db74">&#34;http://kusto-sp&#34;</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&#34;password&#34;</span>: <span style="color:#e6db74">&#34;29c719dd-f2b3-46de-b71c-4004fb6116ee&#34;</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&#34;tenant&#34;</span>: <span style="color:#e6db74">&#34;42f988bf-86f1-42af-91ab-2d7cd011db42&#34;</span>
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p><strong>Add permissions to your database</strong></p>
+<p>Provide an appropriate role to the Service principal you just created. To assign the <code>admin</code> role, <a href="https://docs.microsoft.com/azure/data-explorer/manage-database-permissions?WT.mc_id=devto-blog-abhishgu#manage-permissions-in-the-azure-portal">follow this guide</a> to use the Azure portal or use the following command in your Data Explorer cluster</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-shell" data-lang="shell"><span style="display:flex;"><span>.add database &lt;database name&gt; admins  <span style="color:#f92672">(</span><span style="color:#e6db74">&#39;aadapp=&lt;service principal AppID&gt;;&lt;service principal TenantID&gt;&#39;</span><span style="color:#f92672">)</span> <span style="color:#e6db74">&#39;AAD App&#39;</span>
+</span></span></code></pre></div><p>We will seed the auth related config as a <a href="https://kubernetes.io/docs/concepts/configuration/secret/">Kubernetes Secret</a> - later on you will see where this <code>Secret</code> is referenced.</p>
+<p>Create a file called <code>adx-auth.yaml</code> with the below contents.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-yaml" data-lang="yaml"><span style="display:flex;"><span><span style="color:#f92672">apiVersion</span>: <span style="color:#ae81ff">v1</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">kind</span>: <span style="color:#ae81ff">Secret</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">metadata</span>:
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">name</span>: <span style="color:#ae81ff">adx-auth</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">type</span>: <span style="color:#ae81ff">Opaque</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">stringData</span>:
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">adx-auth.properties</span>: |-<span style="color:#e6db74">
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    kustoURL: &lt;replace ADX Ingest URL&gt;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    tenantID: &lt;enter service principal tenant ID&gt;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    appID: &lt;enter service principal app ID&gt;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    password: &lt;enter service principal tenant password&gt;</span>
+</span></span></code></pre></div><p>Replace values for the following:</p>
+<ul>
+<li><code>kustoURL</code>: Azure Data Explorer ingestion URL e.g. <code>https://ingest-[cluster name].[region].kusto.windows.net</code></li>
+<li><code>tenantID</code> - service principal tenant ID</li>
+<li><code>appID</code> - service principal application ID</li>
+<li><code>password</code> - service principal password</li>
+</ul>
+<h3 id="install-kafka-connect">Install Kafka Connect</h3>
+<p>Create the <code>Secret</code> and initiate the Kafka Cluster creation:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-shell" data-lang="shell"><span style="display:flex;"><span>kubectl apply -f adx-auth.yaml
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>kubectl apply -f https://github.com/abhirockzz/kusto-kafka-connect-strimzi/raw/master/deploy/kafka-connect.yaml
+</span></span></code></pre></div><p>While you wait for the Kafka Connect cluster to start, take a look at this snippet of the <code>KafkaConnect</code> cluster resource definition. Notice the <code>externalConfiguration</code> attribute that points to the secret we had just created. It is loaded into the Kafka Connect <code>Pod</code> as a <a href="https://kubernetes.io/docs/concepts/storage/volumes/">Volume</a> and the Kafka <a href="https://kafka.apache.org/26/javadoc/org/apache/kafka/common/config/provider/FileConfigProvider.html">FileConfigProvider</a> is used to access them.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-yaml" data-lang="yaml"><span style="display:flex;"><span><span style="color:#f92672">apiVersion</span>: <span style="color:#ae81ff">kafka.strimzi.io/v1beta1</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">kind</span>: <span style="color:#ae81ff">KafkaConnect</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">metadata</span>:
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">name</span>: <span style="color:#ae81ff">my-connect-cluster</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">spec</span>:
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">image</span>: <span style="color:#ae81ff">abhirockzz/adx-connector-strimzi:1.0.1</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">config</span>:
+</span></span><span style="display:flex;"><span>    <span style="color:#ae81ff">...</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">config.providers</span>: <span style="color:#ae81ff">file</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">config.providers.file.class</span>: <span style="color:#ae81ff">org.apache.kafka.common.config.provider.FileConfigProvider</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">externalConfiguration</span>:
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">volumes</span>:
+</span></span><span style="display:flex;"><span>      - <span style="color:#f92672">name</span>: <span style="color:#ae81ff">adx-auth-config</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">secret</span>:
+</span></span><span style="display:flex;"><span>          <span style="color:#f92672">secretName</span>: <span style="color:#ae81ff">adx-auth</span>
+</span></span></code></pre></div><p>To check Kafka Connect cluster status:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-shell" data-lang="shell"><span style="display:flex;"><span>kubectl get pod -l<span style="color:#f92672">=</span>strimzi.io/cluster<span style="color:#f92672">=</span>my-connect-cluster -w
+</span></span></code></pre></div><p>Wait for the Kafka Connect Pod to transition into <code>Running</code> state.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-shell" data-lang="shell"><span style="display:flex;"><span>NAME                                          READY   STATUS    RESTARTS   AGE
+</span></span><span style="display:flex;"><span>my-connect-cluster-connect-5bf9db5d9f-9ttg4   1/1     Running   <span style="color:#ae81ff">0</span>          1m
+</span></span></code></pre></div><h3 id="create-the-topic-and-install-connector">Create the topic and install connector</h3>
+<p>You can use the <a href="https://strimzi.io/docs/operators/master/using.html#using-the-topic-operator-str">Strimzi Entity Operator</a> to create the <code>storm-events</code> topic. Here is the <code>Topic</code> definition:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-yaml" data-lang="yaml"><span style="display:flex;"><span><span style="color:#f92672">apiVersion</span>: <span style="color:#ae81ff">kafka.strimzi.io/v1beta1</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">kind</span>: <span style="color:#ae81ff">KafkaTopic</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">metadata</span>:
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">name</span>: <span style="color:#ae81ff">storm-events</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">labels</span>:
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">strimzi.io/cluster</span>: <span style="color:#ae81ff">my-kafka-cluster</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">spec</span>:
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">partitions</span>: <span style="color:#ae81ff">3</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">replicas</span>: <span style="color:#ae81ff">1</span>
+</span></span></code></pre></div><p>To create:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-shell" data-lang="shell"><span style="display:flex;"><span>kubectl apply -f https://github.com/abhirockzz/kusto-kafka-connect-strimzi/raw/master/deploy/topic.yaml
+</span></span></code></pre></div><p>Use <code>kubectl get kafkatopic</code> to see the topic you just created as well as internal Kafka topics</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-shell" data-lang="shell"><span style="display:flex;"><span>NAME                                                          PARTITIONS   REPLICATION FACTOR
+</span></span><span style="display:flex;"><span>consumer-offsets---84e7a678d08f4bd226872e5cdd4eb527fadc1c6a   <span style="color:#ae81ff">50</span>           <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>storm-events                                                  <span style="color:#ae81ff">3</span>            <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>strimzi-connect-cluster-configs                               <span style="color:#ae81ff">1</span>            <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>strimzi-connect-cluster-offsets                               <span style="color:#ae81ff">25</span>           <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>strimzi-connect-cluster-status                                <span style="color:#ae81ff">5</span>            <span style="color:#ae81ff">1</span>
+</span></span></code></pre></div><p>Here is snippet of the connector (<code>KafkaConnector</code>) definition - it&rsquo;s just a way to capture configuration and metadata for the connector you want to install.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-yaml" data-lang="yaml"><span style="display:flex;"><span><span style="color:#f92672">apiVersion</span>: <span style="color:#ae81ff">kafka.strimzi.io/v1alpha1</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">kind</span>: <span style="color:#ae81ff">KafkaConnector</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">metadata</span>:
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">name</span>: <span style="color:#ae81ff">adx-sink-connector</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">labels</span>:
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">strimzi.io/cluster</span>: <span style="color:#ae81ff">my-connect-cluster</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">spec</span>:
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">class</span>: <span style="color:#ae81ff">com.microsoft.azure.kusto.kafka.connect.sink.KustoSinkConnector</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">tasksMax</span>: <span style="color:#ae81ff">3</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">config</span>:
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">topics</span>: <span style="color:#ae81ff">storm-events</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">flush.size.bytes</span>: <span style="color:#ae81ff">10000</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">flush.interval.ms</span>: <span style="color:#ae81ff">50000</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">kusto.tables.topics.mapping</span>: <span style="color:#e6db74">&#34;[{&#39;topic&#39;: &#39;storm-events&#39;,&#39;db&#39;: &#39;[REPLACE DATABASE NAME]&#39;, &#39;table&#39;: &#39;Storms&#39;,&#39;format&#39;: &#39;csv&#39;, &#39;mapping&#39;:&#39;Storms_CSV_Mapping&#39;}]&#34;</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">kusto.url</span>: <span style="color:#ae81ff">${file:/opt/kafka/external-configuration/adx-auth-config/adx-auth.properties:kustoURL}</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">aad.auth.authority</span>: <span style="color:#ae81ff">${file:/opt/kafka/external-configuration/adx-auth-config/adx-auth.properties:tenantID}</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">aad.auth.appid</span>: <span style="color:#ae81ff">${file:/opt/kafka/external-configuration/adx-auth-config/adx-auth.properties:appID}</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">aad.auth.appkey</span>: <span style="color:#ae81ff">${file:/opt/kafka/external-configuration/adx-auth-config/adx-auth.properties:password}</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">key.converter</span>: <span style="color:#e6db74">&#34;org.apache.kafka.connect.storage.StringConverter&#34;</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">value.converter</span>: <span style="color:#e6db74">&#34;org.apache.kafka.connect.storage.StringConverter&#34;</span>
+</span></span></code></pre></div><blockquote>
+<p>The <code>flush.size.bytes</code> and <code>flush.interval.ms</code> attributes work in tandem with each other and serve as a performance knob for batching. Please refer to the <a href="https://github.com/Azure/kafka-sink-azure-kusto/blob/master/README.md#5-sink-properties">connector GitHub repo</a> for details on these and other configuration parameters</p></blockquote>
+<p>Notice how the individual properties (from the <code>Secret</code>) are actually referenced. For example to reference the Service Principal application ID, we used this:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-yaml" data-lang="yaml"><span style="display:flex;"><span><span style="color:#f92672">aad.auth.appid</span>: <span style="color:#ae81ff">${file:/opt/kafka/external-configuration/adx-auth-config/adx-auth.properties:appID}</span>
+</span></span></code></pre></div><ul>
+<li><code>/opt/kafka/external-configuration</code> is a fixed path inside the container</li>
+<li><code>adx-auth-config</code> is the name of the volume in the <code>KafkaConnect</code> definition</li>
+<li><code>adx-auth.properties</code> is the name of the file as defined in the <code>Secret</code></li>
+<li><code>appID</code> is the name of key</li>
+</ul>
+<blockquote>
+<p>The direct attribute name has been used to define non-sensitive connector configs (e.g. <code>topics: storm-events</code>). Alternatively, can encapsulate these in a <code>ConfigMap</code>, load them as a <code>Volume</code> and reference them (just like the sensitive attributes using a <code>Secret</code>).</p></blockquote>
+<p>Copy the above definition for the <code>KafkaConnector</code> to local file <code>adx-connect-config.yaml</code>. Make sure you replace the correct database name in the <code>kusto.tables.topics.mapping</code> attribute. To create:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-shell" data-lang="shell"><span style="display:flex;"><span>kubectl apply -f adx-connect-config.yaml
+</span></span></code></pre></div><p>Check the kafka connect logs <code>kubectl logs -l=strimzi.io/cluster=my-connect-cluster</code>. If everything is working fine, you should see logs similar to this:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-shell" data-lang="shell"><span style="display:flex;"><span>....
+</span></span><span style="display:flex;"><span>INFO <span style="color:#f92672">[</span>Consumer clientId<span style="color:#f92672">=</span>connector-consumer-adx-sink-connector-1, groupId<span style="color:#f92672">=</span>connect-adx-sink-connector<span style="color:#f92672">]</span> Resetting offset <span style="color:#66d9ef">for</span> partition storm-events-1 to offset 0. <span style="color:#f92672">(</span>org.apache.kafka.clients.consumer.internals.SubscriptionState<span style="color:#f92672">)</span> <span style="color:#f92672">[</span>task-thread-adx-sink-connector-1<span style="color:#f92672">]</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>INFO <span style="color:#f92672">[</span>Consumer clientId<span style="color:#f92672">=</span>connector-consumer-adx-sink-connector-2, groupId<span style="color:#f92672">=</span>connect-adx-sink-connector<span style="color:#f92672">]</span> Resetting offset <span style="color:#66d9ef">for</span> partition storm-events-2 to offset 0. <span style="color:#f92672">(</span>org.apache.kafka.clients.consumer.internals.SubscriptionState<span style="color:#f92672">)</span> <span style="color:#f92672">[</span>task-thread-adx-sink-connector-2<span style="color:#f92672">]</span>
+</span></span></code></pre></div><h2 id="data-ingestion-in-action">Data ingestion in action</h2>
+<p>So, we have everything setup. All we need is events to be sent to the Kafka topic, so that we can see the connector in action and ingest data into Azure Data Explorer.</p>
+<p>You can use this handy event generator application (available in <a href="https://hub.docker.com/r/abhirockzz/adx-event-producer">Docker Hub</a>) and deploy it to your Kubernetes cluster - the <code>Dockerfile</code> is available in the <a href="https://github.com/abhirockzz/kusto-kafka-connect-strimzi/raw/master/storm-events-producer/Dockerfile">GitHub repo</a> in case you want to reference it.</p>
+<p>Kubernetes <code>Deployment</code> snippet:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-yaml" data-lang="yaml"><span style="display:flex;"><span><span style="color:#f92672">apiVersion</span>: <span style="color:#ae81ff">apps/v1</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">kind</span>: <span style="color:#ae81ff">Deployment</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">metadata</span>:
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">name</span>: <span style="color:#ae81ff">adx-event-producer</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">spec</span>:
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">replicas</span>: <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#ae81ff">....</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">spec</span>:
+</span></span><span style="display:flex;"><span>      <span style="color:#f92672">containers</span>:
+</span></span><span style="display:flex;"><span>        - <span style="color:#f92672">name</span>: <span style="color:#ae81ff">adx-event-producer</span>
+</span></span><span style="display:flex;"><span>          <span style="color:#f92672">image</span>: <span style="color:#ae81ff">abhirockzz/adx-event-producer</span>
+</span></span><span style="display:flex;"><span>          <span style="color:#f92672">imagePullPolicy</span>: <span style="color:#ae81ff">Always</span>
+</span></span><span style="display:flex;"><span>          <span style="color:#f92672">env</span>:
+</span></span><span style="display:flex;"><span>            - <span style="color:#f92672">name</span>: <span style="color:#ae81ff">KAFKA_BOOTSTRAP_SERVER</span>
+</span></span><span style="display:flex;"><span>              <span style="color:#f92672">value</span>: <span style="color:#ae81ff">my-kafka-cluster-kafka-bootstrap:9092</span>
+</span></span><span style="display:flex;"><span>            - <span style="color:#f92672">name</span>: <span style="color:#ae81ff">KAFKA_TOPIC</span>
+</span></span><span style="display:flex;"><span>              <span style="color:#f92672">value</span>: <span style="color:#ae81ff">storm-events</span>
+</span></span><span style="display:flex;"><span>            - <span style="color:#f92672">name</span>: <span style="color:#ae81ff">SOURCE_FILE</span>
+</span></span><span style="display:flex;"><span>              <span style="color:#f92672">value</span>: <span style="color:#ae81ff">StormEvents.csv</span>
+</span></span></code></pre></div><p>To deploy the producer application:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-shell" data-lang="shell"><span style="display:flex;"><span>kubectl apply -f https://github.com/abhirockzz/kusto-kafka-connect-strimzi/raw/master/deploy/producer.yaml
+</span></span></code></pre></div><p>The application picks up records from the <a href="https://github.com/abhirockzz/kusto-kafka-connect-strimzi/blob/master/storm-events-producer/StormEvents.csv">StormEvents.csv file</a> and sends them to a Kafka topic. Each event is a CSV record that represent data for a Storm occurence (start and end time, state, type etc.), for example: <code>2007-01-01 00:00:00.0000000,2007-01-01 05:00:00.0000000,23357,WISCONSIN,Winter Storm,COOP Observer</code>.</p>
+<blockquote>
+<p>The producer application <a href="https://github.com/abhirockzz/kusto-kafka-connect-strimzi/blob/master/storm-events-producer/main.go#L65">waits for 3 seconds</a> between subsequent produce operations to Kafka. This is intentional so that you can monitor the Kafka Connect logs and make sense of what&rsquo;s going on. The <code>StormEvents.csv</code> file contains more than 50,000 records, so it might take a while for all of them to be batched and ingested to Azure Data Explorer</p></blockquote>
+<p>You can track the application logs using: <code>kubectl logs -f -l app=adx-event-producer</code>. If all is well, you should see something similar to this:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>...
+</span></span><span style="display:flex;"><span>sent message to partition <span style="color:#ae81ff">0</span> offset <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span>event  2007-01-01 00:00:00.0000000,2007-01-01 00:00:00.0000000,13208,NORTH CAROLINA,Thunderstorm Wind,Public
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>sent message to partition <span style="color:#ae81ff">0</span> offset <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>event  2007-01-01 00:00:00.0000000,2007-01-01 05:00:00.0000000,23358,WISCONSIN,Winter Storm,COOP Observer
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>sent message to partition <span style="color:#ae81ff">0</span> offset <span style="color:#ae81ff">2</span>
+</span></span><span style="display:flex;"><span>event  2007-01-01 00:00:00.0000000,2007-01-01 05:00:00.0000000,23357,WISCONSIN,Winter Storm,COOP Observer
+</span></span></code></pre></div><p>The <code>storm-events</code> topic will now start getting events and these will be picked up by the sink connector. If you were to track the connector logs:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-shell" data-lang="shell"><span style="display:flex;"><span>kubectl logs -f -l strimzi.io/cluster<span style="color:#f92672">=</span>my-connect-cluster
+</span></span></code></pre></div><p>&hellip; you should see logs similar to this:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>....
+</span></span><span style="display:flex;"><span>INFO Kusto ingestion: file <span style="color:#f92672">(</span>/tmp/kusto-sink-connector-17d03941-f8ca-498e-bc52-68ced036dc69/kafka_storm-events_0_0.csv.gz<span style="color:#f92672">)</span> of size <span style="color:#f92672">(</span>1722<span style="color:#f92672">)</span> at current offset <span style="color:#f92672">(</span>16<span style="color:#f92672">)</span> <span style="color:#f92672">(</span>com.microsoft.azure.kusto.kafka.connect.sink.TopicPartitionWriter<span style="color:#f92672">)</span> <span style="color:#f92672">[</span>Timer-6<span style="color:#f92672">]</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>INFO WorkerSinkTask<span style="color:#f92672">{</span>id<span style="color:#f92672">=</span>adx-sink-connector-0<span style="color:#f92672">}</span> Committing offsets asynchronously using sequence number 17: <span style="color:#f92672">{</span>storm-events-0<span style="color:#f92672">=</span>OffsetAndMetadata<span style="color:#f92672">{</span>offset<span style="color:#f92672">=</span>17, leaderEpoch<span style="color:#f92672">=</span>null, metadata<span style="color:#f92672">=</span><span style="color:#e6db74">&#39;&#39;</span><span style="color:#f92672">}}</span> <span style="color:#f92672">(</span>org.apache.kafka.connect.runtime.WorkerSinkTask<span style="color:#f92672">)</span> <span style="color:#f92672">[</span>task-thread-adx-sink-connector-0<span style="color:#f92672">]</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>INFO Kusto ingestion: file <span style="color:#f92672">(</span>/tmp/kusto-sink-connector-17d03941-f8ca-498e-bc52-68ced036dc69/kafka_storm-events_0_17.csv.gz<span style="color:#f92672">)</span> of size <span style="color:#f92672">(</span>1666<span style="color:#f92672">)</span> at current offset <span style="color:#f92672">(</span>33<span style="color:#f92672">)</span> <span style="color:#f92672">(</span>com.microsoft.azure.kusto.kafka.connect.sink.TopicPartitionWriter<span style="color:#f92672">)</span> <span style="color:#f92672">[</span>Timer-7<span style="color:#f92672">]</span>
+</span></span><span style="display:flex;"><span>....
+</span></span></code></pre></div><h3 id="query-azure-data-explorer">Query Azure Data Explorer</h3>
+<p>Wait for sometime before data ends up in the <code>Storms</code> table. To confirm, check the row count and confirm that there are no failures in the ingestion process:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-shell" data-lang="shell"><span style="display:flex;"><span>Storms | count
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>. show ingestion failures
+</span></span></code></pre></div><p>Once there is some data, try out a few queries. To see all the records:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-shell" data-lang="shell"><span style="display:flex;"><span>Storms
+</span></span></code></pre></div><p>Use <code>where</code> and <code>project</code> to filter specific data</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-shell" data-lang="shell"><span style="display:flex;"><span>Storms
+</span></span><span style="display:flex;"><span>| where EventType <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;Drought&#39;</span> and State <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;TEXAS&#39;</span>
+</span></span><span style="display:flex;"><span>| project StartTime, EndTime, Source, EventId
+</span></span></code></pre></div><p>Use the <a href="https://docs.microsoft.com/azure/data-explorer/write-queries?WT.mc_id=devto-blog-abhishgu#summarize"><code>summarize</code> operator</a></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-shell" data-lang="shell"><span style="display:flex;"><span>Storms
+</span></span><span style="display:flex;"><span>| summarize event_count<span style="color:#f92672">=</span>count<span style="color:#f92672">()</span> by State
+</span></span><span style="display:flex;"><span>| where event_count &gt; <span style="color:#ae81ff">10</span>
+</span></span><span style="display:flex;"><span>| project State, event_count
+</span></span><span style="display:flex;"><span>| render columnchart
+</span></span></code></pre></div><p><img src="https://strimzi.io/assets/images/posts/2020-09-22-columnchart.png" alt=""></p>
+<p>These are just few examples. Please take a look at the <a href="https://docs.microsoft.com/azure/data-explorer/kusto/query/?WT.mc_id=devto-blog-abhishgu">Kusto Query Language documentation</a> or explore tutorials about how to ingest JSON formatted sample data into Azure Data Explorer, using <a href="https://docs.microsoft.com/azure/data-explorer/write-queries#scalar-operators">scalar operators</a>, <a href="https://docs.microsoft.com/azure/data-explorer/kusto/query/tutorial?pivots=azuredataexplorer&amp;WT.mc_id=devto-blog-abhishgu#timecharts">timecharts</a> etc.</p>
+<h2 id="clean-up-resources">Clean up resources</h2>
+<p>To delete the connector and/or Kafka cluster:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-shell" data-lang="shell"><span style="display:flex;"><span>kubectl delete kafkaconnect/my-connect-cluster
+</span></span><span style="display:flex;"><span>kubectl delete kafka/my-kafka-cluster
+</span></span></code></pre></div><p>To delete the AKS and Azure Data Explorer clusters, simply delete the resource group:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-shell" data-lang="shell"><span style="display:flex;"><span>az group delete --name &lt;AZURE_RESOURCE_GROUP&gt; --yes --no-wait
+</span></span></code></pre></div><h2 id="conclusion">Conclusion</h2>
+<p>That&rsquo;s all for this blog post and I hope you found it useful! Please note that, this is <em>not</em> the only way to ingest data into Azure Data Explorer. You&rsquo;re welcome to refer to the documentation and explore other techniques such as <a href="https://docs.microsoft.com/azure/data-explorer/ingest-data-one-click?WT.mc_id=devto-blog-abhishgu">One-click Ingestion</a>, using <a href="https://docs.microsoft.com/azure/data-explorer/ingest-data-event-grid-overview?WT.mc_id=devto-blog-abhishgu">Event Grid</a>, <a href="https://docs.microsoft.com/azure/data-explorer/ingest-data-iot-hub-overview?WT.mc_id=devto-blog-abhishgu">IoT Hub</a> etc.</p>
+<p>Please consider exploring the following topics as additional learning resources:</p>
+<h3 id="resources">Resources</h3>
+<ul>
+<li><a href="https://strimzi.io/docs/latest/#proc-configuring-kafka-connect-deployment-configuration-kafka-connect">Configuring Kafka Connect cluster</a> using Strimzi</li>
+<li>Strimzi <a href="https://strimzi.io/docs/latest/#type-KafkaConnect-reference">KafkaConnect schema reference</a></li>
+<li>Strimzi <a href="https://strimzi.io/docs/latest/#type-KafkaConnector-reference">KafkaConnector schema reference</a></li>
+<li><a href="https://techcommunity.microsoft.com/t5/azure-data-explorer/just-enough-azure-data-explorer-for-architects/ba-p/1636234">Just Enough Azure Data Explorer for Cloud Architects</a></li>
+<li><a href="https://techcommunity.microsoft.com/t5/azure-data-explorer/azure-data-explorer-kafka-connector-new-features-with-version-1/ba-p/1637143">What&rsquo;s new in Azure Data Explorer connector 1.x</a></li>
+<li><a href="https://docs.microsoft.com/en-us/azure/data-explorer/kql-quick-reference?WT.mc_id=devto-blog-abhishgu">Kusto Query Language</a></li>
+</ul>
+
+
+        
+
+        
+
+        
+      </article>
+
+      
+        <ul class="pager blog-pager">
+          
+            <li class="previous">
+              <a href="https://abhirockzz.github.io/posts/cosmosdb-fault-tolerant-apps/" data-toggle="tooltip" data-placement="top" title="Build fault tolerant applications with Cassandra API for Azure Cosmos DB">&larr; Previous Post</a>
+            </li>
+          
+          
+            <li class="next">
+              <a href="https://abhirockzz.github.io/posts/postgres-azure-data-explorer-cdc/" data-toggle="tooltip" data-placement="top" title="Change Data Capture from PostgreSQL to Azure Data Explorer using Kafka Connect">Next Post &rarr;</a>
+            </li>
+          
+        </ul>
+      
+
+
+      
+
+    </div>
+  </div>
+</div>
+
+    
+<footer>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+        <ul class="list-inline text-center footer-links">
+          
+          
+          <li>
+            <a href="" title="RSS">
+              <span class="fa-stack fa-lg">
+                <i class="fas fa-circle fa-stack-2x"></i>
+                <i class="fas fa-rss fa-stack-1x fa-inverse"></i>
+              </span>
+            </a>
+          </li>
+          
+        </ul>
+        <p class="credits copyright text-muted">
+          
+
+          &nbsp;&bull;&nbsp;&copy;
+          
+          2025
+          
+
+          
+          &nbsp;&bull;&nbsp;
+          <a href="https://abhirockzz.github.io/">Abhishek&#39;s blog</a>
+          
+        </p>
+        
+        <p class="credits theme-by text-muted">
+          <a href="https://gohugo.io">Hugo v0.145.0</a> powered &nbsp;&bull;&nbsp; Theme <a href="https://github.com/halogenica/beautifulhugo">Beautiful Hugo</a> adapted from <a href="https://deanattali.com/beautiful-jekyll/">Beautiful Jekyll</a>
+          
+        </p>
+      </div>
+    </div>
+  </div>
+</footer><script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.js"
+  integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/contrib/auto-render.min.js"
+  integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
+<script src="https://code.jquery.com/jquery-1.12.4.min.js"
+  integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"
+  integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+<script src="https://abhirockzz.github.io/%20js/main.js"></script><script> renderMathInElement(document.body); </script><script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.js"
+  integrity="sha384-QELNnmcmU8IR9ZAykt67vGr9/rZJdHbiWi64V88fCPaOohUlHCqUD/unNN0BXSqy" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe-ui-default.min.js"
+  integrity="sha384-m67o7SkQ1ALzKZIFh4CiTA8tmadaujiTa9Vu+nqPSwDOqHrDmxLezTdFln8077+q" crossorigin="anonymous"></script><script src="https://abhirockzz.github.io/%20js/load-photoswipe.js"></script>
+
+
+
+
+
+
+
+
+    
+  </body>
+</html>
+

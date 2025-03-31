@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en" itemscope itemtype="http://schema.org/WebPage">
+  <head>
+    
+
+<meta charset="utf-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+
+<title>MySQL to DynamoDB: Build a streaming data pipeline on AWS using Kafka - Abhishek&#39;s blog</title>
+<meta name="description" content="Use change data capture with MSK Connect to sync data between Aurora MySQL and DynamoDB
+This is the second part of the blog series which provides a step-by-step walkthrough of data pipelines with Kafka and Kafka Connect. I will be using AWS for demonstration purposes, but the concepts apply to any equivalent options (e.g. running these locally in Docker).
+This part will show Change Data Capture in action that let&rsquo;s you track row-level changes in database tables in response to create, update and delete operations. For example, in MySQL, these change data events are exposed via the MySQL binary log (binlog)."><script type="application/ld+json">
+{
+    "@context": "http://schema.org",
+    "@type": "WebSite",
+    "name": "Abhishek\u0027s blog",
+    
+    "url": "https:\/\/abhirockzz.github.io\/"
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Organization",
+  "name": "",
+  "url": "https:\/\/abhirockzz.github.io\/"
+  
+  
+  
+  
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [{
+        "@type": "ListItem",
+        "position": 1,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io\/",
+          "name": "home"
+        }
+    },{
+        "@type": "ListItem",
+        "position": 3,
+        "item": {
+          "@id": "https:\/\/abhirockzz.github.io\/posts\/msk-to-dynamodb-with-kafka\/",
+          "name": "My SQL to dynamo db build a streaming data pipeline on aws using kafka"
+        }
+    }]
+}
+</script><script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "Article",
+  "author": {
+    "name" : ""
+  },
+  "headline": "MySQL to DynamoDB: Build a streaming data pipeline on AWS using Kafka",
+  "description" : "Use change data capture with MSK Connect to sync data between Aurora MySQL and DynamoDB\nThis is the second part of the blog series which provides a step-by-step walkthrough of data pipelines with Kafka and Kafka Connect. I will be using AWS for demonstration purposes, but the concepts apply to any equivalent options (e.g. running these locally in Docker).\nThis part will show Change Data Capture in action that let\u0026rsquo;s you track row-level changes in database tables in response to create, update and delete operations. For example, in MySQL, these change data events are exposed via the MySQL binary log (binlog).\n",
+  "inLanguage" : "en",
+  "wordCount":  1779 ,
+  "datePublished" : "2022-06-28T00:00:00",
+  "dateModified" : "2022-06-28T00:00:00",
+  "image" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+  "keywords" : [ "kafka, dynamodb, data engineering, nosql, database, aws, tutorial" ],
+  "mainEntityOfPage" : "https:\/\/abhirockzz.github.io\/posts\/msk-to-dynamodb-with-kafka\/",
+  "publisher" : {
+    "@type": "Organization",
+    "name" : "https:\/\/abhirockzz.github.io\/",
+    "logo" : {
+        "@type" : "ImageObject",
+        "url" : "https:\/\/abhirockzz.github.io\/icon.jpg",
+        "height" :  60 ,
+        "width" :  60
+    }
+  }
+}
+</script>
+
+<meta property="og:title" content="MySQL to DynamoDB: Build a streaming data pipeline on AWS using Kafka" />
+<meta property="og:description" content="Use change data capture with MSK Connect to sync data between Aurora MySQL and DynamoDB
+This is the second part of the blog series which provides a step-by-step walkthrough of data pipelines with Kafka and Kafka Connect. I will be using AWS for demonstration purposes, but the concepts apply to any equivalent options (e.g. running these locally in Docker).
+This part will show Change Data Capture in action that let&rsquo;s you track row-level changes in database tables in response to create, update and delete operations. For example, in MySQL, these change data events are exposed via the MySQL binary log (binlog).">
+<meta property="og:image" content="https://abhirockzz.github.io/icon.jpg" />
+<meta property="og:url" content="https://abhirockzz.github.io/posts/msk-to-dynamodb-with-kafka/" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Abhishek&#39;s blog" />
+
+<meta name="twitter:title" content="MySQL to DynamoDB: Build a streaming data pipeline on AWS using Kafka" />
+<meta name="twitter:description" content="Use change data capture with MSK Connect to sync data between Aurora MySQL and DynamoDB
+This is the second part of the blog series which provides a step-by-step walkthrough of data pipelines with …">
+<meta name="twitter:image" content="https://abhirockzz.github.io/icon.jpg" />
+<meta name="twitter:card" content="summary" />
+<link href='https://abhirockzz.github.io/icons/myicon.png' rel='icon' type='image/x-icon' />
+<meta name="generator" content="Hugo 0.145.0">
+<link rel="alternate" href="https://abhirockzz.github.io/%20index.xml" type="application/rss+xml" title="Abhishek&#39;s blog"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css"
+  integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.5.0/css/all.css"
+  integrity="sha384-B4dIYHKNBt8Bc12p+WXckhzcICo0wtJAoU8YZTY5qE0Id1GSseTk6S+L3BlXeVIU" crossorigin="anonymous">
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+  integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous"><link rel="stylesheet" href="https://abhirockzz.github.io/%20css/main.css" /><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic" />
+<link rel="stylesheet"
+  href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800" /><link rel="stylesheet" href="https://abhirockzz.github.io/%20css/syntax.css" /><link rel="stylesheet" href="https://abhirockzz.github.io/%20css/codeblock.css" /><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.css"
+  integrity="sha384-h/L2W9KefUClHWaty3SLE5F/qvc4djlyR4qY3NUV5HGQBBW7stbcfff1+I/vmsHh" crossorigin="anonymous">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/default-skin/default-skin.min.css"
+  integrity="sha384-iD0dNku6PYSIQLyfTOpB06F2KCZJAKLOThS5HRe8b3ibhdEQ6eKsFf/EeFxdOt5R" crossorigin="anonymous">
+
+
+  </head>
+  <body>
+    <nav class="navbar navbar-default navbar-fixed-top navbar-custom">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#main-navbar">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="https://abhirockzz.github.io/">Abhishek&#39;s blog</a>
+    </div>
+
+    <div class="collapse navbar-collapse" id="main-navbar">
+      <ul class="nav navbar-nav navbar-right">
+        
+        
+        <li>
+          <a title="Blog" href="/">Blog</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="About" href="/about">About</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Open-Source" href="/projects">Open-Source</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Presentations" href="/presentations">Presentations</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Publications" href="/publications">Publications</a>
+        </li>
+        
+        
+        
+        <li>
+          <a title="Tags" href="/tags">Tags</a>
+        </li>
+        
+        
+
+        
+        <li>
+          
+          
+          
+        </li>
+        
+
+        
+      </ul>
+    </div>
+
+    
+    <div class="avatar-container">
+      <div class="avatar-img-border">
+        <a title="Abhishek&#39;s blog" href="https://abhirockzz.github.io/">
+          <img class="avatar-img" src="https://abhirockzz.github.io/icon.jpg" alt="Abhishek&#39;s blog" />
+        </a>
+      </div>
+    </div>
+    
+
+  </div>
+</nav>
+
+
+
+    
+
+
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+<div class="pswp__bg"></div>
+
+<div class="pswp__scroll-wrap">
+    
+    <div class="pswp__container">
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+      <div class="pswp__item"></div>
+    </div>
+    
+    <div class="pswp__ui pswp__ui--hidden">
+    <div class="pswp__top-bar">
+      
+      <div class="pswp__counter"></div>
+      <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+      <button class="pswp__button pswp__button--share" title="Share"></button>
+      <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+      <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+      
+      
+      <div class="pswp__preloader">
+        <div class="pswp__preloader__icn">
+          <div class="pswp__preloader__cut">
+            <div class="pswp__preloader__donut"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+      <div class="pswp__share-tooltip"></div>
+    </div>
+    <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+    </button>
+    <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+    </button>
+    <div class="pswp__caption">
+      <div class="pswp__caption__center"></div>
+    </div>
+    </div>
+    </div>
+</div>
+
+
+  
+  
+  
+
+
+
+
+
+
+  
+
+  <header class="header-section ">
+    
+    <div class="intro-header no-img">
+      <div class="container">
+        <div class="row">
+          <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+            <div class="posts-heading">
+              
+                <h1>MySQL to DynamoDB: Build a streaming data pipeline on AWS using Kafka</h1>
+              
+              
+                <hr class="small">
+              
+              
+              
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+
+    
+<div class="container" role="main">
+  <div class="row">
+    <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+      <article role="main" class="blog-post">
+        <p><strong>Use change data capture with MSK Connect to sync data between Aurora MySQL and DynamoDB</strong></p>
+<p>This is the second part of the blog series which provides a step-by-step walkthrough of data pipelines with Kafka and Kafka Connect. I will be using AWS for demonstration purposes, but the concepts apply to any equivalent options (e.g. running these locally in Docker).</p>
+<p>This part will show <em>Change Data Capture</em> in action that let&rsquo;s you track row-level changes in database tables in response to create, update and delete operations. For example, in MySQL, these change data events are exposed via the <a href="https://dev.mysql.com/doc/internals/en/binary-log-overview.html">MySQL binary log (binlog)</a>.</p>
+<p>In <a href="msk-dynamodb-data-pipeline-1.md">Part 1</a>, we used the Datagen connector in the source part of the data pipeline - it helped us generate mock data to MSK topic and keep things simple. We will use Aurora MySQL as the source of data and leverage it&rsquo;s Change Data Capture capability with the <a href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html">Debezium connector for MySQL</a> to extract data in real-time from tables in <a href="https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.AuroraMySQL.html">Aurora MySQL</a>, push that to MSK topics. Then, we will continue to use the DynamoDB sink connector just like we did before.</p>
+<p><strong>If you&rsquo;re new to <a href="https://debezium.io/">Debezium</a>&hellip;</strong></p>
+<p>It is a distributed platform that builds on top of Change Data Capture features available in different databases. It provides a set of <a href="https://debezium.io/documentation/reference/1.2/connectors/index.html">Kafka Connect connectors</a> which tap into row-level changes (using CDC) in database table(s) and convert them into event streams. These are sent to Kafka and can be made available to all the downstream applications.</p>
+<hr>
+<p>Here is a high level diagram of the solution presented in this blog post.</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/ma5ce5o9lkm8sjt0c6rb.png" alt="Image description"></p>
+<p>I am assuming that you are following along from Part 1 where the creation process for the base infrastructure and services required for this tutorial were already covered. If you haven&rsquo;t already, refer to the <strong>Prepare infrastructure components and services</strong> section in <a href="msk-dynamodb-data-pipeline-1.md">part 1</a> section</p>
+<h2 id="data-pipeline-part-1-aurora-mysql-to-msk">Data pipeline part 1: Aurora MySQL to MSK</h2>
+<p>Let&rsquo;s start by creating the first half of the pipeline to synchronise data from Aurora MySQL table to a topic in MSK.</p>
+<p>In this section, you will:</p>
+<ul>
+<li>Download the Debezium connector artefacts</li>
+<li>Create Custom Plugin in MSK</li>
+<li>Deploy the Debezium source connector to MSK Connect</li>
+</ul>
+<p>At the end, you will have the first half of the data pipeline ready to go!</p>
+<h3 id="create-a-custom-plugin-and-connector">Create a Custom plugin and Connector</h3>
+<p><strong>Upload the Debezium connector to Amazon S3</strong></p>
+<p>Log into the Kafka client EC2 instance and run these commands:</p>
+<pre tabindex="0"><code>sudo -u ec2-user -i
+mkdir debezium &amp;&amp; cd debezium
+
+wget https://repo1.maven.org/maven2/io/debezium/debezium-connector-mysql/1.9.0.Final/debezium-connector-mysql-1.9.0.Final-plugin.tar.gz
+tar xzf debezium-connector-mysql-1.9.0.Final-plugin.tar.gz
+
+cd debezium-connector-mysql
+zip -9 ../debezium-connector-mysql-1.9.0.Final-plugin.zip *
+
+cd ..
+aws s3 cp ./debezium-connector-mysql-1.9.0.Final-plugin.zip s3://msk-lab-&lt;ENTER_YOUR_AWS_ACCOUNT_ID&gt;-plugins-bucket/
+</code></pre><p><strong>Create Custom Plugin</strong></p>
+<blockquote>
+<p>For step by step instructions on how to create a MSK Connect Plugin, refer to <a href="https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-plugins.html">Creating a custom plugin using the AWS Management Console</a> in the official documentation.</p></blockquote>
+<p>While creating the Custom Plugin, make sure to choose the Debezium connector zip file you uploaded to <code>S3</code> in the previous step.</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/zea3i0kdmwm7oqxd5i9p.png" alt="Image description"></p>
+<p><strong>Create the Debezium source connector</strong></p>
+<blockquote>
+<p>For step by step instructions on how to create a MSK Connect Connector, refer to <a href="https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-connectors.html#mkc-create-connector-intro">Creating a connector</a> in the official documentation.</p></blockquote>
+<p>To create a connector:</p>
+<ol>
+<li>
+<p>Choose the plugin you just created.</p>
+</li>
+<li>
+<p>Enter the connector name and choose the MSK cluster along with IAM authentication</p>
+</li>
+<li>
+<p>You can enter the content provided below in the connector configuration section. Make sure you replace the following configuration as per your setup:</p>
+<ul>
+<li><code>database.history.kafka.bootstrap.servers</code> - Enter the MSK cluster endpoint</li>
+<li><code>database.hostname</code> - Enter Aurora RDS MySQL Endpoint</li>
+</ul>
+</li>
+</ol>
+<blockquote>
+<p>Leave the rest of configuration unchanged</p></blockquote>
+<pre tabindex="0"><code>connector.class=io.debezium.connector.mysql.MySqlConnector
+database.user=master
+database.server.id=123456
+tasks.max=1
+database.history.kafka.topic=dbhistory.salesdb
+database.history.kafka.bootstrap.servers=&lt;ENTER MSK CLUSTER ENDPOINT&gt;
+database.server.name=salesdb
+database.port=3306
+include.schema.changes=true
+database.hostname=&lt;ENTER RDS MySQL ENDPOINT&gt;
+database.password=S3cretPwd99
+database.include.list=salesdb
+value.converter.schemas.enable=false
+key.converter.schemas.enable=false
+key.converter=org.apache.kafka.connect.storage.StringConverter
+value.converter=org.apache.kafka.connect.json.JsonConverter
+database.history.consumer.security.protocol=SASL_SSL
+database.history.consumer.sasl.mechanism=AWS_MSK_IAM
+database.history.consumer.sasl.jaas.config=software.amazon.msk.auth.iam.IAMLoginModule required;
+database.history.consumer.sasl.client.callback.handler.class=software.amazon.msk.auth.iam.IAMClientCallbackHandler
+database.history.producer.security.protocol=SASL_SSL
+database.history.producer.sasl.mechanism=AWS_MSK_IAM
+database.history.producer.sasl.jaas.config=software.amazon.msk.auth.iam.IAMLoginModule required;
+database.history.producer.sasl.client.callback.handler.class=software.amazon.msk.auth.iam.IAMClientCallbackHandler
+transforms=unwrap
+transforms.unwrap.type=io.debezium.transforms.ExtractNewRecordState
+</code></pre><ol start="4">
+<li>Under <strong>Access permissions</strong>, choose the correct IAM role (the one with <code>AuroraConnectorIAMRole</code> in its name) for the connector</li>
+<li>Click <strong>Next</strong> to move to the <strong>Security</strong> options - leave them unchanged</li>
+<li>Click <strong>Next</strong>. For <strong>Log delivery</strong>, choose <strong>Deliver to Amazon CloudWatch Logs</strong>. Locate and select <code>/msk-connect-demo-cwlog-group</code></li>
+<li>Click <strong>Next</strong> - On the final page, scroll down and click <strong>Create connector</strong> to start the process and wait for the connector to start.</li>
+</ol>
+<p>Once that&rsquo;s done and the connector has transitioned to <strong>Running</strong> state, proceed with the below steps.</p>
+<h3 id="test-the-pipeline">Test the pipeline</h3>
+<p>We want to confirm whether records from the <code>SALES_ORDER</code> table in the <code>salesdb</code> database have been pushed to MSK topic. To do that, from the EC2 host, run the Kafka CLI consumer.</p>
+<blockquote>
+<p>Note the topic name <code>salesdb.salesdb.SALES_ORDER</code> - this is as per Debezium convention</p></blockquote>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>sudo -u ec2-user -i
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>export MSK_BOOTSTRAP_ADDRESS<span style="color:#f92672">=</span>&lt;ENTER MSK CLUSTER ENDPOINT&gt;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>/home/ec2-user/kafka/bin/kafka-console-consumer.sh --bootstrap-server $MSK_BOOTSTRAP_ADDRESS --consumer.config /home/ec2-user/kafka/config/client-config.properties --from-beginning --topic salesdb.salesdb.SALES_ORDER | jq --color-output .
+</span></span></code></pre></div><p>In another terminal, use MySQL client and connect to the Aurora database and insert few records:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>sudo -u ec2-user -i
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>export RDS_AURORA_ENDPOINT<span style="color:#f92672">=</span>&lt;ENTER RDS MySQL ENDPOINT&gt;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>mysql -f -u master -h $RDS_AURORA_ENDPOINT  --password<span style="color:#f92672">=</span>S3cretPwd99
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>USE salesdb;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">select</span> * from SALES_ORDER limit 5;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>INSERT INTO SALES_ORDER <span style="color:#f92672">(</span>ORDER_ID, SITE_ID, ORDER_DATE, SHIP_MODE<span style="color:#f92672">)</span> VALUES <span style="color:#f92672">(</span>29001, 2568, now<span style="color:#f92672">()</span>, <span style="color:#e6db74">&#39;STANDARD&#39;</span><span style="color:#f92672">)</span>;
+</span></span><span style="display:flex;"><span>INSERT INTO SALES_ORDER <span style="color:#f92672">(</span>ORDER_ID, SITE_ID, ORDER_DATE, SHIP_MODE<span style="color:#f92672">)</span> VALUES <span style="color:#f92672">(</span>29002, 1649, now<span style="color:#f92672">()</span>, <span style="color:#e6db74">&#39;ONE-DAY&#39;</span><span style="color:#f92672">)</span>;
+</span></span><span style="display:flex;"><span>INSERT INTO SALES_ORDER <span style="color:#f92672">(</span>ORDER_ID, SITE_ID, ORDER_DATE, SHIP_MODE<span style="color:#f92672">)</span> VALUES <span style="color:#f92672">(</span>29003, 3861, now<span style="color:#f92672">()</span>, <span style="color:#e6db74">&#39;TWO-DAY&#39;</span><span style="color:#f92672">)</span>;
+</span></span><span style="display:flex;"><span>INSERT INTO SALES_ORDER <span style="color:#f92672">(</span>ORDER_ID, SITE_ID, ORDER_DATE, SHIP_MODE<span style="color:#f92672">)</span> VALUES <span style="color:#f92672">(</span>29004, 2568, now<span style="color:#f92672">()</span>, <span style="color:#e6db74">&#39;STANDARD&#39;</span><span style="color:#f92672">)</span>;
+</span></span><span style="display:flex;"><span>INSERT INTO SALES_ORDER <span style="color:#f92672">(</span>ORDER_ID, SITE_ID, ORDER_DATE, SHIP_MODE<span style="color:#f92672">)</span> VALUES <span style="color:#f92672">(</span>29005, 1649, now<span style="color:#f92672">()</span>, <span style="color:#e6db74">&#39;ONE-DAY&#39;</span><span style="color:#f92672">)</span>;
+</span></span><span style="display:flex;"><span>INSERT INTO SALES_ORDER <span style="color:#f92672">(</span>ORDER_ID, SITE_ID, ORDER_DATE, SHIP_MODE<span style="color:#f92672">)</span> VALUES <span style="color:#f92672">(</span>29006, 3861, now<span style="color:#f92672">()</span>, <span style="color:#e6db74">&#39;TWO-DAY&#39;</span><span style="color:#f92672">)</span>;
+</span></span></code></pre></div><p>If everything is setup correctly, you should see the records in the consumer terminal.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&#34;ORDER_ID&#34;</span>: <span style="color:#ae81ff">29001</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&#34;SITE_ID&#34;</span>: <span style="color:#ae81ff">2568</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&#34;ORDER_DATE&#34;</span>: <span style="color:#ae81ff">1655279536000</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&#34;SHIP_MODE&#34;</span>: <span style="color:#e6db74">&#34;STANDARD&#34;</span>
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&#34;ORDER_ID&#34;</span>: <span style="color:#ae81ff">29002</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&#34;SITE_ID&#34;</span>: <span style="color:#ae81ff">1649</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&#34;ORDER_DATE&#34;</span>: <span style="color:#ae81ff">1655279536000</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&#34;SHIP_MODE&#34;</span>: <span style="color:#e6db74">&#34;ONE-DAY&#34;</span>
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&#34;ORDER_ID&#34;</span>: <span style="color:#ae81ff">29003</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&#34;SITE_ID&#34;</span>: <span style="color:#ae81ff">3861</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&#34;ORDER_DATE&#34;</span>: <span style="color:#ae81ff">1655279563000</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&#34;SHIP_MODE&#34;</span>: <span style="color:#e6db74">&#34;TWO-DAY&#34;</span>
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span><span style="color:#960050;background-color:#1e0010">...</span>
+</span></span></code></pre></div><p><strong>The secret to compact change event payloads</strong></p>
+<p>Notice how compact the change data capture event payload is. This is because we configured the connector to use <code>io.debezium.transforms.ExtractNewRecordState</code> which is a Kafka <a href="https://kafka.apache.org/documentation/#connect_transforms">Single Message Transform</a> (SMT). By default Debezium change event structure is quite complex - along with the change event, it also includes metadata such as schema, source database info etc. It looks something like this:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&#34;before&#34;</span>: <span style="color:#66d9ef">null</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&#34;after&#34;</span>: {
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;ORDER_ID&#34;</span>: <span style="color:#ae81ff">29003</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;SITE_ID&#34;</span>: <span style="color:#ae81ff">3861</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;ORDER_DATE&#34;</span>: <span style="color:#ae81ff">1655279563000</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;SHIP_MODE&#34;</span>: <span style="color:#e6db74">&#34;TWO-DAY&#34;</span>
+</span></span><span style="display:flex;"><span>  },
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&#34;source&#34;</span>: {
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;version&#34;</span>: <span style="color:#e6db74">&#34;1.9.0.Final&#34;</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;connector&#34;</span>: <span style="color:#e6db74">&#34;mysql&#34;</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;name&#34;</span>: <span style="color:#e6db74">&#34;salesdb&#34;</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;ts_ms&#34;</span>: <span style="color:#ae81ff">1634569283000</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;snapshot&#34;</span>: <span style="color:#e6db74">&#34;false&#34;</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;db&#34;</span>: <span style="color:#e6db74">&#34;salesdb&#34;</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;sequence&#34;</span>: <span style="color:#66d9ef">null</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;table&#34;</span>: <span style="color:#e6db74">&#34;SALES_ORDER&#34;</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;server_id&#34;</span>: <span style="color:#ae81ff">1733046080</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;gtid&#34;</span>: <span style="color:#66d9ef">null</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;file&#34;</span>: <span style="color:#e6db74">&#34;mysql-bin-changelog.000003&#34;</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;pos&#34;</span>: <span style="color:#ae81ff">43275145</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;row&#34;</span>: <span style="color:#ae81ff">0</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;thread&#34;</span>: <span style="color:#66d9ef">null</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;query&#34;</span>: <span style="color:#66d9ef">null</span>
+</span></span><span style="display:flex;"><span>  },
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&#34;op&#34;</span>: <span style="color:#e6db74">&#34;c&#34;</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&#34;ts_ms&#34;</span>: <span style="color:#ae81ff">1655279563000</span>,
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&#34;transaction&#34;</span>: <span style="color:#66d9ef">null</span>
+</span></span><span style="display:flex;"><span><span style="color:#960050;background-color:#1e0010">...</span>
+</span></span></code></pre></div><p>Thanks to the Kafka SMT (specified using <code>transforms.unwrap.type=io.debezium.transforms.ExtractNewRecordState</code>), we can effectively <code>flatten</code> the event payload and customize it as per our requirements.</p>
+<blockquote>
+<p>For details, refer to <a href="https://debezium.io/documentation/reference/stable/transformations/event-flattening.html">New Record State Extraction</a> in the Debezium documentation.</p></blockquote>
+<hr>
+<h2 id="data-pipeline-part-2-msk-to-dynamodb">Data pipeline part 2: MSK to DynamoDB</h2>
+<p>We can now shift our focus to the second half of the pipeline that&rsquo;s responsible for taking data from MSK topic to DynamoDB table with the help of the DynamoDB Sink connector.</p>
+<p>If the DynamoDB table is not present, the connector automatically creates one for you, but it uses default settings i.e. its creates a table in <a href="https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.ReadWriteCapacityMode.html#HowItWorks.ProvisionedThroughput.Manual">Provisioned Mode</a>, with <code>10</code> read capacity units (RCUs) and <code>10</code> write capacity units (WCUs).</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/l46m4c9r1x0s0pybwcfn.png" alt="Image description"></p>
+<p>But your use-case might need a configuration. For example, in order to handle high volume of data, you may want to configure <a href="https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/AutoScaling.html">Auto scaling</a>, or even better, activate <a href="https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.ReadWriteCapacityMode.html#HowItWorks.OnDemand">On-Demand mode</a> for your table.</p>
+<p>That&rsquo;s exactly what we will do.</p>
+<h3 id="before-you-proceed-create-a-dynamodb-table">Before you proceed, create a DynamoDB table</h3>
+<p>Use the following settings:</p>
+<ul>
+<li>Table name - <code>kafka_salesdb.salesdb.SALES_ORDER</code> (do <em>not</em> change the table name)</li>
+<li>Partition key - <code>ORDER_ID</code> (Number)</li>
+<li>Range key - <code>SITE_ID</code> (Number)</li>
+<li>Capacity mode - On-demand</li>
+</ul>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/i0wss7lnvhnqec2h9rv2.png" alt="Image description"></p>
+<p>That&rsquo;s it, you&rsquo;re good to go!</p>
+<h3 id="create-a-custom-plugin-and-connector-1">Create a Custom plugin and Connector</h3>
+<blockquote>
+<p>For step by step instructions on how to create a MSK Connect Plugin, refer to <a href="https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-plugins.html">Creating a custom plugin using the AWS Management Console</a> in the official documentation.</p></blockquote>
+<p>While creating the Custom Plugin, make sure to choose the DynamoDB connector zip file you uploaded to <code>S3</code> in the previous step.</p>
+<blockquote>
+<p>For step by step instructions on how to create a MSK Connect Connector, refer to <a href="https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-connectors.html#mkc-create-connector-intro">Creating a connector</a> in the official documentation.</p></blockquote>
+<p>To create a connector:</p>
+<ol>
+<li>
+<p>Choose the plugin you just created.</p>
+</li>
+<li>
+<p>Enter the connector name and choose the MSK cluster along with IAM authentication</p>
+</li>
+<li>
+<p>You can enter the content provided below in the connector configuration section. Make sure you replace the following configuration as per your setup:</p>
+<ul>
+<li>Use the right topic name for <code>topics</code> attribute (we are using <code>salesdb.salesdb.SALES_ORDER</code> in this example, since that&rsquo;s the topic name format that Debezium source connector adopts)</li>
+<li>For <code>confluent.topic.bootstrap.servers</code>, enter MSK cluster endpoint</li>
+<li>For <code>aws.dynamodb.endpoint</code> and <code>aws.dynamodb.region</code>, enter the region where you created the DynamoDB table e.g. <code>us-east-1</code></li>
+</ul>
+</li>
+</ol>
+<blockquote>
+<p>Leave the rest of configuration unchanged</p></blockquote>
+<pre tabindex="0"><code>connector.class=io.confluent.connect.aws.dynamodb.DynamoDbSinkConnector
+tasks.max=2
+aws.dynamodb.region=&lt;ENTER AWS REGION e.g. us-east-1&gt;
+aws.dynamodb.endpoint=https://dynamodb.&lt;ENTER AWS REGION&gt;.amazonaws.com
+topics=salesdb.salesdb.SALES_ORDER
+value.converter.schemas.enable=false
+key.converter=org.apache.kafka.connect.storage.StringConverter
+value.converter=org.apache.kafka.connect.json.JsonConverter
+table.name.format=kafka_${topic}
+confluent.topic.bootstrap.servers=&lt;ENTER MSK CLUSTER ENDPOINT&gt;
+confluent.topic.security.protocol=SASL_SSL
+confluent.topic.sasl.mechanism=AWS_MSK_IAM
+confluent.topic.sasl.jaas.config=software.amazon.msk.auth.iam.IAMLoginModule required;
+confluent.topic.sasl.client.callback.handler.class=software.amazon.msk.auth.iam.IAMClientCallbackHandler
+aws.dynamodb.pk.hash=value.ORDER_ID
+aws.dynamodb.pk.sort=value.SITE_ID
+</code></pre><ol start="4">
+<li>Under <strong>Access permissions</strong>, choose the correct IAM role (the one with <code>DynamoDBConnectorIAMRole</code> in its name) for the connector</li>
+<li>Click <strong>Next</strong> to move to the <strong>Security</strong> options - leave them unchanged</li>
+<li>Click <strong>Next</strong>. For <strong>Log delivery</strong>, choose <strong>Deliver to Amazon CloudWatch Logs</strong>. Locate and select <code>/msk-connect-demo-cwlog-group</code></li>
+<li>Click <strong>Next</strong> - On the final page, scroll down and click <strong>Create connector</strong> to start the process and wait for the connector to start.</li>
+</ol>
+<p>Once that&rsquo;s done and the connector has transitioned to <strong>Running</strong> state, proceed with the below steps.</p>
+<p><strong>Choosing DynamoDB primary key</strong></p>
+<p>In the above configuration we set <code>aws.dynamodb.pk.hash</code> and <code>aws.dynamodb.pk.sort</code> to <code>value.ORDER_ID</code> and <code>value.SITE_ID</code> respectively. This implies that the <code>ORDER_ID</code> field from the Kafka topic event payload will be used as the partition key and the value for <code>SITE_ID</code> will we designated as the Range key (depending on your requirements, you can also leave <code>aws.dynamodb.pk.sort</code> empty).</p>
+<h3 id="test-the-end-to-end-pipeline">Test the end to end pipeline</h3>
+<p>As part of the initial load process, the connector makes sure that all the existing records from Kafka topic are persisted to the DynamoDB table specified in the connector configuration. In this case, you should see more than <code>29000</code> records (as per <code>SALES_ORDER</code> table) in DynamoDB and you can run queries to explore the data.</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/16ge9zblrpk7q39ta7zn.png" alt="Image description"></p>
+<p>To continue testing the end to end pipeline, you can insert more data in the <code>SALES_ORDER</code> table and confirm that they were synchronised to Kafka via the Debezium source connector and all the way to DynamoDB, thanks to the sink connector.</p>
+<hr>
+<h2 id="delete-resources">Delete resources</h2>
+<p>Once you&rsquo;re done, delete the resources that you had created.</p>
+<ul>
+<li>Delete the contents of the S3 bucket (<code>msk-lab-&lt;YOUR ACCOUNT_ID&gt;-plugins-bucket</code>)</li>
+<li>Delete the CloudFormation stack</li>
+<li>Delete the DynamoDB table</li>
+<li>Delete the MSK Connect connectors, Plugins and Custom configuration</li>
+</ul>
+<h2 id="conclusion--wrap-up">Conclusion &amp; wrap up</h2>
+<p>Change Data Capture is a powerful tool, but we need a way to tap into these event logs and make it available to other services which depend on that data. In this part, you saw how we can leverage this capability to setup a streaming data pipeline between MySQL and DynamoDB using Kafka Connect.</p>
+<p>This wraps up this series. Happy building!</p>
+
+
+        
+          <div class="blog-tags">
+            
+              <a href="https://abhirockzz.github.io//tags/kafka/">kafka</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/dynamodb/">dynamodb</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/data-engineering/">data engineering</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/nosql/">nosql</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/database/">database</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/aws/">aws</a>&nbsp;
+            
+              <a href="https://abhirockzz.github.io//tags/tutorial/">tutorial</a>&nbsp;
+            
+          </div>
+        
+
+        
+
+        
+      </article>
+
+      
+        <ul class="pager blog-pager">
+          
+            <li class="previous">
+              <a href="https://abhirockzz.github.io/posts/msk-dynamodb-data-pipeline-1/" data-toggle="tooltip" data-placement="top" title="Build a data pipeline on AWS with Kafka, Kafka connect and DynamoDB">&larr; Previous Post</a>
+            </li>
+          
+          
+            <li class="next">
+              <a href="https://abhirockzz.github.io/posts/cdk8s-k8s-go-1/" data-toggle="tooltip" data-placement="top" title="Write your Kubernetes Infrastructure as Go code - Getting started with cdk8s">Next Post &rarr;</a>
+            </li>
+          
+        </ul>
+      
+
+
+      
+
+    </div>
+  </div>
+</div>
+
+    
+<footer>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+        <ul class="list-inline text-center footer-links">
+          
+          
+          <li>
+            <a href="" title="RSS">
+              <span class="fa-stack fa-lg">
+                <i class="fas fa-circle fa-stack-2x"></i>
+                <i class="fas fa-rss fa-stack-1x fa-inverse"></i>
+              </span>
+            </a>
+          </li>
+          
+        </ul>
+        <p class="credits copyright text-muted">
+          
+
+          &nbsp;&bull;&nbsp;&copy;
+          
+          2025
+          
+
+          
+          &nbsp;&bull;&nbsp;
+          <a href="https://abhirockzz.github.io/">Abhishek&#39;s blog</a>
+          
+        </p>
+        
+        <p class="credits theme-by text-muted">
+          <a href="https://gohugo.io">Hugo v0.145.0</a> powered &nbsp;&bull;&nbsp; Theme <a href="https://github.com/halogenica/beautifulhugo">Beautiful Hugo</a> adapted from <a href="https://deanattali.com/beautiful-jekyll/">Beautiful Jekyll</a>
+          
+        </p>
+      </div>
+    </div>
+  </div>
+</footer><script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.js"
+  integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/contrib/auto-render.min.js"
+  integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
+<script src="https://code.jquery.com/jquery-1.12.4.min.js"
+  integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"
+  integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+<script src="https://abhirockzz.github.io/%20js/main.js"></script><script> renderMathInElement(document.body); </script><script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe.min.js"
+  integrity="sha384-QELNnmcmU8IR9ZAykt67vGr9/rZJdHbiWi64V88fCPaOohUlHCqUD/unNN0BXSqy" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/photoswipe/4.1.2/photoswipe-ui-default.min.js"
+  integrity="sha384-m67o7SkQ1ALzKZIFh4CiTA8tmadaujiTa9Vu+nqPSwDOqHrDmxLezTdFln8077+q" crossorigin="anonymous"></script><script src="https://abhirockzz.github.io/%20js/load-photoswipe.js"></script>
+
+
+
+
+
+
+
+
+    
+  </body>
+</html>
+
