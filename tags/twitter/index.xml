@@ -1,0 +1,306 @@
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Abhishek Gupta&#39;s Blog – Twitter</title>
+    <link>http://localhost:1313/tags/twitter/</link>
+    <description>Recent content in Twitter on Abhishek Gupta&#39;s Blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en</language>
+    <copyright>© Abhishek Gupta, 2025</copyright>
+    <lastBuildDate>Tue, 30 Mar 2021 00:00:00 +0000</lastBuildDate>
+    
+	  <atom:link href="http://localhost:1313/tags/twitter/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+      
+        
+      
+    
+    
+    <item>
+      <title>RediSearch in Action</title>
+      <link>http://localhost:1313/blog/real-time-search-redisearch-kafka/</link>
+      <pubDate>Tue, 30 Mar 2021 00:00:00 +0000</pubDate>
+      
+      <guid>http://localhost:1313/blog/real-time-search-redisearch-kafka/</guid>
+      <description>
+        
+        
+        &lt;p&gt;&lt;a href=&#34;https://redis.io/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Redis&lt;/a&gt; has a &lt;a href=&#34;https://redis.io/topics/data-types-intro&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;versatile set of data structures&lt;/a&gt; ranging from simple &lt;a href=&#34;https://redis.io/topics/data-types-intro#redis-strings&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Strings&lt;/a&gt; all the way to powerful abstractions such as &lt;a href=&#34;https://redis.io/topics/streams-intro&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Redis Streams&lt;/a&gt;. The native data types can take you a long way, but there are certain use cases that may require a workaround. One example is the requirement to use secondary indexes in Redis in order to go beyond the key-based search/lookup for richer query capabilities. Though you can &lt;a href=&#34;https://redis.io/topics/indexes&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;use Sorted Sets, Lists, and so on to get the job done&lt;/a&gt;, you’ll need to factor in some trade-offs.&lt;/p&gt;
+&lt;p&gt;Enter &lt;a href=&#34;https://oss.redislabs.com/redisearch/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;RediSearch&lt;/a&gt;! Available as a &lt;a href=&#34;https://redis.io/topics/modules-intro&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Redis module&lt;/a&gt;, RediSearch provides flexible search capabilities, thanks to a first-class secondary indexing engine. It offers powerful features such as full-text Search, auto completion, geographical indexing, and many more.&lt;/p&gt;
+&lt;p&gt;To demonstrate the power of RediSearch, this blog post offers a practical example of how to use RediSearch with &lt;a href=&#34;https://docs.microsoft.com/azure/azure-cache-for-redis/cache-overview?WT.mc_id=data-13024-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Azure Cache for Redis&lt;/a&gt; with the help of a &lt;a href=&#34;https://golang.org/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Go&lt;/a&gt; service built using the &lt;a href=&#34;https://github.com/RediSearch/redisearch-go&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;RediSearch Go client&lt;/a&gt;. It’s designed to give you a set of applications that let you ingest tweets in real-time and query them flexibly using RediSearch.&lt;/p&gt;
+&lt;p&gt;Specifically, you will learn how to:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;Work with RediSearch indexes&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Use different RediSearch data types, such as &lt;code&gt;TEXT&lt;/code&gt;, &lt;code&gt;NUMERIC&lt;/code&gt;, &lt;code&gt;TAG&lt;/code&gt;, and others&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;How to build an application to show RediSearch capabilities&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;How to deploy the service components to Azure with just a few commands&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Analyze tweet data by querying RediSearch&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Application overview&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;application-overview&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#application-overview&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;As mentioned, the example service lets you consume tweets in real-time and makes them available for querying via RediSearch.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://cdn-images-1.medium.com/max/2000/0*1d5h_hgwvXSFqSHA.png&#34; alt=&#34;&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;It has two components:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Consumer/Indexer:&lt;/strong&gt; Reads from the Twitter Streaming API, creates the index, and continuously adds tweet data (in Redis &lt;code&gt;HASH&lt;/code&gt;es) as they arrive.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Search service:&lt;/strong&gt; A REST API that allows you to search tweets using the RediSearch &lt;a href=&#34;https://oss.redislabs.com/redisearch/Query_Syntax/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;query syntax&lt;/a&gt;.&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;At this point, I am going to dive into how to get the solution up and running so that you can see it in action. However, if you’re interested in understanding how the individual components work, please refer to the &lt;strong&gt;Code walk through&lt;/strong&gt; section below, and the GitHub repo for this blog: &lt;a href=&#34;https://github.com/abhirockzz/redisearch-tweet-analysis&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;https://github.com/abhirockzz/redisearch-tweet-analysis&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Prerequisites&lt;/strong&gt;&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;To begin with, you will need a Microsoft Azure account: &lt;a href=&#34;https://azure.microsoft.com/free/?WT.mc_id=data-13024-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;get one for free&lt;/a&gt; here!&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;The service components listed above will be deployed to &lt;a href=&#34;https://docs.microsoft.com/azure/container-instances/container-instances-overview?WT.mc_id=data-13024-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Azure Container Instances&lt;/a&gt; using native Docker CLI commands. This capability is enabled by &lt;a href=&#34;https://docs.docker.com/engine/context/aci-integration/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;integration between Docker and Azure&lt;/a&gt; .&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;You will need Docker Desktop version 2.3.0.5 or later, for &lt;a href=&#34;https://desktop.docker.com/win/edge/Docker%20Desktop%20Installer.exe&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Windows&lt;/a&gt;, &lt;a href=&#34;https://desktop.docker.com/mac/edge/Docker.dmg&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;macOS&lt;/a&gt;, or install the &lt;a href=&#34;https://docs.docker.com/engine/context/aci-integration/#install-the-docker-aci-integration-cli-on-linux&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Docker ACI Integration CLI for Linux&lt;/a&gt;. To use Twitter Streaming API, you will also need a Twitter developer account. If you don’t have one already, please &lt;a href=&#34;https://developer.twitter.com/en/apply-for-access&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;follow these instructions&lt;/a&gt;.&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;Start off by using this quick-start tutorial to &lt;a href=&#34;https://docs.microsoft.com/azure/azure-cache-for-redis/quickstart-create-redis-enterprise?WT.mc_id=data-13024-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;set up a Redis Enterprise tier cache&lt;/a&gt; on Azure. Once you finish the set up, ensure that you have the the Redis host name and access key handy:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://cdn-images-1.medium.com/max/2048/0*QaZM0CdxqYji42KT.png&#34; alt=&#34;&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Both the components of our service are available as Docker containers: the &lt;a href=&#34;https://hub.docker.com/repository/docker/abhirockzz/redisearch-tweets-consumer&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Tweet indexing service&lt;/a&gt; and the &lt;a href=&#34;https://hub.docker.com/repository/docker/abhirockzz/redisearch-tweets-search&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Search API service&lt;/a&gt;. (If you need to build your own Docker images, please use the respective Dockerfile available on the GitHub repo.)&lt;/p&gt;
+&lt;p&gt;You will now see how convenient it is to deploy these to &lt;a href=&#34;https://docs.microsoft.com/azure/container-instances/?WT.mc_id=data-13024-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Azure Container Instances&lt;/a&gt;, which allows you to run Docker containers on-demand in a managed, serverless Azure environment.&lt;/p&gt;
+&lt;h2&gt;Deploy to Azure&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;deploy-to-azure&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#deploy-to-azure&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;pre&gt;&lt;code&gt;version: &amp;quot;2&amp;quot;
+services:
+  tweets-search:
+    image: abhirockzz/redisearch-tweets-search
+    ports:
+      - 80:80
+    environment:
+      - REDIS_HOST=&amp;lt;azure redis host name&amp;gt;
+      - REDIS_PASSWORD=&amp;lt;azure redis access key&amp;gt;
+      - REDISEARCH_INDEX_NAME=tweets-index
+  tweets-indexer:
+    image: abhirockzz/redisearch-tweets-consumer
+    environment:
+      - TWITTER_CONSUMER_KEY=&amp;lt;twitter api consumer key&amp;gt;
+      - TWITTER_CONSUMER_SECRET_KEY=&amp;lt;twitter api consumer secret&amp;gt;
+      - TWITTER_ACCESS_TOKEN=&amp;lt;twitter api access token&amp;gt;
+      - TWITTER_ACCESS_SECRET_TOKEN=&amp;lt;twitter api access secret&amp;gt;
+      - REDIS_HOST=&amp;lt;azure redis host name&amp;gt;
+      - REDIS_PASSWORD=&amp;lt;azure redis access key&amp;gt;
+      - REDISEARCH_INDEX_NAME=tweets-index
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;A docker-compose.yml file defines the individual components ( tweets-search and tweets-indexer). All you need to do is update it to replace the values for your Azure Redis instance as well as your Twitter developer account credentials. Here is the file in its &lt;a href=&#34;https://github.com/abhirockzz/redisearch-tweet-analysis&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;entirety&lt;/a&gt;:&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://docs.microsoft.com/azure/container-instances/quickstart-docker-cli?WT.mc_id=data-13024-abhishgu#create-azure-context&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Create an Azure context&lt;/a&gt;:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;docker login azure 
+docker context create aci aci-context 
+docker context use aci-context
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Clone the GitHub repo:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;git clone https://github.com/abhirockzz/redisearch-tweet-analysis 
+cd redisearch-tweet-analysis
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Deploy both the service components as part of a &lt;a href=&#34;https://docs.microsoft.com/azure/container-instances/container-instances-container-groups?WT.mc_id=data-13024-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;container group&lt;/a&gt;:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;docker compose up -p azure-redisearch-app
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;em&gt;Note that Docker Compose commands currently available in an ACI context start with docker compose. That is NOT the same as docker-compose with a hyphen.&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;You will see an output similar to this:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;[+] Running 1/3 
+⠿ Group azure-redisearch-app Created 8.3s ⠸ tweets-search Creating 6.3s ⠸ tweets-indexer Creating 6.3s
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Wait for services to start, you can also check the &lt;a href=&#34;https://docs.microsoft.com/azure/container-instances/container-instances-quickstart-portal?WT.mc_id=data-13024-abhishgu#view-container-logs&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Azure portal&lt;/a&gt;. Once both the services are up and running, you can check their respective logs:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;docker logs azure-redisearch-app_tweets-indexer 
+docker logs azure-redisearch-app_tweets-search
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;If all goes well, the tweet-consumer service should have kicked off. It will read a stream of tweets and persist them to Redis.&lt;/p&gt;
+&lt;h2&gt;The moment of truth!&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;the-moment-of-truth&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#the-moment-of-truth&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;It’s time to query the tweet data. To do so, you can access the REST API in Azure Container Instances with an IP address and a fully qualified domain name (FQDN) (read more in &lt;a href=&#34;https://docs.microsoft.com/azure/container-instances/container-instances-overview?WT.mc_id=data-13024-abhishgu#container-access&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Container Access&lt;/a&gt;). To find the IP, run &lt;code&gt;docker ps&lt;/code&gt; and check the &lt;code&gt;PORTS&lt;/code&gt; section in the output&lt;/p&gt;
+&lt;p&gt;You can now run all sorts of queries! Before diving in, here is a quick idea of the indexed attributes that you can use in your search queries:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;id - this is a the Tweet ID ( TEXT attribute) 
+user - the is the screen name ( TEXT attribute) 
+text - tweet contents ( TEXT attribute) 
+source - tweet source e.g. Twitter for Android, Twitter Web App, Twitter for iPhone ( TEXT attribute) 
+hashtags - hashtags (if any) in the tweet (available in CSV format as a TAG attribute) 
+location - tweet location (if available). this is a user defined location (not the exact location per se) 
+created - timestamp (epoch) of the tweet. this is NUMERIC field and can be used for range queries 
+coordinates - geographic location (longitude, latitude) if made available by the client ( GEO attribute)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;(Note, I use &lt;a href=&#34;https://curl.se/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;curl&lt;/a&gt; in the examples below)&lt;/p&gt;
+&lt;p&gt;Set the base URL for the search service API:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;export REDISEARCH_API_BASE_URL=&amp;lt;for example, http://20.197.96.54:80/search&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Start simple and query all the documents (using * ):&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;curl -i $REDISEARCH_API_BASE_URL?q=*
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;You will see an output similar to this:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;HTTP/1.1 200 OK 
+Page-Size: 10 
+Search-Hits: 12 
+Date: Mon, 25 Jan 2021 13:21:52 GMT 
+Content-Type: text/plain; charset=utf-8 
+Transfer-Encoding: chunked 
+//JSON array of documents (omitted)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Notice the headers Page-Size and Search-Hits: these are custom headers being passed from the application, mainly to demonstrate pagination and limits. In response to our “get me all the documents” query, we found 12 results in Redis, but the JSON body returned 10 entries. This is because of the default behavior of the RediSearch Go API, which you can change using different query parameter, such as:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;curl -i &amp;quot;$REDISEARCH_API_BASE_URL?q=*&amp;amp;offset_limit=0,100&amp;quot; 
+
+offset_limit=0,100 will return up to 100 documents ( limit ) starting with the first one ( offset = 0).
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Or, for example, search for tweets sent from an iPhone:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;curl -i &amp;quot;$REDISEARCH_API_BASE_URL?q=@source:iphone&amp;quot;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;You may not always want all the attributes in the query result. For example, this is how to just get back the user (Twitter screen name) and the tweet text:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;curl -i &amp;quot;$REDISEARCH_API_BASE_URL?q=@location:india&amp;amp;fields=user,text&amp;quot;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;How about a query on the user name (e.g. starting with jo):&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;curl -i &amp;quot;$REDISEARCH_API_BASE_URL?q=@user:jo*&amp;quot;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;You can also use a combination of attributes in the query:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;bash curl -i $REDISEARCH_API_BASE_URL?q=@location:India @source:android
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;How about we look for tweets with specific hashtags? It is possible to use multiple hashtags (separated by |)?&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;curl -i &amp;quot;$REDISEARCH_API_BASE_URL?q=@hashtags:\{potus|cov*\}&amp;quot;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Want to find out how many tweets with the biden hashtag were created recently? Use a range query:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;curl -i &amp;quot;$REDISEARCH_API_BASE_URL?q=@hashtags:{biden} @created:[1611556920000000000 1711556930000000000]&amp;quot;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;If you were lucky to grab some coordinates info on the tweets, you can try extracting them and then query on coordinates attribute:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;docker compose down -p azure-redisearch-app
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;These are just a few examples. Feel free to experiment further and try out other queries. &lt;a href=&#34;https://oss.redislabs.com/redisearch/Query_Syntax/#a_few_query_examples&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;This section in the RediSearch documentation&lt;/a&gt; might come in handy!&lt;/p&gt;
+&lt;h2&gt;Clean up&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;clean-up&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#clean-up&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;blockquote&gt;
+  &lt;p&gt;After you finish, don’t forget to stop the services and the respective containers in Azure Container Instances:&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Use the Azure Portal to &lt;a href=&#34;https://docs.microsoft.com/azure/azure-cache-for-redis/cache-go-get-started?WT.mc_id=data-13024-abhishgu#clean-up-resources&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;delete the Azure Redis instance&lt;/a&gt; that you had created.&lt;/p&gt;
+&lt;h2&gt;Code walk through&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;code-walk-through&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#code-walk-through&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;This section provides a high-level overview of the code for the individual components. This should make it easier to navigate the source code in the GitHub repo.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Tweets consumer/indexer:&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://github.com/dghubble/go-twitter&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;go-twitter library&lt;/a&gt; has been used to interact with Twitter.&lt;/p&gt;
+&lt;p&gt;It authenticates to the Twitter Streaming API:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;config := oauth1.NewConfig(GetEnvOrFail(consumerKeyEnvVar), GetEnvOrFail(consumerSecretKeyEnvVar)) 
+token := oauth1.NewToken(GetEnvOrFail(accessTokenEnvVar), GetEnvOrFail(accessSecretEnvVar)) 
+httpClient := config.Client(oauth1.NoContext, token) 
+client := twitter.NewClient(httpClient)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And listens to a stream of tweets in a separate goroutine:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;demux := twitter.NewSwitchDemux() 
+demux.Tweet = func(tweet *twitter.Tweet) { 
+  if !tweet.PossiblySensitive { 
+    go index.AddData(tweetToMap(tweet)) 
+    time.Sleep(3 * time.Second) 
+  } 
+} 
+go func() { 
+  for tweet := range stream.Messages { 
+    demux.Handle(tweet) 
+  } 
+}()
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Notice the go index.AddData(tweetToMap(tweet))- this is where the indexing component is invoked. It connects to Azure Cache for Redis:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;host := GetEnvOrFail(redisHost) 
+password := GetEnvOrFail(redisPassword) 
+indexName = GetEnvOrFail(indexNameEnvVar) 
+
+pool = &amp;amp;redis.Pool{Dial: func() (redis.Conn, error) { 
+  return redis.Dial(&amp;quot;tcp&amp;quot;, host, redis.DialPassword(password), redis.DialUseTLS(true), redis.DialTLSConfig(&amp;amp;tls.Config{MinVersion: tls}
+  }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;It then drops the index (and the existing documents as well) before re-creating it:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;rsClient := redisearch.NewClientFromPool(pool, indexName) 
+
+err := rsClient.DropIndex(true) 
+
+schema := redisearch.NewSchema(redisearch.DefaultOptions). 
+AddField(redisearch.NewTextFieldOptions(&amp;quot;id&amp;quot;, redisearch.TextFieldOptions{})). 
+AddField(redisearch.NewTextFieldOptions(&amp;quot;user&amp;quot;, redisearch.TextFieldOptions{})). 
+AddField(redisearch.NewTextFieldOptions(&amp;quot;text&amp;quot;, redisearch.TextFieldOptions{})). 
+AddField(redisearch.NewTextFieldOptions(&amp;quot;source&amp;quot;, redisearch.TextFieldOptions{})). 
+//tags are comma-separated by default 
+AddField(redisearch.NewTagFieldOptions(&amp;quot;hashtags&amp;quot;, redisearch.TagFieldOptions{})). 
+AddField(redisearch.NewTextFieldOptions(&amp;quot;location&amp;quot;, redisearch.TextFieldOptions{})). 
+AddField(redisearch.NewNumericFieldOptions(&amp;quot;created&amp;quot;, redisearch.NumericFieldOptions{Sortable: true})). 
+AddField(redisearch.NewGeoFieldOptions(&amp;quot;coordinates&amp;quot;, redisearch.GeoFieldOptions{})) 
+
+indexDefinition := redisearch.NewIndexDefinition().AddPrefix(indexDefinitionHashPrefix) 
+
+err = rsClient.CreateIndexWithIndexDefinition(schema, indexDefinition)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The index and its associated documents are dropped to allow you to start with a clean state, which makes it easier to experiment/demo. You can choose to comment out this part if you wish.&lt;/p&gt;
+&lt;p&gt;Information for each tweet is stored in a &lt;code&gt;HASH&lt;/code&gt; (named &lt;code&gt;tweet:[tweet ID]&lt;/code&gt;) using the &lt;code&gt;HSET&lt;/code&gt; operation:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;func AddData(tweetData map[string]interface{}) { 
+conn := pool.Get() 
+hashName := fmt.Sprintf(&amp;quot;tweet:%s&amp;quot;, tweetData[&amp;quot;id&amp;quot;]) 
+val := redis.Args{hashName}.AddFlat(tweetData) 
+_, err := conn.Do(&amp;quot;HSET&amp;quot;, val...) 
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Tweets search exposes a REST API to query RediSearch. All the options (including query, etc.) are passed in the form of query parameters. For example, &lt;a href=&#34;http://localhost:8080/search?q=@source:iphone.&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;&lt;em&gt;http://localhost:8080/search?q=@source:iphone&lt;/em&gt;.&lt;/a&gt; It extracts the required query parameters:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;qParams, err := url.ParseQuery(req.URL.RawQuery) 
+if err != nil { 
+log.Println(&amp;quot;invalid query params&amp;quot;) 
+http.Error(rw, err.Error(), http.StatusBadRequest) 
+return 
+} 
+searchQuery := qParams.Get(queryParamQuery) 
+query := redisearch.NewQuery(searchQuery)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The q parameter is mandatory. However, you can also use the following parameters for search:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;fields&lt;/strong&gt; : to specify which attributes you want to return in the result, and,&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;offset_limit&lt;/strong&gt; : if you want to specify the offset from where you want to search and the number of documents that you want to include in the result (by default, offset is 0 and limit is 10 — as per RediSearch Go client).&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;For example:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;http://localhost:8080/search?q=@source:Web&amp;amp;fields=user,source&amp;amp;offset_limit=5,100 
+fields := qParams.Get(queryParamFields) 
+offsetAndLimit := qParams.Get(queryParamOffsetLimit)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Finally, the results are iterated over and passed back as JSON (array of documents):&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;docs, total, err := rsClient.Search(query) 
+response := []map[string]interface{}{} 
+for _, doc := range docs { 
+response = append(response, doc.Properties) 
+} 
+rw.Header().Add(responseHeaderSearchHits, strconv.Itoa(total)) 
+err = json.NewEncoder(rw).Encode(response)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;That’s all for this section!&lt;/p&gt;
+&lt;h2&gt;Redis Enterprise tiers on Azure Cache for Redis&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;redis-enterprise-tiers-on-azure-cache-for-redis&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#redis-enterprise-tiers-on-azure-cache-for-redis&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Redis Enterprise is available as a native service on Azure in the form of &lt;a href=&#34;https://aka.ms/azure-redis-enterprise-tiers&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;two new tiers for Azure Cache for Redis&lt;/a&gt; which are operated and supported by Microsoft and Redis Labs. This service gives developers access to a rich set of Redis Enterprise features, including modules like RediSearch. For more information, see these resources:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;a href=&#34;https://redislabs.com/blog/azure-cache-for-redis-enterprise-tiers-general-availability/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Azure Cache for Redis, Enterprise Tiers Are Now Generally Available&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;a href=&#34;https://redislabs.com/blog/microsoft-partnership-redis-enterprise-cloud/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Deepening Our Partnership with Microsoft to Grow Redis Enterprise in the Cloud&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;a href=&#34;https://azure.microsoft.com/blog/microsoft-and-redis-labs-collaborate-to-give-developers-new-azure-cache-for-redis-capabilities/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Microsoft and Redis Labs collaborate to give developers new Azure Cache for Redis capabilities&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;a href=&#34;https://azure.microsoft.com/updates/redis-enterprise-features-on-azure-cache-for-redis-coming-soon/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Redis Enterprise features on Azure Cache for Redis&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Conclusion&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;conclusion&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#conclusion&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;This end-to-end application demonstrates how to work with indexes, ingest real-time data to create documents (tweet information) which are indexed by RediSearch engine and then use the versatile query syntax to extract insights on those tweets.&lt;/p&gt;
+&lt;p&gt;Want to understand what happens behind the scenes when you search for a topic on the &lt;a href=&#34;https://docs.redislabs.com/latest/?_ga=2.77626132.1653715209.1616048817-375979169.1604497376&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Redis Labs documentation&lt;/a&gt;? &lt;a href=&#34;https://redislabs.com/blog/building-real-time-full-text-site-search-with-redisearch/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Check out this blog post&lt;/a&gt; to learn how Redis Labs site incorporated full-text search with RediSearch! Or, perhaps you’re interested in exploring &lt;a href=&#34;https://redislabs.com/blog/serverless-development-with-aws-lambda-and-redis-enterprise-cloud/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;how to use RediSearch in a serverless application&lt;/a&gt;?&lt;/p&gt;
+&lt;p&gt;If you’re still getting started, visit the &lt;a href=&#34;https://redislabs.com/modules/redisearch-quick-start/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;RediSearch Quick Start page&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;If you want to learn more about the enterprise capabilities in Azure Cache for Redis, you can check out the following resources:&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Originally published at &lt;a href=&#34;https://redislabs.com/blog/redisearch-in-action/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;https://redislabs.com&lt;/a&gt; on March 30, 2021.&lt;/em&gt;&lt;/p&gt;
+
+      </description>
+    </item>
+    
+  </channel>
+</rss>

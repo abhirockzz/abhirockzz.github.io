@@ -1,0 +1,292 @@
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Abhishek Gupta&#39;s Blog – Azure Synapse</title>
+    <link>http://localhost:1313/tags/azure-synapse/</link>
+    <description>Recent content in Azure Synapse on Abhishek Gupta&#39;s Blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en</language>
+    <copyright>© Abhishek Gupta, 2025</copyright>
+    <lastBuildDate>Sat, 17 Jul 2021 00:00:00 +0000</lastBuildDate>
+    
+	  <atom:link href="http://localhost:1313/tags/azure-synapse/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+      
+        
+      
+    
+    
+    <item>
+      <title>Getting started with Azure Data Explorer and Azure Synapse Analytics for Big Data processing</title>
+      <link>http://localhost:1313/blog/adx-synapse-integration/</link>
+      <pubDate>Sat, 17 Jul 2021 00:00:00 +0000</pubDate>
+      
+      <guid>http://localhost:1313/blog/adx-synapse-integration/</guid>
+      <description>
+        
+        
+        &lt;p&gt;&lt;a href=&#34;https://docs.microsoft.com/azure/data-explorer/data-explorer-overview?WT.mc_id=data-21329-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Azure Data Explorer&lt;/a&gt; is a fully managed data analytics service that can handle large volumes of diverse data from any data source, such as websites, applications, IoT devices, and more. Azure Data Explorer makes it simple to ingest this data and enables you to do complex ad hoc queries on the data in seconds. It scales quickly to terabytes of data, in minutes, allowing rapid iterations of data exploration to discover relevant insights. It is already integrated with Apache Spark work via the &lt;a href=&#34;https://github.com/Azure/azure-kusto-spark&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Data Source and Data Sink Connector&lt;/a&gt; and is used to power solutions for near real-time data processing, data archiving, machine learning etc.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://cdn-images-1.medium.com/max/4784/1*m8ZtDaguIjXwLJz5a92T4w.png&#34; alt=&#34;Azure Data Explorer for Big Data workloads&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Thanks to an extension to this solution, Azure Data Explorer is available as a Linked Service in Azure Synapse Analytics, allowing seamless integration between Azure Data Explorer and Apache Spark pools in Azure Synapse.&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://docs.microsoft.com/azure/synapse-analytics/overview-what-is?WT.mc_id=data-21329-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Azure Synapse&lt;/a&gt; brings together the best of SQL technologies used in enterprise data warehousing, Spark technologies used for big data, Pipelines for data integration and ETL/ELT, and deep integration with other Azure services such as Power BI, CosmosDB, and AzureML.&lt;/p&gt;
+&lt;p&gt;This blog post is a getting started guide to demonstrate the integration between Azure Data Explorer and Azure Synapse. It covers:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;How to process existing data in Azure Data Explorer using Spark and Azure Synapse.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Process streaming and batch data using Spark and write it back to Azure data explore.&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;&lt;em&gt;Notebooks are available in this GitHub repo — &lt;a href=&#34;https://github.com/abhirockzz/synapse-azure-data-explorer-101&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;https://github.com/abhirockzz/synapse-azure-data-explorer-101&lt;/a&gt;&lt;/em&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;To learn along, all you need is an Azure account (you can &lt;a href=&#34;https://azure.microsoft.com/free/?WT.mc_id=data-21329-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;get one for free&lt;/a&gt;). Move on to the next section once you’re ready!&lt;/p&gt;
+&lt;h2&gt;Initial setup and configuration&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;initial-setup-and-configuration&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#initial-setup-and-configuration&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Start by creating an &lt;a href=&#34;https://docs.microsoft.com/azure/synapse-analytics/quickstart-create-workspace?WT.mc_id=data-21329-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Azure Synapse workspace&lt;/a&gt; along with an &lt;a href=&#34;https://docs.microsoft.com/azure/synapse-analytics/quickstart-create-apache-spark-pool-portal?WT.mc_id=data-21329-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Apache Spark pool&lt;/a&gt;. Then, &lt;a href=&#34;https://docs.microsoft.com/azure/data-explorer/create-cluster-database-portal?WT.mc_id=data-21329-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Create an Azure Data Explorer cluster and database&lt;/a&gt;&lt;/p&gt;
+&lt;h3&gt;Adjust the Ingestion Policy&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;adjust-the-ingestion-policy&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#adjust-the-ingestion-policy&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;During the ingestion process, Azure Data Explorer attempts to optimise for throughput by batching small ingress data chunks together as they await ingestion — this is governed by the &lt;a href=&#34;https://docs.microsoft.com/azure/data-explorer/kusto/management/batchingpolicy?WT.mc_id=data-21329-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;IngestionBatching policy&lt;/a&gt;. The default policy values are: 5 minutes as the maximum delay time, 1000 items and total size of 1G for batching. What this means that there is a certain amount of delay between when the data ingestion is triggered, until it is ready for querying. The good thing is that, the policy can be fine tuned as per requirements.&lt;/p&gt;
+&lt;p&gt;For the purposes of this demo, we focus on getting our data available for query as soon as possible. Hence, you should update the policy by using MaximumBatchingTimeSpan value of 30 seconds&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;.alter database adxdb policy ingestionbatching @&#39;{&amp;quot;MaximumBatchingTimeSpan&amp;quot;: &amp;quot;00:00:30&amp;quot;}&#39;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;The impact of setting this policy to a very small value is an increased cost and reduced performance — this is just for demo purposes&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;h3&gt;Connect to Azure Data Explorer from Synapse&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;connect-to-azure-data-explorer-from-synapse&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#connect-to-azure-data-explorer-from-synapse&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;In Azure Synapse Analytics, a &lt;strong&gt;Linked Service&lt;/strong&gt; is where you define your connection information to other services. You can create a linked service for Azure Data Explorer &lt;a href=&#34;https://docs.microsoft.com/en-us/azure/synapse-analytics/quickstart-connect-azure-data-explorer?WT.mc_id=data-21329-abhishgu#connect-an-azure-data-explorer-database-to-an-azure-synapse-workspace&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;using the Azure Synapse Analytics workspace&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://cdn-images-1.medium.com/max/2716/1*PlkbGOWqXee8hiQlLsuN9w.png&#34; alt=&#34;Creating Linked Service (Image by author)&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;Managed Identity is being used as the &lt;strong&gt;Authentication Method&lt;/strong&gt; as opposed to Service Principals&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;After you create the Linked Service, it will show up in the list:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://cdn-images-1.medium.com/max/2000/1*3GXcH6rj83vBgwU1F_hkcg.png&#34; alt=&#34;Azure Data Explorer Linked Service (Image by author)&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Ok you are all set!&lt;/p&gt;
+&lt;p&gt;If you’re already using Azure Data Explorer, it’s likely that you have a lot of data sitting there, ready to be processed! So let’s start off by exploring this aspect.&lt;/p&gt;
+&lt;h2&gt;Process existing data in Azure Data Explorer&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;process-existing-data-in-azure-data-explorer&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#process-existing-data-in-azure-data-explorer&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Data Ingestion is key component for a Big Data Analytics services such as Azure Data Explorer. No wonder, it supports a &lt;a href=&#34;https://docs.microsoft.com/azure/data-explorer/ingest-data-overview?WT.mc_id=data-21329-abhishgu#ingestion-methods-and-tools&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;plethora of ways&lt;/a&gt; using which you can pull in data from a variety of sources. Although a detailed discussion of ingestion techniques and options, you are welcome to read about it in the documentation.&lt;/p&gt;
+&lt;p&gt;In the interest of time, let’s &lt;a href=&#34;https://docs.microsoft.com/azure/data-explorer/ingest-sample-data?WT.mc_id=data-21329-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;ingest data manually&lt;/a&gt;. Don’t let the word “manually” mislead you. It’s quite simple and fast!&lt;/p&gt;
+&lt;p&gt;Start by creating a table (let’s call it StormEvents_1) in the database:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;.create table StormEvents_1 (StartTime: datetime, EndTime: datetime, EpisodeId: int, EventId: int, State: string, EventType: string, InjuriesDirect: int, InjuriesIndirect: int, DeathsDirect: int, DeathsIndirect: int, DamageProperty: int, DamageCrops: int, Source: string, BeginLocation: string, EndLocation: string, BeginLat: real, BeginLon: real, EndLat: real, EndLon: real, EpisodeNarrative: string, EventNarrative: string, StormSummary: dynamic)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;… and ingest CSV data into the table (directly from Blob storage):&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;.ingest into table StormEvents_1 &#39;https://kustosamplefiles.blob.core.windows.net/samplefiles/StormEvents.csv?sv=2019-12-12&amp;amp;ss=b&amp;amp;srt=o&amp;amp;sp=r&amp;amp;se=2022-09-05T02:23:52Z&amp;amp;st=2020-09-04T18:23:52Z&amp;amp;spr=https&amp;amp;sig=VrOfQMT1gUrHltJ8uhjYcCequEcfhjyyMX%2FSc3xsCy4%3D&#39; with (ignoreFirstRecord=true)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;&lt;em&gt;If you found this technique useful, I encourage you to try out &lt;a href=&#34;https://docs.microsoft.com/azure/data-explorer/one-click-ingestion-new-table?WT.mc_id=data-21329-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;one-click ingestion&lt;/a&gt; as well!&lt;/em&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;It might take a minute or so for ingestion to complete. Confirm if data is available and execute simple queries:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;.show ingestion failures
+
+StormEvents_1| count 
+StormEvents_1| take 5 
+
+StormEvents_1| take 5 | project StartTime, EndTime, State, EventType, DamageProperty, Source
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The StormEvents_1 table provides some information about storms that happened in the United States. It looks like this:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://cdn-images-1.medium.com/max/5540/1*NwtzNxOOZxjgRSgxrXC4tA.png&#34; alt=&#34;Azure Data Explorer table data (Image by author)&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;For the subsequent steps, you can either paste the code directly into a &lt;a href=&#34;https://docs.microsoft.com/azure/synapse-analytics/spark/apache-spark-development-using-notebooks?tabs=classical&amp;amp;WT.mc_id=data-21329-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Synapse Studio notebook in Azure Synapse Analytics&lt;/a&gt; or import &lt;a href=&#34;https://github.com/abhirockzz/synapse-azure-data-explorer-101/blob/master/notebooks/synapse-adx-read.ipynb&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;this notebook&lt;/a&gt; into the workspace.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://cdn-images-1.medium.com/max/2000/0*LbNkxzgRrJq0Xzz1.png&#34; alt=&#34;Azure Synapse Workspace Notebooks (Image by author)&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Start off with something simple:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;kustoDf  = spark.read \
+            .format(&amp;quot;com.microsoft.kusto.spark.synapse.datasource&amp;quot;) \
+            .option(&amp;quot;spark.synapse.linkedService&amp;quot;, &amp;quot;adx&amp;quot;) \
+            .option(&amp;quot;kustoDatabase&amp;quot;, &amp;quot;adxdb&amp;quot;) \
+            .option(&amp;quot;kustoQuery&amp;quot;, &amp;quot;StormEvents_1 | take 10&amp;quot;) \
+            .load()
+
+display(kustoDf)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;To read data from Azure Data Explorer, we need to specify thequery using the kustoQuery option. In this case, we are simply executing StormEvents_1 | take 10 to validate the data.&lt;/p&gt;
+&lt;p&gt;Let’s try another Kusto query this time:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;filtered_df = spark.read \
+.format(&amp;quot;com.microsoft.kusto.spark.synapse.datasource&amp;quot;) \
+.option(&amp;quot;spark.synapse.linkedService&amp;quot;, &amp;quot;AzureDataExplorer1&amp;quot;) \
+.option(&amp;quot;kustoDatabase&amp;quot;, &amp;quot;mydb&amp;quot;) \
+.option(&amp;quot;kustoQuery&amp;quot;, &amp;quot;StormEvents_1 | where DamageProperty &amp;gt; 0 and DeathsDirect &amp;gt; 0 | project EventId, State, StartTime, EndTime, EventType, DamageProperty, DeathsDirect, Source&amp;quot;) \
+.load()
+
+filtered_df.createOrReplaceTempView(&amp;quot;storm_dataset&amp;quot;)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;This will read &lt;em&gt;all&lt;/em&gt; the records into a DataFrame, select the relevant columns and filter the data. For example, we are excluding events where there has not been any property damage or deaths. Finally, we create a temporary view (storm_dataset) in order to perform further data exploration using Apache Spark SQL.&lt;/p&gt;
+&lt;p&gt;Before that, lets use Seaborn (a Python data visualisation library) to draw a simple bar plot:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;import seaborn as sns
+import matplotlib.pyplot as plt
+
+filtered_df = filtered_df.toPandas()
+
+ax = sns.barplot(x=&amp;quot;DeathsDirect&amp;quot;, y=&amp;quot;EventType&amp;quot;,data=filtered_df)
+ax.set_title(&#39;deaths per event type&#39;)
+ax.set_xlabel(&#39;Deaths#&#39;)
+ax.set_ylabel(&#39;Event Type&#39;)
+plt.show()
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://cdn-images-1.medium.com/max/2808/1*uoltf1pn-vRjzAIyetZSqw.png&#34; alt=&#34;Seaborn plot (Image by author)&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Here is an example for Spark SQL on top of the temporary view.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;%%sql
+
+SELECT EventType, AVG(DamageProperty) AS avg_property_damage
+FROM storm_dataset 
+GROUP BY EventType
+ORDER BY avg_property_damage DESC
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We calculated the average damage inflicted by each event type (avalanche, ice storm etc.). The below output is in the form of a column chart (but there are other options as well):&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://cdn-images-1.medium.com/max/2508/1*DClI194213XeVjhNjg4o-A.png&#34; alt=&#34;Chart output (Image by author)&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Here is a slight variation of the above, where we find out the maximum no. of deaths per State.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;%%sql
+
+SELECT 
+    State
+    , MAX(DeathsDirect) AS deaths
+FROM storm_dataset 
+GROUP BY State
+ORDER BY deaths DESC
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And a Pie chart output this time:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://cdn-images-1.medium.com/max/2968/1*WkODgEM2Q9ENgwhfhc2g2A.png&#34; alt=&#34;Pie chart output (Image by author)&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Now you know how to extract insights from existing data sets in Azure Data Explorer by processing using the Apache Spark pools in Azure Synapse.&lt;/p&gt;
+&lt;h2&gt;Process and write data to Azure Data Explorer&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;process-and-write-data-to-azure-data-explorer&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#process-and-write-data-to-azure-data-explorer&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;This section will cover how to process data using Spark (Synapse Spark Pools to be precise) and write it to Azure Data Explorer for further analysis.&lt;/p&gt;
+&lt;p&gt;Start by creating another table StormEvents_2&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;.create table StormEvents_2 (StartTime: datetime, EndTime: datetime, EpisodeId: int, EventId: int, State: string, EventType: string, InjuriesDirect: int, InjuriesIndirect: int, DeathsDirect: int, DeathsIndirect: int, DamageProperty: int, DamageCrops: int, Source: string, BeginLocation: string, EndLocation: string, BeginLat: real, BeginLon: real, EndLat: real, EndLon: real, EpisodeNarrative: string, EventNarrative: string, StormSummary: dynamic)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We will use existing CSV data. This is the same data that we had earlier ingested into Azure Data Explorer. But, this time, we will download it to our local machine and upload it to the ADLS Gen2 account associated with the Azure Synapse workspace.&lt;/p&gt;
+&lt;p&gt;Start by downloading this file:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;curl -o StormEvents.csv &amp;quot;https://kustosamplefiles.blob.core.windows.net/samplefiles/StormEvents.csv?sv=2019-12-12&amp;amp;ss=b&amp;amp;srt=o&amp;amp;sp=r&amp;amp;se=2022-09-05T02:23:52Z&amp;amp;st=2020-09-04T18:23:52Z&amp;amp;spr=https&amp;amp;sig=VrOfQMT1gUrHltJ8uhjYcCequEcfhjyyMX%2FSc3xsCy4%3D&amp;quot;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Upload it to the ADLS file system using the workspace:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://cdn-images-1.medium.com/max/6472/1*yCsKVXJkGFrUR7ivTUOqrQ.png&#34; alt=&#34;Upload file to Azure Data Lake Storage (Image by author)&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;&lt;em&gt;For the subsequent steps, you can either paste the code directly into a &lt;a href=&#34;https://docs.microsoft.com/azure/synapse-analytics/spark/apache-spark-development-using-notebooks?tabs=classical&amp;amp;WT.mc_id=data-21329-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Synapse Studio notebook in Azure Synapse Analytics&lt;/a&gt; or import &lt;a href=&#34;https://github.com/abhirockzz/synapse-azure-data-explorer-101/blob/master/notebooks/synapse-adx-write-batch.ipynb&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;this notebook&lt;/a&gt; into the workspace.&lt;/em&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Load the dataset from ADLS Gen2 to a DataFrame:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;events = (spark.read
+                .csv(&amp;quot;/StormEvents.csv&amp;quot;, header=True, inferSchema=&#39;true&#39;)
+              )
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Apply some basic &lt;em&gt;filtering&lt;/em&gt; using Apache Spark — omit rows with null data, drop columns we don’t need for processing and filter rows where there has not been any property damage.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;events_filtered = events.dropna() \
+                        .drop(&#39;StormSummary&#39;, &#39;EndLat&#39;,&#39;EndLon&#39;,&#39;BeginLat&#39;,&#39;BeginLon&#39;) \
+                        .filter((events.DamageProperty &amp;gt; 0))
+
+print(events_filtered.count())
+display(events_filtered.take(10))
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Finally, write the DataFrame to Azure Data Explorer:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;events_filtered.write \
+    .format(&amp;quot;com.microsoft.kusto.spark.synapse.datasource&amp;quot;) \
+    .option(&amp;quot;spark.synapse.linkedService&amp;quot;, &amp;quot;adx&amp;quot;) \
+    .option(&amp;quot;kustoDatabase&amp;quot;, &amp;quot;adxdb&amp;quot;) \
+    .option(&amp;quot;kustoTable&amp;quot;, &amp;quot;StormEvents_2&amp;quot;) \
+    .option(&amp;quot;tableCreateOptions&amp;quot;,&amp;quot;FailIfNotExist&amp;quot;) \
+    .mode(&amp;quot;Append&amp;quot;) \
+    .save()
+&lt;/code&gt;&lt;/pre&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;Notice that we’ve used FailIfNotExist which implies that the operation will fail if the table is not found in the requested cluster and database.
+The other option is CreateIfNotExist — if the table is not found in the requested cluster and database, it will be created, with a schema matching the DataFrame that is being written.
+For more refer to &lt;a href=&#34;https://github.com/Azure/azure-kusto-spark/blob/master/docs/KustoSink.md#supported-options&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;https://github.com/Azure/azure-kusto-spark/blob/master/docs/KustoSink.md#supported-options&lt;/a&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Give it a minute for the data to be written. Then you can execute Azure Data Explorer queries to your heart’s content! Try out the below:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;.show ingestion failures
+
+StormEvents_2| take 10
+
+StormEvents_2
+| summarize event_count=count() by bin(StartTime, 1d)
+| render timechart
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://cdn-images-1.medium.com/max/5648/1*4hxQUAAsvKcoioAY1qylog.png&#34; alt=&#34;Time-chart output (Image by author)&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;What you just executed was just a glimpse of a typical batch based data processing setup. But that’s not always going to be the case!&lt;/p&gt;
+&lt;h2&gt;Quick recap&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;quick-recap&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#quick-recap&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;In this blog post, you learned:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;How to &lt;strong&gt;setup and configure&lt;/strong&gt; Azure Synapse and Azure Data Explorer (including secure access).&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;How to make the most of existing data&lt;/strong&gt; in Azure Data Explorer and process it using Apache Spark pools in Azure Synapse.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;How to process data&lt;/strong&gt; from external sources and write the results back Azure Data Explorer for further analysis.&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Wrap up!&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;wrap-up&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#wrap-up&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;These were simple examples to help you get started. But, the full power of Apache Spark SQL, &lt;a href=&#34;https://docs.microsoft.com/azure/synapse-analytics/spark/apache-spark-version-support?WT.mc_id=data-17928-abhishgu#python-libraries&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Python&lt;/a&gt; and &lt;a href=&#34;https://docs.microsoft.com/azure/synapse-analytics/spark/apache-spark-version-support?WT.mc_id=data-17928-abhishgu#scala-and-java-libraries&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Scala/Java&lt;/a&gt; libraries are available to you. I’d be remiss if I don’t mention Synapse SQL Pools (available in &lt;a href=&#34;https://docs.microsoft.com/azure/synapse-analytics/sql/on-demand-workspace-overview?WT.mc_id=data-17928-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Serverless&lt;/a&gt; and &lt;a href=&#34;https://docs.microsoft.com/azure/synapse-analytics/sql-data-warehouse/sql-data-warehouse-overview-what-is?toc=/azure/synapse-analytics/toc.json&amp;amp;bc=/azure/synapse-analytics/breadcrumb/toc.json&amp;amp;WT.mc_id=data-17928-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Dedicated&lt;/a&gt; modes) that allows data access through T-SQL and open possibilities to a wide range of business intelligence, ad-hoc querying tools, and popular drivers.&lt;/p&gt;
+&lt;p&gt;🙏🏻 Thanks to &lt;a href=&#34;https://www.linkedin.com/in/manoj-b-raheja/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Manoj Raheja&lt;/a&gt; and &lt;a href=&#34;https://twitter.com/AdiPolak?&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Adi Polak&lt;/a&gt; for their review and feedback! 🙏🏻&lt;/p&gt;
+
+      </description>
+    </item>
+    
+    <item>
+      <title>Securely access Azure SQL Database from Azure Synapse</title>
+      <link>http://localhost:1313/blog/access-sqldb-keyvault/</link>
+      <pubDate>Fri, 16 Jul 2021 00:00:00 +0000</pubDate>
+      
+      <guid>http://localhost:1313/blog/access-sqldb-keyvault/</guid>
+      <description>
+        
+        
+        &lt;p&gt;&lt;a href=&#34;https://docs.microsoft.com/sql/connect/spark/connector?view=sql-server-ver15&amp;amp;WT.mc_id=data-34417-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;The Apache Spark connector for Azure SQL Database (and SQL Server)&lt;/a&gt; enables these databases to be used as input data sources and output data sinks for Apache Spark jobs. You can use the connector in &lt;a href=&#34;https://docs.microsoft.com/azure/synapse-analytics/spark/data-sources/apache-spark-sql-connector?WT.mc_id=data-34417-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Azure Synapse Analytics&lt;/a&gt; for big data analytics on real-time transactional data and to persist results for ad-hoc queries or reporting.&lt;/p&gt;
+&lt;p&gt;At the time of writing, there is no linked service or AAD pass-through support with the Azure SQL connector via Azure Synapse Analytics. But you can use other options such as Azure &lt;a href=&#34;https://docs.microsoft.com/azure/synapse-analytics/spark/data-sources/apache-spark-sql-connector?WT.mc_id=data-34417-abhishgu#azure-active-directory-authentication&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Active Directory authentication&lt;/a&gt; or via direct SQL authentication (username and password based). A secure way of doing this is to store the Azure SQL Database credentials in Azure Key Vault (as Secret) — this is what’s covered in this short blog post.&lt;/p&gt;
+&lt;p&gt;Assuming you have an &lt;a href=&#34;https://docs.microsoft.com/azure/synapse-analytics/quickstart-create-workspace?WT.mc_id=data-34417-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Azure Synapse Workspace&lt;/a&gt; and &lt;a href=&#34;https://docs.microsoft.com/azure/azure-sql/database/single-database-create-quickstart?tabs=azure-portal&amp;amp;WT.mc_id=data-34417-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Azure SQL Database&lt;/a&gt; already created, all you need to is:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Create an Azure Key Vault and add a Secret to store the Azure SQL Database connectivity info.&lt;/li&gt;
+&lt;li&gt;Create a Linked Service for your Azure Key Vault in Azure Synapse Workspace.&lt;/li&gt;
+&lt;li&gt;Provide appropriate permissions to Azure Synapse workspace managed service identity to Azure Key Vault&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Here is a walk through of the process&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;here-is-a-walk-through-of-the-process&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#here-is-a-walk-through-of-the-process&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;&lt;a href=&#34;https://docs.microsoft.com/azure/key-vault/general/quick-create-portal?WT.mc_id=data-34417-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Create an Azure Key Vault&lt;/a&gt; and &lt;a href=&#34;https://docs.microsoft.com/azure/key-vault/secrets/quick-create-portal?WT.mc_id=data-34417-abhishgu#add-a-secret-to-key-vault&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;add a Secret&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/n4q9s3cnt8x8y1i6csjo.png&#34; alt=&#34;Alt Text&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;I have stored the entire JDBC connection string in this case but you can choose to just store the password as well.&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;To retrieve secrets from Azure Key Vault, the recommended way is to create a Linked Service to your Azure Key Vault. Also, make sure that the &lt;a href=&#34;https://docs.microsoft.com/azure/synapse-analytics/security/synapse-workspace-managed-identity?WT.mc_id=data-34417-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Synapse workspace managed service identity (MSI)&lt;/a&gt; has Secret Get privileges on your Azure Key Vault. This will let Synapse authenticate to Azure Key Vault using the Synapse workspace managed service identity.&lt;/p&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;You can also authenticate using your user Azure Active Directory credential.&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Create a Linked Service in Azure Synapse Workspace:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/vu0q7qi27twsfe38fs8e.png&#34; alt=&#34;Alt Text&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://docs.microsoft.com/azure/key-vault/general/assign-access-policy-portal?WT.mc_id=data-34417-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Grant appropriate access&lt;/a&gt; for Azure Synapse workspace service managed identity to your Azure Key Vault:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/8xniaqmnvknlzyfzyiui.png&#34; alt=&#34;Alt Text&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Choose &lt;code&gt;Get&lt;/code&gt; permission on &lt;code&gt;Secret&lt;/code&gt;:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/wjvogk10rykwii2rho9m.png&#34; alt=&#34;Alt Text&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Search for the Synapse Workspace Managed Service Identity — it’s the same name as that of the workspace&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/mk1dpsweqm2x540seuxi.png&#34; alt=&#34;Alt Text&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Add the policy:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/5thmy61st6g55ellfee9.png&#34; alt=&#34;Alt Text&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Click Save to confirm:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/fry4926cycozbglysniv.png&#34; alt=&#34;Alt Text&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;h2&gt;Let’s see how to use this…&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;lets-see-how-to-use-this&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#lets-see-how-to-use-this&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;blockquote&gt;
+  &lt;p&gt;I will be using &lt;code&gt;pyspark&lt;/code&gt; in Synapse Spark pools as an example.&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Synapse uses Azure Active Directory (AAD) passthrough by default for authentication between resources. If you need to connect to a resource using other credentials, &lt;a href=&#34;https://docs.microsoft.com/azure/synapse-analytics/spark/apache-spark-secure-credentials-with-tokenlibrary?pivots=programming-language-python&amp;amp;WT.mc_id=data-34417-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;use the TokenLibrary directly&lt;/a&gt; — this simplifies the process of retrieving SAS tokens, AAD tokens, connection strings, and secrets stored in a linked service or from an Azure Key Vault.&lt;/p&gt;
+&lt;p&gt;To retrieve a secret stored from Azure Key Vault, use the &lt;code&gt;TokenLibrary.getSecret()&lt;/code&gt; function. Here is a &lt;a href=&#34;https://docs.microsoft.com/azure/synapse-analytics/spark/apache-spark-secure-credentials-with-tokenlibrary?pivots=programming-language-python&amp;amp;WT.mc_id=data-34417-abhishgu#getsecret&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;python example&lt;/a&gt; but same applies to &lt;a href=&#34;https://docs.microsoft.com/azure/synapse-analytics/spark/apache-spark-secure-credentials-with-tokenlibrary?pivots=programming-language-csharp&amp;amp;WT.mc_id=data-34417-abhishgu#getsecret&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;C#&lt;/a&gt; or &lt;a href=&#34;https://docs.microsoft.com/azure/synapse-analytics/spark/apache-spark-secure-credentials-with-tokenlibrary?pivots=programming-language-scala&amp;amp;WT.mc_id=data-34417-abhishgu#getsecret&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Scala&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;For example, to access data from &lt;code&gt;SalesLT.Customer&lt;/code&gt; table (part of AdventureWorks sample database), you can use the following:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-python&#34; data-lang=&#34;python&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;n&#34;&gt;url&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;TokenLibrary&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;getSecret&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;&amp;lt;Azure Key Vault name&amp;gt;&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;&amp;lt;Secret name&amp;gt;&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;&amp;lt;Linked Service name&amp;gt;&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;n&#34;&gt;dbtable&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;SalesLT.Customer&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;n&#34;&gt;customers&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;spark&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;read&lt;/span&gt; \
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;format&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;com.microsoft.sqlserver.jdbc.spark&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt; \
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;option&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;url&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;url&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt; \
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;option&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;dbtable&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;dbtable&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt; \
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;load&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;()&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;print&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;customers&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;count&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;())&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;n&#34;&gt;customers&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;show&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;mi&#34;&gt;5&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;That’s all there is to it!&lt;/p&gt;
+
+      </description>
+    </item>
+    
+  </channel>
+</rss>

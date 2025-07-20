@@ -1,0 +1,373 @@
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Abhishek Gupta&#39;s Blog – Data Engineering</title>
+    <link>http://localhost:1313/tags/data-engineering/</link>
+    <description>Recent content in Data Engineering on Abhishek Gupta&#39;s Blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en</language>
+    <copyright>© Abhishek Gupta, 2025</copyright>
+    <lastBuildDate>Tue, 28 Jun 2022 00:00:00 +0000</lastBuildDate>
+    
+	  <atom:link href="http://localhost:1313/tags/data-engineering/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+      
+        
+      
+    
+    
+    <item>
+      <title>MySQL to DynamoDB: Build a streaming data pipeline on AWS using Kafka</title>
+      <link>http://localhost:1313/blog/msk-to-dynamodb-with-kafka/</link>
+      <pubDate>Tue, 28 Jun 2022 00:00:00 +0000</pubDate>
+      
+      <guid>http://localhost:1313/blog/msk-to-dynamodb-with-kafka/</guid>
+      <description>
+        
+        
+        &lt;p&gt;&lt;strong&gt;Use change data capture with MSK Connect to sync data between Aurora MySQL and DynamoDB&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;This is the second part of the blog series which provides a step-by-step walkthrough of data pipelines with Kafka and Kafka Connect. I will be using AWS for demonstration purposes, but the concepts apply to any equivalent options (e.g. running these locally in Docker).&lt;/p&gt;
+&lt;p&gt;This part will show &lt;em&gt;Change Data Capture&lt;/em&gt; in action that let&amp;rsquo;s you track row-level changes in database tables in response to create, update and delete operations. For example, in MySQL, these change data events are exposed via the &lt;a href=&#34;https://dev.mysql.com/doc/internals/en/binary-log-overview.html&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;MySQL binary log (binlog)&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;In &lt;a href=&#34;msk-dynamodb-data-pipeline-1.md&#34; &gt;Part 1&lt;/a&gt;, we used the Datagen connector in the source part of the data pipeline - it helped us generate mock data to MSK topic and keep things simple. We will use Aurora MySQL as the source of data and leverage it&amp;rsquo;s Change Data Capture capability with the &lt;a href=&#34;https://debezium.io/documentation/reference/1.9/connectors/mysql.html&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Debezium connector for MySQL&lt;/a&gt; to extract data in real-time from tables in &lt;a href=&#34;https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.AuroraMySQL.html&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Aurora MySQL&lt;/a&gt;, push that to MSK topics. Then, we will continue to use the DynamoDB sink connector just like we did before.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;If you&amp;rsquo;re new to &lt;a href=&#34;https://debezium.io/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Debezium&lt;/a&gt;&amp;hellip;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;It is a distributed platform that builds on top of Change Data Capture features available in different databases. It provides a set of &lt;a href=&#34;https://debezium.io/documentation/reference/1.2/connectors/index.html&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Kafka Connect connectors&lt;/a&gt; which tap into row-level changes (using CDC) in database table(s) and convert them into event streams. These are sent to Kafka and can be made available to all the downstream applications.&lt;/p&gt;
+&lt;hr&gt;
+&lt;p&gt;Here is a high level diagram of the solution presented in this blog post.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/ma5ce5o9lkm8sjt0c6rb.png&#34; alt=&#34;Image description&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;I am assuming that you are following along from Part 1 where the creation process for the base infrastructure and services required for this tutorial were already covered. If you haven&amp;rsquo;t already, refer to the &lt;strong&gt;Prepare infrastructure components and services&lt;/strong&gt; section in &lt;a href=&#34;msk-dynamodb-data-pipeline-1.md&#34; &gt;part 1&lt;/a&gt; section&lt;/p&gt;
+&lt;h2&gt;Data pipeline part 1: Aurora MySQL to MSK&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;data-pipeline-part-1-aurora-mysql-to-msk&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#data-pipeline-part-1-aurora-mysql-to-msk&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Let&amp;rsquo;s start by creating the first half of the pipeline to synchronise data from Aurora MySQL table to a topic in MSK.&lt;/p&gt;
+&lt;p&gt;In this section, you will:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Download the Debezium connector artefacts&lt;/li&gt;
+&lt;li&gt;Create Custom Plugin in MSK&lt;/li&gt;
+&lt;li&gt;Deploy the Debezium source connector to MSK Connect&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;At the end, you will have the first half of the data pipeline ready to go!&lt;/p&gt;
+&lt;h3&gt;Create a Custom plugin and Connector&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;create-a-custom-plugin-and-connector&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#create-a-custom-plugin-and-connector&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;Upload the Debezium connector to Amazon S3&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;Log into the Kafka client EC2 instance and run these commands:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;pre&gt;&lt;code&gt;sudo -u ec2-user -i
+mkdir debezium &amp;amp;&amp;amp; cd debezium
+
+wget https://repo1.maven.org/maven2/io/debezium/debezium-connector-mysql/1.9.0.Final/debezium-connector-mysql-1.9.0.Final-plugin.tar.gz
+tar xzf debezium-connector-mysql-1.9.0.Final-plugin.tar.gz
+
+cd debezium-connector-mysql
+zip -9 ../debezium-connector-mysql-1.9.0.Final-plugin.zip *
+
+cd ..
+aws s3 cp ./debezium-connector-mysql-1.9.0.Final-plugin.zip s3://msk-lab-&amp;lt;ENTER_YOUR_AWS_ACCOUNT_ID&amp;gt;-plugins-bucket/&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;&lt;strong&gt;Create Custom Plugin&lt;/strong&gt;&lt;/p&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;For step by step instructions on how to create a MSK Connect Plugin, refer to &lt;a href=&#34;https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-plugins.html&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Creating a custom plugin using the AWS Management Console&lt;/a&gt; in the official documentation.&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;While creating the Custom Plugin, make sure to choose the Debezium connector zip file you uploaded to &lt;code&gt;S3&lt;/code&gt; in the previous step.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/zea3i0kdmwm7oqxd5i9p.png&#34; alt=&#34;Image description&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Create the Debezium source connector&lt;/strong&gt;&lt;/p&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;For step by step instructions on how to create a MSK Connect Connector, refer to &lt;a href=&#34;https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-connectors.html#mkc-create-connector-intro&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Creating a connector&lt;/a&gt; in the official documentation.&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;To create a connector:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;Choose the plugin you just created.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Enter the connector name and choose the MSK cluster along with IAM authentication&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;You can enter the content provided below in the connector configuration section. Make sure you replace the following configuration as per your setup:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;database.history.kafka.bootstrap.servers&lt;/code&gt; - Enter the MSK cluster endpoint&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;database.hostname&lt;/code&gt; - Enter Aurora RDS MySQL Endpoint&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;Leave the rest of configuration unchanged&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;pre&gt;&lt;code&gt;connector.class=io.debezium.connector.mysql.MySqlConnector
+database.user=master
+database.server.id=123456
+tasks.max=1
+database.history.kafka.topic=dbhistory.salesdb
+database.history.kafka.bootstrap.servers=&amp;lt;ENTER MSK CLUSTER ENDPOINT&amp;gt;
+database.server.name=salesdb
+database.port=3306
+include.schema.changes=true
+database.hostname=&amp;lt;ENTER RDS MySQL ENDPOINT&amp;gt;
+database.password=S3cretPwd99
+database.include.list=salesdb
+value.converter.schemas.enable=false
+key.converter.schemas.enable=false
+key.converter=org.apache.kafka.connect.storage.StringConverter
+value.converter=org.apache.kafka.connect.json.JsonConverter
+database.history.consumer.security.protocol=SASL_SSL
+database.history.consumer.sasl.mechanism=AWS_MSK_IAM
+database.history.consumer.sasl.jaas.config=software.amazon.msk.auth.iam.IAMLoginModule required;
+database.history.consumer.sasl.client.callback.handler.class=software.amazon.msk.auth.iam.IAMClientCallbackHandler
+database.history.producer.security.protocol=SASL_SSL
+database.history.producer.sasl.mechanism=AWS_MSK_IAM
+database.history.producer.sasl.jaas.config=software.amazon.msk.auth.iam.IAMLoginModule required;
+database.history.producer.sasl.client.callback.handler.class=software.amazon.msk.auth.iam.IAMClientCallbackHandler
+transforms=unwrap
+transforms.unwrap.type=io.debezium.transforms.ExtractNewRecordState&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;ol start=&#34;4&#34;&gt;
+&lt;li&gt;Under &lt;strong&gt;Access permissions&lt;/strong&gt;, choose the correct IAM role (the one with &lt;code&gt;AuroraConnectorIAMRole&lt;/code&gt; in its name) for the connector&lt;/li&gt;
+&lt;li&gt;Click &lt;strong&gt;Next&lt;/strong&gt; to move to the &lt;strong&gt;Security&lt;/strong&gt; options - leave them unchanged&lt;/li&gt;
+&lt;li&gt;Click &lt;strong&gt;Next&lt;/strong&gt;. For &lt;strong&gt;Log delivery&lt;/strong&gt;, choose &lt;strong&gt;Deliver to Amazon CloudWatch Logs&lt;/strong&gt;. Locate and select &lt;code&gt;/msk-connect-demo-cwlog-group&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;Click &lt;strong&gt;Next&lt;/strong&gt; - On the final page, scroll down and click &lt;strong&gt;Create connector&lt;/strong&gt; to start the process and wait for the connector to start.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;Once that&amp;rsquo;s done and the connector has transitioned to &lt;strong&gt;Running&lt;/strong&gt; state, proceed with the below steps.&lt;/p&gt;
+&lt;h3&gt;Test the pipeline&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;test-the-pipeline&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#test-the-pipeline&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;We want to confirm whether records from the &lt;code&gt;SALES_ORDER&lt;/code&gt; table in the &lt;code&gt;salesdb&lt;/code&gt; database have been pushed to MSK topic. To do that, from the EC2 host, run the Kafka CLI consumer.&lt;/p&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;Note the topic name &lt;code&gt;salesdb.salesdb.SALES_ORDER&lt;/code&gt; - this is as per Debezium convention&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;sudo -u ec2-user -i
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;export&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;MSK_BOOTSTRAP_ADDRESS&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&amp;lt;ENTER MSK CLUSTER ENDPOINT&amp;gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;/home/ec2-user/kafka/bin/kafka-console-consumer.sh --bootstrap-server &lt;span class=&#34;nv&#34;&gt;$MSK_BOOTSTRAP_ADDRESS&lt;/span&gt; --consumer.config /home/ec2-user/kafka/config/client-config.properties --from-beginning --topic salesdb.salesdb.SALES_ORDER &lt;span class=&#34;p&#34;&gt;|&lt;/span&gt; jq --color-output .&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;In another terminal, use MySQL client and connect to the Aurora database and insert few records:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;sudo -u ec2-user -i
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;export&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;RDS_AURORA_ENDPOINT&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&amp;lt;ENTER RDS MySQL ENDPOINT&amp;gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;mysql -f -u master -h &lt;span class=&#34;nv&#34;&gt;$RDS_AURORA_ENDPOINT&lt;/span&gt;  --password&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;S3cretPwd99
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;USE salesdb&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;k&#34;&gt;select&lt;/span&gt; * from SALES_ORDER limit 5&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;INSERT INTO SALES_ORDER &lt;span class=&#34;o&#34;&gt;(&lt;/span&gt;ORDER_ID, SITE_ID, ORDER_DATE, SHIP_MODE&lt;span class=&#34;o&#34;&gt;)&lt;/span&gt; VALUES &lt;span class=&#34;o&#34;&gt;(&lt;/span&gt;29001, 2568, now&lt;span class=&#34;o&#34;&gt;()&lt;/span&gt;, &lt;span class=&#34;s1&#34;&gt;&amp;#39;STANDARD&amp;#39;&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;)&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;INSERT INTO SALES_ORDER &lt;span class=&#34;o&#34;&gt;(&lt;/span&gt;ORDER_ID, SITE_ID, ORDER_DATE, SHIP_MODE&lt;span class=&#34;o&#34;&gt;)&lt;/span&gt; VALUES &lt;span class=&#34;o&#34;&gt;(&lt;/span&gt;29002, 1649, now&lt;span class=&#34;o&#34;&gt;()&lt;/span&gt;, &lt;span class=&#34;s1&#34;&gt;&amp;#39;ONE-DAY&amp;#39;&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;)&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;INSERT INTO SALES_ORDER &lt;span class=&#34;o&#34;&gt;(&lt;/span&gt;ORDER_ID, SITE_ID, ORDER_DATE, SHIP_MODE&lt;span class=&#34;o&#34;&gt;)&lt;/span&gt; VALUES &lt;span class=&#34;o&#34;&gt;(&lt;/span&gt;29003, 3861, now&lt;span class=&#34;o&#34;&gt;()&lt;/span&gt;, &lt;span class=&#34;s1&#34;&gt;&amp;#39;TWO-DAY&amp;#39;&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;)&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;INSERT INTO SALES_ORDER &lt;span class=&#34;o&#34;&gt;(&lt;/span&gt;ORDER_ID, SITE_ID, ORDER_DATE, SHIP_MODE&lt;span class=&#34;o&#34;&gt;)&lt;/span&gt; VALUES &lt;span class=&#34;o&#34;&gt;(&lt;/span&gt;29004, 2568, now&lt;span class=&#34;o&#34;&gt;()&lt;/span&gt;, &lt;span class=&#34;s1&#34;&gt;&amp;#39;STANDARD&amp;#39;&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;)&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;INSERT INTO SALES_ORDER &lt;span class=&#34;o&#34;&gt;(&lt;/span&gt;ORDER_ID, SITE_ID, ORDER_DATE, SHIP_MODE&lt;span class=&#34;o&#34;&gt;)&lt;/span&gt; VALUES &lt;span class=&#34;o&#34;&gt;(&lt;/span&gt;29005, 1649, now&lt;span class=&#34;o&#34;&gt;()&lt;/span&gt;, &lt;span class=&#34;s1&#34;&gt;&amp;#39;ONE-DAY&amp;#39;&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;)&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;INSERT INTO SALES_ORDER &lt;span class=&#34;o&#34;&gt;(&lt;/span&gt;ORDER_ID, SITE_ID, ORDER_DATE, SHIP_MODE&lt;span class=&#34;o&#34;&gt;)&lt;/span&gt; VALUES &lt;span class=&#34;o&#34;&gt;(&lt;/span&gt;29006, 3861, now&lt;span class=&#34;o&#34;&gt;()&lt;/span&gt;, &lt;span class=&#34;s1&#34;&gt;&amp;#39;TWO-DAY&amp;#39;&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;)&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;If everything is setup correctly, you should see the records in the consumer terminal.&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-json&#34; data-lang=&#34;json&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;nt&#34;&gt;&amp;#34;ORDER_ID&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;mi&#34;&gt;29001&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;nt&#34;&gt;&amp;#34;SITE_ID&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;mi&#34;&gt;2568&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;nt&#34;&gt;&amp;#34;ORDER_DATE&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;mi&#34;&gt;1655279536000&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;nt&#34;&gt;&amp;#34;SHIP_MODE&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;STANDARD&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;nt&#34;&gt;&amp;#34;ORDER_ID&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;mi&#34;&gt;29002&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;nt&#34;&gt;&amp;#34;SITE_ID&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;mi&#34;&gt;1649&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;nt&#34;&gt;&amp;#34;ORDER_DATE&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;mi&#34;&gt;1655279536000&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;nt&#34;&gt;&amp;#34;SHIP_MODE&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;ONE-DAY&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;nt&#34;&gt;&amp;#34;ORDER_ID&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;mi&#34;&gt;29003&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;nt&#34;&gt;&amp;#34;SITE_ID&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;mi&#34;&gt;3861&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;nt&#34;&gt;&amp;#34;ORDER_DATE&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;mi&#34;&gt;1655279563000&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;nt&#34;&gt;&amp;#34;SHIP_MODE&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;TWO-DAY&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;err&#34;&gt;...&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;&lt;strong&gt;The secret to compact change event payloads&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;Notice how compact the change data capture event payload is. This is because we configured the connector to use &lt;code&gt;io.debezium.transforms.ExtractNewRecordState&lt;/code&gt; which is a Kafka &lt;a href=&#34;https://kafka.apache.org/documentation/#connect_transforms&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Single Message Transform&lt;/a&gt; (SMT). By default Debezium change event structure is quite complex - along with the change event, it also includes metadata such as schema, source database info etc. It looks something like this:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-json&#34; data-lang=&#34;json&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;nt&#34;&gt;&amp;#34;before&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;kc&#34;&gt;null&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;nt&#34;&gt;&amp;#34;after&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;nt&#34;&gt;&amp;#34;ORDER_ID&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;mi&#34;&gt;29003&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;nt&#34;&gt;&amp;#34;SITE_ID&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;mi&#34;&gt;3861&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;nt&#34;&gt;&amp;#34;ORDER_DATE&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;mi&#34;&gt;1655279563000&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;nt&#34;&gt;&amp;#34;SHIP_MODE&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;TWO-DAY&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;p&#34;&gt;},&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;nt&#34;&gt;&amp;#34;source&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;nt&#34;&gt;&amp;#34;version&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;1.9.0.Final&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;nt&#34;&gt;&amp;#34;connector&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;mysql&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;nt&#34;&gt;&amp;#34;name&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;salesdb&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;nt&#34;&gt;&amp;#34;ts_ms&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;mi&#34;&gt;1634569283000&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;nt&#34;&gt;&amp;#34;snapshot&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;false&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;nt&#34;&gt;&amp;#34;db&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;salesdb&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;nt&#34;&gt;&amp;#34;sequence&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;kc&#34;&gt;null&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;nt&#34;&gt;&amp;#34;table&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;SALES_ORDER&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;nt&#34;&gt;&amp;#34;server_id&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;mi&#34;&gt;1733046080&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;nt&#34;&gt;&amp;#34;gtid&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;kc&#34;&gt;null&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;nt&#34;&gt;&amp;#34;file&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;mysql-bin-changelog.000003&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;nt&#34;&gt;&amp;#34;pos&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;mi&#34;&gt;43275145&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;nt&#34;&gt;&amp;#34;row&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;mi&#34;&gt;0&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;nt&#34;&gt;&amp;#34;thread&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;kc&#34;&gt;null&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;nt&#34;&gt;&amp;#34;query&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;kc&#34;&gt;null&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;p&#34;&gt;},&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;nt&#34;&gt;&amp;#34;op&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;c&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;nt&#34;&gt;&amp;#34;ts_ms&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;mi&#34;&gt;1655279563000&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;nt&#34;&gt;&amp;#34;transaction&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;kc&#34;&gt;null&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;err&#34;&gt;...&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;Thanks to the Kafka SMT (specified using &lt;code&gt;transforms.unwrap.type=io.debezium.transforms.ExtractNewRecordState&lt;/code&gt;), we can effectively &lt;code&gt;flatten&lt;/code&gt; the event payload and customize it as per our requirements.&lt;/p&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;For details, refer to &lt;a href=&#34;https://debezium.io/documentation/reference/stable/transformations/event-flattening.html&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;New Record State Extraction&lt;/a&gt; in the Debezium documentation.&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h2&gt;Data pipeline part 2: MSK to DynamoDB&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;data-pipeline-part-2-msk-to-dynamodb&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#data-pipeline-part-2-msk-to-dynamodb&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;We can now shift our focus to the second half of the pipeline that&amp;rsquo;s responsible for taking data from MSK topic to DynamoDB table with the help of the DynamoDB Sink connector.&lt;/p&gt;
+&lt;p&gt;If the DynamoDB table is not present, the connector automatically creates one for you, but it uses default settings i.e. its creates a table in &lt;a href=&#34;https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.ReadWriteCapacityMode.html#HowItWorks.ProvisionedThroughput.Manual&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Provisioned Mode&lt;/a&gt;, with &lt;code&gt;10&lt;/code&gt; read capacity units (RCUs) and &lt;code&gt;10&lt;/code&gt; write capacity units (WCUs).&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/l46m4c9r1x0s0pybwcfn.png&#34; alt=&#34;Image description&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;But your use-case might need a configuration. For example, in order to handle high volume of data, you may want to configure &lt;a href=&#34;https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/AutoScaling.html&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Auto scaling&lt;/a&gt;, or even better, activate &lt;a href=&#34;https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.ReadWriteCapacityMode.html#HowItWorks.OnDemand&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;On-Demand mode&lt;/a&gt; for your table.&lt;/p&gt;
+&lt;p&gt;That&amp;rsquo;s exactly what we will do.&lt;/p&gt;
+&lt;h3&gt;Before you proceed, create a DynamoDB table&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;before-you-proceed-create-a-dynamodb-table&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#before-you-proceed-create-a-dynamodb-table&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;Use the following settings:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Table name - &lt;code&gt;kafka_salesdb.salesdb.SALES_ORDER&lt;/code&gt; (do &lt;em&gt;not&lt;/em&gt; change the table name)&lt;/li&gt;
+&lt;li&gt;Partition key - &lt;code&gt;ORDER_ID&lt;/code&gt; (Number)&lt;/li&gt;
+&lt;li&gt;Range key - &lt;code&gt;SITE_ID&lt;/code&gt; (Number)&lt;/li&gt;
+&lt;li&gt;Capacity mode - On-demand&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/i0wss7lnvhnqec2h9rv2.png&#34; alt=&#34;Image description&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;That&amp;rsquo;s it, you&amp;rsquo;re good to go!&lt;/p&gt;
+&lt;h3&gt;Create a Custom plugin and Connector&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;create-a-custom-plugin-and-connector-1&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#create-a-custom-plugin-and-connector-1&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;blockquote&gt;
+  &lt;p&gt;For step by step instructions on how to create a MSK Connect Plugin, refer to &lt;a href=&#34;https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-plugins.html&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Creating a custom plugin using the AWS Management Console&lt;/a&gt; in the official documentation.&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;While creating the Custom Plugin, make sure to choose the DynamoDB connector zip file you uploaded to &lt;code&gt;S3&lt;/code&gt; in the previous step.&lt;/p&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;For step by step instructions on how to create a MSK Connect Connector, refer to &lt;a href=&#34;https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-connectors.html#mkc-create-connector-intro&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Creating a connector&lt;/a&gt; in the official documentation.&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;To create a connector:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;Choose the plugin you just created.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Enter the connector name and choose the MSK cluster along with IAM authentication&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;You can enter the content provided below in the connector configuration section. Make sure you replace the following configuration as per your setup:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Use the right topic name for &lt;code&gt;topics&lt;/code&gt; attribute (we are using &lt;code&gt;salesdb.salesdb.SALES_ORDER&lt;/code&gt; in this example, since that&amp;rsquo;s the topic name format that Debezium source connector adopts)&lt;/li&gt;
+&lt;li&gt;For &lt;code&gt;confluent.topic.bootstrap.servers&lt;/code&gt;, enter MSK cluster endpoint&lt;/li&gt;
+&lt;li&gt;For &lt;code&gt;aws.dynamodb.endpoint&lt;/code&gt; and &lt;code&gt;aws.dynamodb.region&lt;/code&gt;, enter the region where you created the DynamoDB table e.g. &lt;code&gt;us-east-1&lt;/code&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;Leave the rest of configuration unchanged&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;pre&gt;&lt;code&gt;connector.class=io.confluent.connect.aws.dynamodb.DynamoDbSinkConnector
+tasks.max=2
+aws.dynamodb.region=&amp;lt;ENTER AWS REGION e.g. us-east-1&amp;gt;
+aws.dynamodb.endpoint=https://dynamodb.&amp;lt;ENTER AWS REGION&amp;gt;.amazonaws.com
+topics=salesdb.salesdb.SALES_ORDER
+value.converter.schemas.enable=false
+key.converter=org.apache.kafka.connect.storage.StringConverter
+value.converter=org.apache.kafka.connect.json.JsonConverter
+table.name.format=kafka_${topic}
+confluent.topic.bootstrap.servers=&amp;lt;ENTER MSK CLUSTER ENDPOINT&amp;gt;
+confluent.topic.security.protocol=SASL_SSL
+confluent.topic.sasl.mechanism=AWS_MSK_IAM
+confluent.topic.sasl.jaas.config=software.amazon.msk.auth.iam.IAMLoginModule required;
+confluent.topic.sasl.client.callback.handler.class=software.amazon.msk.auth.iam.IAMClientCallbackHandler
+aws.dynamodb.pk.hash=value.ORDER_ID
+aws.dynamodb.pk.sort=value.SITE_ID&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;ol start=&#34;4&#34;&gt;
+&lt;li&gt;Under &lt;strong&gt;Access permissions&lt;/strong&gt;, choose the correct IAM role (the one with &lt;code&gt;DynamoDBConnectorIAMRole&lt;/code&gt; in its name) for the connector&lt;/li&gt;
+&lt;li&gt;Click &lt;strong&gt;Next&lt;/strong&gt; to move to the &lt;strong&gt;Security&lt;/strong&gt; options - leave them unchanged&lt;/li&gt;
+&lt;li&gt;Click &lt;strong&gt;Next&lt;/strong&gt;. For &lt;strong&gt;Log delivery&lt;/strong&gt;, choose &lt;strong&gt;Deliver to Amazon CloudWatch Logs&lt;/strong&gt;. Locate and select &lt;code&gt;/msk-connect-demo-cwlog-group&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;Click &lt;strong&gt;Next&lt;/strong&gt; - On the final page, scroll down and click &lt;strong&gt;Create connector&lt;/strong&gt; to start the process and wait for the connector to start.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;Once that&amp;rsquo;s done and the connector has transitioned to &lt;strong&gt;Running&lt;/strong&gt; state, proceed with the below steps.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Choosing DynamoDB primary key&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;In the above configuration we set &lt;code&gt;aws.dynamodb.pk.hash&lt;/code&gt; and &lt;code&gt;aws.dynamodb.pk.sort&lt;/code&gt; to &lt;code&gt;value.ORDER_ID&lt;/code&gt; and &lt;code&gt;value.SITE_ID&lt;/code&gt; respectively. This implies that the &lt;code&gt;ORDER_ID&lt;/code&gt; field from the Kafka topic event payload will be used as the partition key and the value for &lt;code&gt;SITE_ID&lt;/code&gt; will we designated as the Range key (depending on your requirements, you can also leave &lt;code&gt;aws.dynamodb.pk.sort&lt;/code&gt; empty).&lt;/p&gt;
+&lt;h3&gt;Test the end to end pipeline&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;test-the-end-to-end-pipeline&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#test-the-end-to-end-pipeline&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;As part of the initial load process, the connector makes sure that all the existing records from Kafka topic are persisted to the DynamoDB table specified in the connector configuration. In this case, you should see more than &lt;code&gt;29000&lt;/code&gt; records (as per &lt;code&gt;SALES_ORDER&lt;/code&gt; table) in DynamoDB and you can run queries to explore the data.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/16ge9zblrpk7q39ta7zn.png&#34; alt=&#34;Image description&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;To continue testing the end to end pipeline, you can insert more data in the &lt;code&gt;SALES_ORDER&lt;/code&gt; table and confirm that they were synchronised to Kafka via the Debezium source connector and all the way to DynamoDB, thanks to the sink connector.&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2&gt;Delete resources&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;delete-resources&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#delete-resources&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Once you&amp;rsquo;re done, delete the resources that you had created.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Delete the contents of the S3 bucket (&lt;code&gt;msk-lab-&amp;lt;YOUR ACCOUNT_ID&amp;gt;-plugins-bucket&lt;/code&gt;)&lt;/li&gt;
+&lt;li&gt;Delete the CloudFormation stack&lt;/li&gt;
+&lt;li&gt;Delete the DynamoDB table&lt;/li&gt;
+&lt;li&gt;Delete the MSK Connect connectors, Plugins and Custom configuration&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Conclusion &amp;amp; wrap up&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;conclusion--wrap-up&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#conclusion--wrap-up&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Change Data Capture is a powerful tool, but we need a way to tap into these event logs and make it available to other services which depend on that data. In this part, you saw how we can leverage this capability to setup a streaming data pipeline between MySQL and DynamoDB using Kafka Connect.&lt;/p&gt;
+&lt;p&gt;This wraps up this series. Happy building!&lt;/p&gt;
+
+      </description>
+    </item>
+    
+  </channel>
+</rss>

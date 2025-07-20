@@ -1,0 +1,434 @@
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Abhishek Gupta&#39;s Blog – Spring</title>
+    <link>http://localhost:1313/tags/spring/</link>
+    <description>Recent content in Spring on Abhishek Gupta&#39;s Blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en</language>
+    <copyright>© Abhishek Gupta, 2025</copyright>
+    <lastBuildDate>Tue, 22 Jun 2021 00:00:00 +0000</lastBuildDate>
+    
+	  <atom:link href="http://localhost:1313/tags/spring/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+      
+        
+      
+    
+    
+    <item>
+      <title>Processing Time-Series Data with Redis and Apache Kafka</title>
+      <link>http://localhost:1313/blog/redis-timeseries-kafka/</link>
+      <pubDate>Tue, 22 Jun 2021 00:00:00 +0000</pubDate>
+      
+      <guid>http://localhost:1313/blog/redis-timeseries-kafka/</guid>
+      <description>
+        
+        
+        &lt;p&gt;&lt;a href=&#34;https://oss.redislabs.com/redistimeseries/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;RedisTimeSeries&lt;/a&gt; is a Redis Module that brings native Time Series data structure to Redis. Time Series solutions which were earlier built on top of Sorted Sets (or Redis Streams) can benefit from &lt;code&gt;RedisTimeSeries&lt;/code&gt; features such as high volume inserts, low latency reads, flexible query language, down-sampling and much more!&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/7nctg9q63sbg8xclx7x4.jpeg&#34; alt=&#34;Alt Text&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Generally speaking, Time Series data is (relatively) simple. Having said that, we need to factor in other characteristics as well:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Data velocity: For e.g. think hundreds of metrics from thousands of devices per second&lt;/li&gt;
+&lt;li&gt;Volume (Big data): Think data accumulation over months (even years)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Thus, Time Series databases such as &lt;code&gt;RedisTimeSeries&lt;/code&gt; are just a part of the overall solution. You also need to think about how to &lt;em&gt;collect&lt;/em&gt; (ingest), &lt;em&gt;process&lt;/em&gt; and &lt;em&gt;send&lt;/em&gt; all your data to &lt;code&gt;RedisTimeSeries&lt;/code&gt;. What you really need is a scalable Data Pipeline that can act as a buffer to decouple producers, consumers.&lt;/p&gt;
+&lt;p&gt;That&amp;rsquo;s where &lt;a href=&#34;https://kafka.apache.org/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Apache Kafka&lt;/a&gt; comes in! In addition to the core broker, it has a rich ecosystem of components, including &lt;a href=&#34;https://kafka.apache.org/documentation/#connect&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Kafka Connect&lt;/a&gt; (which is a part of the solution architecture presented in this blog post), client libraries in multiple languages, &lt;a href=&#34;https://kafka.apache.org/documentation/streams/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Kafka Streams&lt;/a&gt;, Mirror Maker etc.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/qu8rr9j6bju2lrebnbqq.png&#34; alt=&#34;Alt Text&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;This blog post provides a practical example of how to use &lt;code&gt;RedisTimeSeries&lt;/code&gt; with Apache Kafka for analyzing time series data.&lt;/p&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;GitHub repo - &lt;a href=&#34;https://github.com/abhirockzz/redis-timeseries-kafka&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;https://github.com/abhirockzz/redis-timeseries-kafka&lt;/a&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Let&amp;rsquo;s start off by exploring the use case first - please note that it has been kept simple for the purposes of the blog post, but the subsequent sections&lt;/p&gt;
+&lt;h2&gt;Device monitoring&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;device-monitoring&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#device-monitoring&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Imagine there are many locations and each of them has multiple devices and you&amp;rsquo;re tasked with the responsibility to monitor device metrics - for now we will consider &lt;code&gt;temperature&lt;/code&gt; and &lt;code&gt;pressure&lt;/code&gt;. We will store these metrics in &lt;code&gt;RedisTimeSeries&lt;/code&gt; (of course!) and use the following naming convention for the keys - &lt;code&gt;&amp;lt;metric name&amp;gt;:&amp;lt;location&amp;gt;:&amp;lt;device&amp;gt;&lt;/code&gt;. For e.g. temperature for device &lt;code&gt;1&lt;/code&gt; in location &lt;code&gt;5&lt;/code&gt; will be represented as &lt;code&gt;temp:5:1&lt;/code&gt;. each time series data point will also have the following labels (metadata) - &lt;code&gt;metric&lt;/code&gt;, &lt;code&gt;location&lt;/code&gt;, &lt;code&gt;device&lt;/code&gt;. This is to allow for flexible querying as you will see later in the upcoming sections.&lt;/p&gt;
+&lt;p&gt;Here are a couple of examples to give you an idea of how you would add data points using the &lt;code&gt;TS.ADD&lt;/code&gt; command:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# temperature for device 2 in location 3 along with labels&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;TS.ADD temp:3:2 * &lt;span class=&#34;m&#34;&gt;20&lt;/span&gt; LABELS metric temp location &lt;span class=&#34;m&#34;&gt;3&lt;/span&gt; device &lt;span class=&#34;m&#34;&gt;2&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# pressure for device 2 in location 3&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;TS.ADD pressure:3:2 * &lt;span class=&#34;m&#34;&gt;60&lt;/span&gt; LABELS metric pressure location &lt;span class=&#34;m&#34;&gt;3&lt;/span&gt; device 2&lt;span class=&#34;sb&#34;&gt;`&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;h2&gt;Solution Architecture&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;solution-architecture&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#solution-architecture&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Here is what the solution looks like at a high level:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/8o81jaitl7uhunnlpg52.png&#34; alt=&#34;Alt Text&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;To summarise the end-to-end flow:&lt;/p&gt;
+&lt;p&gt;Simulated device data is sent to a local MQTT broker. this data is picked up by the MQTT Kafka connect source connector and sent to a confluent cloud Kafka cluster in Azure. it is processed by a spring application in Azure Spring Cloud which is finally sent to a Redis database in Azure.&lt;/p&gt;
+&lt;p&gt;It&amp;rsquo;s time to dive in! Before that, make sure you have the following:&lt;/p&gt;
+&lt;h2&gt;Pre-reqs&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;pre-reqs&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#pre-reqs&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;ul&gt;
+&lt;li&gt;An Azure account - &lt;a href=&#34;https://azure.microsoft.com/free/?WT.mc_id=data-17927-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;you can get one for free here&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Install &lt;a href=&#34;https://docs.microsoft.com/cli/azure/install-azure-cli?WT.mc_id=data-17927-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Azure CLI&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;JDK 11 for e.g. &lt;a href=&#34;https://openjdk.java.net/projects/jdk/11/]&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;OpenJDK&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;A recent version of &lt;a href=&#34;https://maven.apache.org/download.cgi&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Maven&lt;/a&gt; and &lt;a href=&#34;https://git-scm.com/downloads&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Git&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Set up the infrastructure components&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;set-up-the-infrastructure-components&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#set-up-the-infrastructure-components&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Follow the documentation to &lt;a href=&#34;https://docs.microsoft.com/azure/azure-cache-for-redis/quickstart-create-redis-enterprise?WT.mc_id=data-17927-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;provision Azure Cache for Redis (Enterprise Tier)&lt;/a&gt; which comes with the &lt;code&gt;RedisTimeSeries&lt;/code&gt; module.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/hyead6p0cyckht5smzb8.png&#34; alt=&#34;Alt Text&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Provision &lt;a href=&#34;https://docs.microsoft.com/azure/partner-solutions/apache-kafka-confluent-cloud/create?WT.mc_id=data-17927-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Confluent Cloud cluster on Azure Marketplace&lt;/a&gt; and also create a Kafka topic (e.g. &lt;code&gt;mqtt.device-stats&lt;/code&gt;)&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/zn292lz6v7pzyw1kfvp6.png&#34; alt=&#34;Alt Text&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;You can provision an instance of Azure Spring Cloud &lt;a href=&#34;https://docs.microsoft.com/azure/spring-cloud/quickstart-provision-service-instance?tabs=Azure-portal&amp;amp;pivots=programming-language-java&amp;amp;WT.mc_id=data-17927-abhishgu#provision-an-instance-of-azure-spring-cloud-1&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;using the Azure portal&lt;/a&gt; or &lt;a href=&#34;https://docs.microsoft.com/cli/azure/ext/spring-cloud/spring-cloud?view=azure-cli-latest&amp;amp;WT.mc_id=data-17927-abhishgu#ext_spring_cloud_az_spring_cloud_create&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;use the Azure CLI&lt;/a&gt;&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;az spring-cloud create -n &amp;lt;name of Azure Spring Cloud service&amp;gt; -g &amp;lt;resource group name&amp;gt; -l &amp;lt;enter location e.g southeastasia&amp;gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/qy5dhus2u43yv43g1c6q.png&#34; alt=&#34;Alt Text&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Before moving on, make sure to clone the GitHub repo:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;git clone https://github.com/abhirockzz/redis-timeseries-kafka
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;cd&lt;/span&gt; redis-timeseries-kafka&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;h2&gt;Setup local services&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;setup-local-services&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#setup-local-services&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;The components include:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;https://mosquitto.org/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Mosquitto&lt;/a&gt; MQTT broker&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;https://grafana.com/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Grafana&lt;/a&gt; for tracking time series data in dashboard&lt;/li&gt;
+&lt;li&gt;Kafka Connect with the &lt;a href=&#34;https://docs.confluent.io/kafka-connect-mqtt/current/mqtt-source-connector/index.html&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;MQTT source connector&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;MQTT broker&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;mqtt-broker&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#mqtt-broker&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;I installed and started the &lt;code&gt;mosquitto&lt;/code&gt; broker locally on Mac.&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;brew install mosquitto
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;brew services start mosquitto&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;You can &lt;a href=&#34;https://mosquitto.org/download/]&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;follow steps corresponding your OS&lt;/a&gt; or feel free to use the &lt;a href=&#34;https://hub.docker.com/_/eclipse-mosquitto&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;this Docker image&lt;/a&gt;.&lt;/p&gt;
+&lt;h3&gt;Grafana&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;grafana&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#grafana&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;I installed and started Grafana locally on Mac.&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;brew install grafana
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;brew services start grafana&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;You can do the same for your OS or feel free to use this &lt;a href=&#34;https://hub.docker.com/r/grafana/grafana&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Docker image&lt;/a&gt;.&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;docker run -d -p 3000:3000 --name&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;grafana -e &lt;span class=&#34;s2&#34;&gt;&amp;#34;GF_INSTALL_PLUGINS=redis-datasource&amp;#34;&lt;/span&gt; grafana/grafana&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;h3&gt;Kafka Connect&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;kafka-connect&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#kafka-connect&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;blockquote&gt;
+  &lt;p&gt;You should be able to find the &lt;code&gt;connect-distributed.properties&lt;/code&gt; file in the repo that you just cloned. Replace the values for properties such as &lt;code&gt;bootstrap.servers&lt;/code&gt;, &lt;code&gt;sasl.jaas.config&lt;/code&gt; etc.&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;First, &lt;a href=&#34;https://kafka.apache.org/downloads&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;download and unzip Apache Kafka&lt;/a&gt; locally.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Start a local Kafka Connect cluster&lt;/strong&gt;&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;export&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;KAFKA_INSTALL_DIR&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&amp;lt;kafka installation directory e.g. /home/foo/kafka_2.12-2.5.0&amp;gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nv&#34;&gt;$KAFKA_INSTALL_DIR&lt;/span&gt;/bin/connect-distributed.sh connect-distributed.properties&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;To &lt;a href=&#34;https://www.confluent.io/hub/confluentinc/kafka-connect-mqtt&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;install MQTT source connector manually&lt;/a&gt;:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Download the connector/plugin ZIP file &lt;a href=&#34;https://www.confluent.io/hub/confluentinc/kafka-connect-mqtt&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;from this link&lt;/a&gt;, and,&lt;/li&gt;
+&lt;li&gt;Extract it into one of the directories that is listed on the Connect worker&amp;rsquo;s &lt;code&gt;plugin.path&lt;/code&gt; configuration properties&lt;/li&gt;
+&lt;/ul&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;If you&amp;rsquo;re using Confluent Platform locally, simply use the CLI: &lt;code&gt;confluent-hub install confluentinc/kafka-connect-mqtt:latest&lt;/code&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;&lt;strong&gt;Create MQTT source connector instance&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;Make sure to check the &lt;code&gt;mqtt-source-config.json&lt;/code&gt; file: make sure you enter the right topic name for &lt;code&gt;kafka.topic&lt;/code&gt; and leave the &lt;code&gt;mqtt.topics&lt;/code&gt; unchanged.&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;curl -X POST -H &lt;span class=&#34;s1&#34;&gt;&amp;#39;Content-Type: application/json&amp;#39;&lt;/span&gt; http://localhost:8083/connectors -d @mqtt-source-config.json
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# wait for a minute before checking the connector status&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;curl http://localhost:8083/connectors/mqtt-source/status&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;h2&gt;Deploy the device data processor app&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;deploy-the-device-data-processor-app&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#deploy-the-device-data-processor-app&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Build the application JAR file:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;cd&lt;/span&gt; consumer
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;export&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;JAVA_HOME&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;/Library/Java/JavaVirtualMachines/zulu-11.jdk/Contents/Home
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;mvn clean package&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;Create an Azure Spring Cloud application and deploy the JAR file:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;az spring-cloud app create -n device-data-processor -s &amp;lt;name of Azure Spring Cloud instance&amp;gt; -g &amp;lt;name of resource group&amp;gt; --runtime-version Java_11
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;az spring-cloud app deploy -n device-data-processor -s &amp;lt;name of Azure Spring Cloud instance&amp;gt; -g &amp;lt;name of resource group&amp;gt; --jar-path target/device-data-processor-0.0.1-SNAPSHOT.jar&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;h2&gt;Start simulated device data generator&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;start-simulated-device-data-generator&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#start-simulated-device-data-generator&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Use script to send data to local MQTT broker. You can use the script in the GitHub repo you just cloned:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;./gen-timeseries-data.sh&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;All it does is use the &lt;code&gt;mosquitto_pub&lt;/code&gt; CLI command to send data&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Data is sent to the &lt;code&gt;device-stats&lt;/code&gt; MQTT topic (this is &lt;em&gt;not&lt;/em&gt; the Kafka topic). You can double check by using the CLI subscriber:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;mosquitto_sub -h localhost -t device-stats&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;&lt;strong&gt;To validate the end-to-end pipeline&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;Check the Kafka topic in the Confluent Cloud portal. You should also check the logs for the device data processor app in Azure Spring Cloud:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;az spring-cloud app logs -f -n device-data-processor -s &amp;lt;name of Azure Spring Cloud instance&amp;gt; -g &amp;lt;name of resource group&amp;gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;h2&gt;Enjoy Grafana dashboards!&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;enjoy-grafana-dashboards&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#enjoy-grafana-dashboards&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Browse to the Grafana UI at &lt;code&gt;localhost:3000&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;The Redis Data Source plugin for Grafana works with any Redis database, including Azure Cache for Redis. Follow the &lt;a href=&#34;https://abhishek1987.medium.com/an-easy-to-use-monitoring-solution-for-redis-5a8a73d56129&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;instructions in this blog post&lt;/a&gt; to configure a data source.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://miro.medium.com/max/1750/0*VcY0fkq8cd-9bozc.png&#34; alt=&#34;&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Import the dashboards in the &lt;code&gt;grafana_dashboards&lt;/code&gt; folder in the GitHub repo you had cloned.&lt;/p&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;Refer to the &lt;a href=&#34;https://grafana.com/docs/grafana/latest/dashboards/export-import/#importing-a-dashboard&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Grafana documentation&lt;/a&gt; if you need assistance on how to import dashboards.&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;For instance here is a dashboard that shows the average pressure (over 30 seconds) for device 5 in location 1 (uses &lt;code&gt;TS.MRANGE&lt;/code&gt;)&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/0jasrfzqwsjuaqmt57sc.png&#34; alt=&#34;Alt Text&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Here is another dashboard, that shows the maximum temperature (over 15 seconds) for multiple devices in location 3 (again, thanks to &lt;code&gt;TS.MRANGE&lt;/code&gt;).&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/shraogkbvtnzh3cmpdvu.png&#34; alt=&#34;Alt Text&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;h2&gt;So, you want to run some RedisTimeSeries commands!&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;so-you-want-to-run-some-redistimeseries-commands&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#so-you-want-to-run-some-redistimeseries-commands&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Crank up the &lt;code&gt;redis-cli&lt;/code&gt; and connect to the Azure Cache for Redis instance:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;redis-cli -h &amp;lt;azure redis hostname e.g. redisdb.southeastasia.redisenterprise.cache.azure.net&amp;gt; -p &lt;span class=&#34;m&#34;&gt;10000&lt;/span&gt; -a &amp;lt;azure redis access key&amp;gt; --tls&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;Start with simple queries:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# pressure in device 5 for location 1&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;TS.GET pressure:1:5
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# temperature in device 5 for location 4&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;TS.GET temp:4:5&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;Filter by location and get temperature and pressure for &lt;em&gt;all&lt;/em&gt; devices:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;TS.MGET WITHLABELS FILTER &lt;span class=&#34;nv&#34;&gt;location&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;m&#34;&gt;3&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;Extract temp and pressure for all devices in one or more locations within a specific time range:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;TS.MRANGE - + WITHLABELS FILTER &lt;span class=&#34;nv&#34;&gt;location&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;m&#34;&gt;3&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;TS.MRANGE - + WITHLABELS FILTER &lt;span class=&#34;nv&#34;&gt;location&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=(&lt;/span&gt;3,5&lt;span class=&#34;o&#34;&gt;)&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;&lt;code&gt;- +&lt;/code&gt; refers to everything from beginning up until the latest timestamp, but you could be more specific&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;&lt;code&gt;MRANGE&lt;/code&gt; is what we need! We can get back multiple time series and use filter.&lt;/p&gt;
+&lt;p&gt;We can also filter by a specific device in a location and further drill down by either temperature or pressure:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;TS.MRANGE - + WITHLABELS FILTER &lt;span class=&#34;nv&#34;&gt;location&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;m&#34;&gt;3&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;device&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;m&#34;&gt;2&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;TS.MRANGE - + WITHLABELS FILTER &lt;span class=&#34;nv&#34;&gt;location&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;m&#34;&gt;3&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;device&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;m&#34;&gt;2&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;metric&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;temp&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;All these can be combined with aggregations.&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;TS.MRANGE - + WITHLABELS FILTER &lt;span class=&#34;nv&#34;&gt;location&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;m&#34;&gt;3&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;metric&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;temp
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# all the temp data points are not useful. how about an average (or max) instead of every temp data points?&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;TS.MRANGE - + WITHLABELS AGGREGATION avg &lt;span class=&#34;m&#34;&gt;10000&lt;/span&gt; FILTER &lt;span class=&#34;nv&#34;&gt;location&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;m&#34;&gt;3&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;metric&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;temp
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;TS.MRANGE - + WITHLABELS AGGREGATION max &lt;span class=&#34;m&#34;&gt;10000&lt;/span&gt; FILTER &lt;span class=&#34;nv&#34;&gt;location&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;m&#34;&gt;3&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;metric&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;temp&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;It&amp;rsquo;s also possible to create a rule to do this aggregation and store in a different time series&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Once you&amp;rsquo;re done, don&amp;rsquo;t forget to delete resources to avoid unwanted costs.&lt;/p&gt;
+&lt;h2&gt;Delete resources&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;delete-resources&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#delete-resources&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Delete resources:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;https://docs.microsoft.com/azure/partner-solutions/apache-kafka-confluent-cloud/manage?WT.mc_id=data-17927-abhishgu#delete-confluent-organization&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Follow the steps in the documentation&lt;/a&gt; to delete the Confluent Cloud cluster - all you need is to delete the Confluent organisation.&lt;/li&gt;
+&lt;li&gt;Similarly, you should &lt;a href=&#34;https://docs.microsoft.com/azure/azure-cache-for-redis/cache-go-get-started?WT.mc_id=data-17927-abhishgu#clean-up-resources&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;delete the Azure Cache for Redis instance&lt;/a&gt; as well.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;On your local machine:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Stop the Kafka Connect cluster&lt;/li&gt;
+&lt;li&gt;Stop the mosquitto broker (e.g. &lt;code&gt;brew services stop mosquitto&lt;/code&gt;)&lt;/li&gt;
+&lt;li&gt;Stop Grafana service (e.g. &lt;code&gt;brew services stop grafana&lt;/code&gt;)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;We explored a data pipeline to ingest, process and query time series data using Redis and Kafka. When you think about next steps and move towards a production grade solution, you should consider a few more things.&lt;/p&gt;
+&lt;h2&gt;Additional considerations&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;additional-considerations&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#additional-considerations&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/ln5p024p1pinr20p4ymy.png&#34; alt=&#34;Alt Text&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Optimising &lt;code&gt;RedisTimeSeries&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;https://oss.redislabs.com/redistimeseries/configuration/#retention_policy&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Retention policy&lt;/a&gt;: Think about this since your time series data points &lt;em&gt;do not&lt;/em&gt; get trimmed/deleted by default.&lt;/li&gt;
+&lt;li&gt;Down-sampling/Aggregations &lt;a href=&#34;https://oss.redislabs.com/redistimeseries/commands/#aggregation-compaction-downsampling&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Rules&lt;/a&gt;: You don&amp;rsquo;t want to store data forever, right? Make sure to configure appropriate rules to take care of this (e.g. &lt;code&gt;TS.CREATERULE temp:1:2 temp:avg:30 AGGREGATION avg 30000&lt;/code&gt;)&lt;/li&gt;
+&lt;li&gt;Duplicate data policy: How would you like to handle duplicate samples? Make sure that the default policy (&lt;code&gt;BLOCK&lt;/code&gt;) is indeed what you need. If not, consider &lt;a href=&#34;https://oss.redislabs.com/redistimeseries/configuration/#duplicate_policy&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;other options&lt;/a&gt;.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;This is not an exhaustive list. For other configuration options, please refer to the &lt;a href=&#34;https://oss.redislabs.com/redistimeseries/configuration/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;&lt;code&gt;RedisTimeSeries&lt;/code&gt; documentation&lt;/a&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;&lt;strong&gt;What about long term data retention?&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/z5otot0lo3g0oenash8b.png&#34; alt=&#34;Alt Text&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Data is precious, including time series! You may want to process it further e.g. run Machine learning to extract insights, predictive maintenance etc. For this to be possible, you will need to retain this data for longer time frame and for this to be cost-effective and efficient, you would want to use a scalable Object storage service such &lt;a href=&#34;https://docs.microsoft.com/azure/storage/blobs/data-lake-storage-introduction?WT.mc_id=data-17927-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Azure Data Lake Storage Gen2&lt;/a&gt; (ADLS Gen2).&lt;/p&gt;
+&lt;p&gt;There is a connector for that! You could enhance you existing data pipeline by using the fully-managed &lt;a href=&#34;https://docs.confluent.io/cloud/current/connectors/cc-azure-datalakeGen2-storage-sink.html&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Azure Data Lake Storage Gen2 Sink Connector for Confluent Cloud&lt;/a&gt; to process and store the data in ADLS and then run machine learning using &lt;a href=&#34;https://docs.microsoft.com/azure/synapse-analytics/spark/apache-spark-machine-learning-mllib-notebook?WT.mc_id=data-17927-abhishgu#predictive-analysis-example-on-nyc-taxi-data&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Azure Synapse Analytics&lt;/a&gt; or &lt;a href=&#34;https://docs.microsoft.com/azure/databricks/applications/machine-learning/?WT.mc_id=data-17927-abhishgu&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Azure Databricks&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Scalability&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;Your time series data volumes can only move one way – up! It&amp;rsquo;s critical for your solution to be scalable from variety of angles:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Core infrastructure: Managed services allow teams to focus on the solution rather than setting up and maintaining infrastructure, specially when it comes to complex distributed systems such as databases and streaming platforms such as Redis and Kafka.&lt;/li&gt;
+&lt;li&gt;Kafka Connect: As far as the data pipeline is concerned, you&amp;rsquo;re in good hands since Kafka Connect platform is inherently stateless and horizontally scalable. You&amp;rsquo;ve a lot of options in terms of how you want to architect and size your Kafka Connect worker clusters.&lt;/li&gt;
+&lt;li&gt;Custom applications: As was the case in this solution, we built a custom application to process data in Kafka topics. Fortunately, the same scalability characteristics apply to them as well. In terms of horizontal scale - it is limited only by number of Kafka topic partitions you have.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;Integration: It&amp;rsquo;s not just Grafana! &lt;code&gt;RedisTimeSeries&lt;/code&gt; also integrates with &lt;a href=&#34;https://github.com/RedisTimeSeries/prometheus-redistimeseries-adapter&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Prometheus&lt;/a&gt; and &lt;a href=&#34;https://github.com/RedisTimeSeries/telegraf&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Telegraf&lt;/a&gt;. However, there is no Kafka connector at the time this blog post was written - this would a great add-on!&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;h2&gt;Conclusion&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;conclusion&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#conclusion&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Sure, you can use Redis for (almost) everything, including time series workloads! Be sure to think about the end-to-end architecture for data pipeline and integration from time series data sources, all the way to Redis and beyond.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/gdup1h1m343d5m4h3f7i.png&#34; alt=&#34;Alt Text&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+
+      </description>
+    </item>
+    
+  </channel>
+</rss>

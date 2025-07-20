@@ -1,0 +1,123 @@
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Abhishek Gupta&#39;s Blog – Cosmosdb</title>
+    <link>http://localhost:1313/tags/cosmosdb/</link>
+    <description>Recent content in Cosmosdb on Abhishek Gupta&#39;s Blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en</language>
+    <copyright>© Abhishek Gupta, 2025</copyright>
+    <lastBuildDate>Tue, 02 Nov 2021 00:00:00 +0000</lastBuildDate>
+    
+	  <atom:link href="http://localhost:1313/tags/cosmosdb/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+      
+        
+      
+    
+    
+    <item>
+      <title>Now Generally Available – Partial Document Update in Azure Cosmos DB</title>
+      <link>http://localhost:1313/blog/cosmosdb-partial-doc-update/</link>
+      <pubDate>Tue, 02 Nov 2021 00:00:00 +0000</pubDate>
+      
+      <guid>http://localhost:1313/blog/cosmosdb-partial-doc-update/</guid>
+      <description>
+        
+        
+        &lt;p&gt;&lt;em&gt;Originally posted on &lt;a href=&#34;https://devblogs.microsoft.com/cosmosdb/partial-document-update-ga/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;https://devblogs.microsoft.com/cosmosdb/partial-document-update-ga/&lt;/a&gt;&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;We’re excited to announce the general availability of &lt;a href=&#34;https://docs.microsoft.com/en-us/azure/cosmos-db/partial-document-update&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;partial document update&lt;/a&gt; for the Azure Cosmos DB Core (SQL) API, which was announced at Microsoft Ignite! This new feature makes it possible to perform path-level updates to specific fields/properties in a single document without needing to perform a full document read-replace operation. Partial document update is currently supported in Azure Cosmos DB &lt;a href=&#34;https://docs.microsoft.com/azure/cosmos-db/sql/sql-api-sdk-dotnet-standard&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;.NET SDK&lt;/a&gt;, &lt;a href=&#34;https://docs.microsoft.com/azure/cosmos-db/sql/sql-api-sdk-java-v4&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Java SDK&lt;/a&gt;, &lt;a href=&#34;https://docs.microsoft.com/azure/cosmos-db/sql/sql-api-sdk-node&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Node SDK&lt;/a&gt;, and &lt;a href=&#34;https://docs.microsoft.com/azure/cosmos-db/sql/how-to-write-stored-procedures-triggers-udfs?tabs=javascript&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;stored procedures&lt;/a&gt;.&lt;/p&gt;
+&lt;h2&gt;Document updates – then and now&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;document-updates--then-and-now&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#document-updates--then-and-now&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;To put things in context, here is a refresher on how one would typically use a document replace operation: Read the document, update it locally (client side) including any &lt;a href=&#34;https://docs.microsoft.com/azure/cosmos-db/sql/database-transactions-optimistic-concurrency#optimistic-concurrency-control&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;optimistic concurrency control&lt;/a&gt; (OCC) checks if necessary and, finally call the replace operation along with the updated document.&lt;/p&gt;
+&lt;p&gt;Here is a trimmed down example of how one would use partial document update (using the Java SDK):&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-java&#34; data-lang=&#34;java&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;//step 1&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;UserInfo&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;user&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;container&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;na&#34;&gt;readItem&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;user&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;na&#34;&gt;getId&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(),&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;new&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;PartitionKey&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;user&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;na&#34;&gt;getEmail&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;()),&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;UserInfo&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;na&#34;&gt;class&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;);&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; 
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;c1&#34;&gt;//step 2 &lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;CosmosPatchOperations&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;patchOps&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;CosmosPatchOperations&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;na&#34;&gt;create&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;().&lt;/span&gt;&lt;span class=&#34;na&#34;&gt;add&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;/phone/2&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;12345&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;).&lt;/span&gt;&lt;span class=&#34;na&#34;&gt;set&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;/address&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;123 Foobar&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;);&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; 
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt; 
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;c1&#34;&gt;//step 3 &lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;container&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;na&#34;&gt;patchItem&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;user&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;na&#34;&gt;getId&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(),&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;new&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;PartitionKey&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;user&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;na&#34;&gt;getEmail&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;()),&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;patchOps&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;reqOps&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;UserInfo&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;na&#34;&gt;class&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;);&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;ul&gt;
+&lt;li&gt;Read the document (this is the same as replace) with readItem method.&lt;/li&gt;
+&lt;li&gt;Define the updates you want to make (in form of a CosmosPatchOperations object – in this case we add a phone number (an array) and set the address to a different one.&lt;/li&gt;
+&lt;li&gt;Invoke the patchItem method.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Benefits of partial document update&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;benefits-of-partial-document-update&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#benefits-of-partial-document-update&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;When compared with the replace operation, the overhead of serializing the entire document is eliminated since the client application only needs to deal with properties to be updated (phone and address in this example). This becomes significant when your application makes frequent updates to only a few properties in your documents, such as incrementing counters, toggling true/false flags or similar types of changes.&lt;/p&gt;
+&lt;p&gt;Not having to send the entire document over the wire impacts overall application performance – reduced network bandwidth usage, lower end-to end-latency and savings of CPU cycles on the Azure Cosmos DB SDK client hosts.&lt;/p&gt;
+&lt;p&gt;Some of the other developer productivity benefits that are a by-product of the flexible programming model enabled by partial document update:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Combining multiple operations: Partial document update supports different types of operations (see next section). Depending on your requirements, you can combine multiple such operations as part of a single invocation as opposed to incurring cost of round trips for separate operation type.&lt;/li&gt;
+&lt;li&gt;Conditional update: If you want the partial update to depend on a pre-condition, you can define it using a SQL-like filter predicate (for example, from c where c.taskNum = 3). The partial update operation will fail if the pre-condition specified in the predicate is not satisfied.&lt;/li&gt;
+&lt;li&gt;Transactions support: Partial document update works in the context of a &lt;a href=&#34;https://docs.microsoft.com/en-us/azure/cosmos-db/sql/transactional-batch&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Transactional batch&lt;/a&gt; as well. This means that multiple documents within the same partition key can be patched (partially updated) as part of a transaction (along with other operations such as create). The transaction will be committed only if all the operations succeed. If any operation fails, the entire transaction is rolled back.&lt;/li&gt;
+&lt;li&gt;Transparent conflict resolution: If your Azure Cosmos DB account is configured with multiple write regions, &lt;a href=&#34;https://docs.microsoft.com/azure/cosmos-db/conflict-resolution-policies&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;conflicts and respective resolution policies&lt;/a&gt; are applicable at the document level (with Last Write Wins being the default conflict resolution policy). This works differently in case of partial document updates – conflicts that occur due to concurrent patch operations to the same document across multiple regions will be detected and resolved at the path-level. This means that as long as you’re updating different properties (paths) in the same document, they will be merged successfully.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Partial document update operations&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;partial-document-update-operations&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#partial-document-update-operations&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Although Partial document update is a top-level operation (just like Replace), it supports sub-operations (the code snippet above used add and set). You can &lt;a href=&#34;https://docs.microsoft.com/azure/cosmos-db/partial-document-update#supported-operations&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;refer to the documentation&lt;/a&gt; for details, but here is a summary:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Add: Creates a new element (if it does not already exist).&lt;/li&gt;
+&lt;li&gt;Set: Updates an element (creates one if it does not already exist).&lt;/li&gt;
+&lt;li&gt;Replace: Updates an element only if it already exists.&lt;/li&gt;
+&lt;li&gt;Remove: Deletes an existing element.&lt;/li&gt;
+&lt;li&gt;Increment: Increases/decreases by specified value (use negative value to decrease).&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Learn more&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;learn-more&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#learn-more&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Find out more about Azure Cosmos DB partial document update:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;https://docs.microsoft.com/azure/cosmos-db/partial-document-update&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Read the concepts&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;https://docs.microsoft.com/azure/cosmos-db/partial-document-update-getting-started&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Code samples&lt;/a&gt; to get you started&lt;/li&gt;
+&lt;li&gt;Add/Set/Replace operations – &lt;a href=&#34;https://docs.microsoft.com/azure/cosmos-db/partial-document-update#similarities-and-differences&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;how are they similar, yet different&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;https://docs.microsoft.com/azure/cosmos-db/partial-document-update-faq&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Frequently asked questions&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;a href=&#34;https://azure.microsoft.com/services/cosmos-db/#overview&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Get started free&lt;/a&gt; with Azure Cosmos DB.&lt;/p&gt;
+
+      </description>
+    </item>
+    
+    <item>
+      <title>Enhance local development experience using the Azure Cosmos DB Linux emulator and VS Code</title>
+      <link>http://localhost:1313/blog/cosmosdb-emulator-devcontainer/</link>
+      <pubDate>Tue, 21 Sep 2021 00:00:00 +0000</pubDate>
+      
+      <guid>http://localhost:1313/blog/cosmosdb-emulator-devcontainer/</guid>
+      <description>
+        
+        
+        &lt;p&gt;This blog post provides a quick overview and demo of how you can use the &lt;a href=&#34;https://docs.microsoft.com/azure/cosmos-db/linux-emulator?tabs=ssl-netstd21&#34; title=&#34;https://docs.microsoft.com/en-us/azure/cosmos-db/linux-emulator?tabs=ssl-netstd21&#34;target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Azure Cosmos DB Linux Emulator on Docker&lt;/a&gt; (in preview at the time of writing) along with &lt;a href=&#34;https://code.visualstudio.com/&#34; title=&#34;https://code.visualstudio.com/&#34;target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Visual Studio Code&lt;/a&gt; in order to enhance your local development experience.&lt;/p&gt;
+&lt;p&gt;Since the Azure Cosmos DB Linux Emulator is readily available as a Docker image (simply &lt;code&gt;docker pull mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator&lt;/code&gt;), it&amp;rsquo;s easy to incorporate it within your existing setup. For instance, it could be in a &lt;code&gt;docker-compose&lt;/code&gt; file as a part of a larger stack (here is an &lt;a href=&#34;https://devblogs.microsoft.com/cosmosdb/kafka-azure-cosmos-db-docker/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;example of how to use it with Apache Kafka&lt;/a&gt;). However, complementing it with the &lt;a href=&#34;https://code.visualstudio.com/docs/remote/containers&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Visual Studio Code Remote - Containers&lt;/a&gt; extension, gives you the ability to leverage a Docker container as a full-fledged development environment.&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://code.visualstudio.com/assets/docs/remote/containers/architecture-containers.png&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;&lt;img src=&#34;https://code.visualstudio.com/assets/docs/remote/containers/architecture-containers.png&#34; alt=&#34;&#34; loading=&#34;lazy&#34; /&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Say you want to build an app with &lt;a href=&#34;https://docs.microsoft.com/azure/cosmos-db/sql/sql-query-getting-started&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Azure Cosmos DB Core (SQL) API&lt;/a&gt; and the &lt;a href=&#34;https://docs.microsoft.com/azure/cosmos-db/sql/sql-api-sdk-java-v4&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Java SDK&lt;/a&gt;, and you have VS Code and Docker (optionally Docker Compose) available. Just create a JSON configuration file (called &lt;code&gt;devcontainer.json&lt;/code&gt;) to define your stack. You can then spin up an environment on-demand with just a few clicks - this will constitute one or more Docker containers along with the entire operating system, programming language runtime (Java in this case), toolset, etc. which you originally specified in &lt;code&gt;devcontainer.json&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;Some of the obvious benefits of using the emulator include: it&amp;rsquo;s cost-effective (free!), convenient for scenarios when your app has other components (e.g. messaging systems) and great for iterative development/prototyping/demos since setting up and tearing down the environment is easy, consistent and error-free (in most cases!)  &lt;/p&gt;
+&lt;h3&gt;How to use the Azure Cosmos DB Linux emulator with VS Code&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;how-to-use-the-azure-cosmos-db-linux-emulator-with-vs-code&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#how-to-use-the-azure-cosmos-db-linux-emulator-with-vs-code&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;Use the instructions in this &lt;a href=&#34;https://github.com/Azure-Samples/cosmosdb-java-devcontainers-demo&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;GitHub repo&lt;/a&gt; to get started quickly. It is based on the &lt;a href=&#34;https://github.com/Azure-Samples/azure-cosmos-java-sql-api-samples&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;original sample code repo for Azure Cosmos DB Java SDK for SQL API&lt;/a&gt; with &lt;a href=&#34;https://github.com/Azure-Samples/cosmosdb-java-devcontainers-demo/tree/main/.devcontainer&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;added files&lt;/a&gt; to enable &amp;ldquo;Visual Studio Code Remote - Containers&amp;rdquo; experience.&lt;/p&gt;
+&lt;p&gt;You can also follow along with the video that shows all of this in action:&lt;/p&gt;
+&lt;div style=&#34;position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden;&#34;&gt;
+      &lt;iframe allow=&#34;accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen&#34; loading=&#34;eager&#34; referrerpolicy=&#34;strict-origin-when-cross-origin&#34; src=&#34;https://www.youtube.com/embed/sMgmE3zuHNY?autoplay=0&amp;amp;controls=1&amp;amp;end=0&amp;amp;loop=0&amp;amp;mute=0&amp;amp;start=0&#34; style=&#34;position: absolute; top: 0; left: 0; width: 100%; height: 100%; border:0;&#34; title=&#34;YouTube video&#34;&gt;&lt;/iframe&gt;
+    &lt;/div&gt;
+
+&lt;p&gt;This example can be extended to any Java application. All you need to do is add the &lt;em&gt;.devcontainer&lt;/em&gt; folder to your current project and (maybe) tweak a few things depending on your requirement for e.g. the &lt;a href=&#34;https://github.com/Azure-Samples/cosmosdb-java-devcontainers-demo/blob/main/.devcontainer/Dockerfile#L5&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Java version&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;What this demonstrates is just the tip of the iceberg and you could leverage it in so many interesting ways. I look forward to hearing how you use it!&lt;/p&gt;
+&lt;h3&gt;More resources&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;more-resources&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#more-resources&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;Find &lt;a href=&#34;https://docs.microsoft.com/azure/cosmos-db/optimize-dev-test&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;more ways to dev/test free&lt;/a&gt; with Azure Cosmos DB&lt;/li&gt;
+&lt;li&gt;Download the &lt;a href=&#34;https://docs.microsoft.com/azure/cosmos-db/local-emulator?tabs=ssl-netstd21&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Azure Cosmos DB local emulator&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Review &lt;a href=&#34;https://docs.microsoft.com/azure/cosmos-db/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;technical documentation&lt;/a&gt; for Azure Cosmos DB&lt;/li&gt;
+&lt;/ul&gt;
+
+      </description>
+    </item>
+    
+  </channel>
+</rss>

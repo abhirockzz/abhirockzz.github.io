@@ -1,0 +1,263 @@
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Abhishek Gupta&#39;s Blog – Machine Learning</title>
+    <link>http://localhost:1313/tags/machine-learning/</link>
+    <description>Recent content in Machine Learning on Abhishek Gupta&#39;s Blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en</language>
+    <copyright>© Abhishek Gupta, 2025</copyright>
+    <lastBuildDate>Mon, 07 Jan 2019 00:00:00 +0000</lastBuildDate>
+    
+	  <atom:link href="http://localhost:1313/tags/machine-learning/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+      
+        
+      
+    
+    
+    <item>
+      <title>Serverless Image Classification with TensorFlow</title>
+      <link>http://localhost:1313/blog/serverless-tensorflow-image-classification/</link>
+      <pubDate>Mon, 07 Jan 2019 00:00:00 +0000</pubDate>
+      
+      <guid>http://localhost:1313/blog/serverless-tensorflow-image-classification/</guid>
+      <description>
+        
+        
+        &lt;p&gt;Image classification is a canonical example used to demonstrate machine learning techniques. This post shows you how to run a TensorFlow-based image classification application on the recently announced cloud service Oracle Functions.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://cdn-images-1.medium.com/max/10368/0*ttPF09-HpLimWtPT&#34; alt=&#34;Photo by Franck V. on Unsplash&#34; loading=&#34;lazy&#34; /&gt;&lt;em&gt;Photo by &lt;a href=&#34;https://unsplash.com/@franckinjapan?utm_source=medium&amp;amp;utm_medium=referral&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Franck V.&lt;/a&gt; on &lt;a href=&#34;https://unsplash.com?utm_source=medium&amp;amp;utm_medium=referral&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Unsplash&lt;/a&gt;&lt;/em&gt;&lt;/p&gt;
+&lt;h2&gt;Oracle Functions&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;oracle-functions&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#oracle-functions&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Oracle Functions which is a fully managed, highly scalable, on-demand, function-as-a-service platform built on enterprise-grade &lt;a href=&#34;https://cloud.oracle.com/en_US/cloud-infrastructure&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Oracle Cloud Infrastructure&lt;/a&gt;. It’s a serverless offering that enables you to focus on writing code to meet business needs without worrying about the underlying infrastructure, and get billed only for the resources consumed during the execution. You can deploy your code and call it directly or in response to triggers — Oracle Functions does all the work required to ensure that your application is highly available, scalable, secure, and monitored.&lt;/p&gt;
+&lt;p&gt;Oracle Functions is powered by the &lt;a href=&#34;http://fnproject.io/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Fn Project&lt;/a&gt;, which is an open source, container native, serverless platform that can be run anywhere — in any cloud or on-premises. You can download and install the open source distribution of Fn Project, develop and test a function locally, and then use the same tooling to deploy that function to Oracle Functions.&lt;/p&gt;
+&lt;h2&gt;What to Expect&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;what-to-expect&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#what-to-expect&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Before we dive into the details, let’s see what you can expect from your serverless machine learning function. After it’s set up and running, you can point the app to images and it will return an estimate of what it thinks the image is, along with the accuracy of the estimate.&lt;/p&gt;
+&lt;p&gt;For example, when passed to the classification function, this image returned — &lt;em&gt;This is a ‘pizza’ Accuracy — 100%&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://cdn-images-1.medium.com/max/NaN/0*NnNtFMF8xcc1nRcm&#34; alt=&#34;Photo by &#34; loading=&#34;lazy&#34; /&gt;&lt;strong&gt;Photo by &lt;a href=&#34;https://unsplash.com/@alanaktion?utm_source=medium&amp;amp;utm_medium=referral&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Alan Hardman&lt;/a&gt; on &lt;a href=&#34;https://unsplash.com/?utm_source=medium&amp;amp;utm_medium=referral&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Unsplash&lt;/a&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;h2&gt;The Code&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;the-code&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#the-code&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;The image classification function is based on an &lt;a href=&#34;https://github.com/tensorflow/models/tree/master/samples/languages/java/label_image&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;existing TensorFlow example&lt;/a&gt;. It leverages the &lt;a href=&#34;https://www.tensorflow.org/install/lang_java&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;TensorFlow Java SDK&lt;/a&gt;, which in turn uses the native C++ implementation using JNI (Java Native Interface).&lt;/p&gt;
+&lt;h3&gt;Function Image Input&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;function-image-input&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#function-image-input&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;The image classification function leverages the &lt;a href=&#34;https://github.com/fnproject/fdk-java/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Fn Java FDK&lt;/a&gt;, which simplifies the process of developing and running Java functions. One of its benefits is that it can seamlessly convert the input sent to your functions into Java objects and types. This includes:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;Simple data binding, like handling string input.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Binding JSON data types to POJOs. You can customize this because it’s internally implemented using &lt;a href=&#34;https://github.com/FasterXML/jackson&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Jackson&lt;/a&gt;.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Working with raw inputs, enabled by an abstraction of the raw Fn Java FDK events received or returned by the function.&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;The binding can be &lt;a href=&#34;https://github.com/fnproject/fdk-java/blob/master/docs/ExtendingDataBinding.md&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;further extended&lt;/a&gt; if you want to customize the way your input and output data is marshaled.&lt;/p&gt;
+&lt;p&gt;The existing TensorFlow example expects a list of image names (which must be present on the machine from which the code is being executed) as input. The function behaves similarly, but with an important difference — it uses the flexible binding capability provided by the Fn Java FDK. The classify method serves as the entry point to the function and accepts a Java byte array (byte[]), which represents the raw bytes of the image that is passed into the function. This byte array is then used to create the &lt;a href=&#34;https://www.tensorflow.org/api_docs/java/reference/org/tensorflow/Tensor&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Tensor&lt;/a&gt; object using the static &lt;a href=&#34;https://www.tensorflow.org/api_docs/java/reference/org/tensorflow/Tensors#create%28byte%5B%5D%29&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Tensor.create(byte[])&lt;/a&gt; method:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;public class LabelImageFunction { 
+  public String classify(byte[] **image**) { ... 
+   Tensor&amp;lt;String&amp;gt; input = Tensors.create(**image**); ... 
+   } 
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The full source code is available on &lt;a href=&#34;https://github.com/abhirockzz/fn-hello-tensorflow&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;GitHub&lt;/a&gt;.&lt;/p&gt;
+&lt;h3&gt;Machine Learning Model&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;machine-learning-model&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#machine-learning-model&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;Typically, a machine-learning-based system consists of the following phases:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Training:&lt;/strong&gt; An algorithm is fed with past (historical) data in order to learn from it (derive patterns) and build a model. Very often, this process is ongoing.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Predicting:&lt;/strong&gt; The generated model is then used to generate predictions or outputs in response to new inputs based on the facts that were learned during the training phase&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;This application uses a pregenerated model. As an added convenience, the model (and labels) required by the classification logic are packaged with the function itself (part of the Docker image). These can be found in the resources folder of the source code.&lt;/p&gt;
+&lt;p&gt;This means that you don’t have to set up a dedicated model serving component (like &lt;a href=&#34;https://www.tensorflow.org/serving/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;TensorFlow Serving&lt;/a&gt;).&lt;/p&gt;
+&lt;h3&gt;Function Metadata&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;function-metadata&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#function-metadata&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;The func.yaml file contains function metadata, including attributes like memory and timeout (for this function, they are 1024 MB and 120 seconds, respectively). This metadata is required because of the (fairly) demanding nature of the image classification algorithm (as opposed to simpler computations).&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;schema_version: 20180708 
+name: classify 
+version: 0.0.1 
+runtime: java 
+memory: 1024 
+timeout: 120 
+triggers: 
+ - name: classify 
+   type: http 
+   source: /classify
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Here is a summary of the attributes used:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;schema_version represents the version of the specification for this file.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;name is the name and tag to which this function is pushed.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;version represents the current version of the function. When deploying, it is appended to the image as a tag.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;runtime represents the programming language runtime, which is java in this case.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;memory (optional) is the maximum memory threshold for this function. If this function exceeds this limit during execution, it’s stopped and an error message is logged.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;timeout (optional) is the maximum time that a function is allowed to run.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;triggers (optional) is an array of trigger entities that specify triggers for the function. In this case, we’re using an HTTP trigger.&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Function Dockerfile&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;function-dockerfile&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#function-dockerfile&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;Oracle Functions uses a set of prebuilt, language-specific Docker images for build and runtime phases. For example, for Java functions, &lt;a href=&#34;https://hub.docker.com/r/fnproject/fn-java-fdk-build/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;fn-java-fdk-build&lt;/a&gt; is used for the build phase and &lt;a href=&#34;https://hub.docker.com/r/fnproject/fn-java-fdk/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;fn-java-fdk&lt;/a&gt; is used at runtime.&lt;/p&gt;
+&lt;p&gt;Here is the default Dockerfile that is used to create Docker images for your functions:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;FROM fnproject/fn-java-fdk-build:jdk9-1.0.75 as build-stage 
+WORKDIR /function 
+ENV MAVEN_OPTS -Dhttp.proxyHost= -Dhttp.proxyPort= -Dhttps.proxyHost= -Dhttps.proxyPort= -Dhttp.nonProxyHosts= -Dmaven.repo.local=/usr/share/maven/ref/repository 
+ADD pom.xml /function/pom.xml 
+RUN [&amp;quot;mvn&amp;quot;, &amp;quot;package&amp;quot;, &amp;quot;dependency:copy-dependencies&amp;quot;, &amp;quot;-DincludeScope=runtime&amp;quot;, &amp;quot;-DskipTests=true&amp;quot;, &amp;quot;-Dmdep.prependGroupId=true&amp;quot;, &amp;quot;-DoutputDirectory=target&amp;quot;, &amp;quot;--fail-never&amp;quot;] 
+ADD src /function/src 
+RUN [&amp;quot;mvn&amp;quot;, &amp;quot;package&amp;quot;] 
+
+FROM fnproject/fn-java-fdk:jdk9-1.0.75 
+WORKDIR /function 
+COPY --from=build-stage /function/target/*.jar /function/app/ 
+CMD [&amp;quot;com.example.fn.HelloFunction::handleRequest&amp;quot;]
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;It’s a multiple-stage Docker build that performs the following actions (out-of-the-box):&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;Maven package and build&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Copying (using COPY) the function JAR and dependencies to the runtime image&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Setting the command to be executed (using CMD) when the function container is spawned&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;But there are times when you need more control over the creation of the Docker image, for example, to incorporate native third-party libraries. In such cases, you want to use a custom Dockerfile. It’s powerful because it gives you the freedom to define the recipe for your function. All you need to do is extend from the &lt;a href=&#34;https://github.com/fnproject/dockers&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;base Docker images&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;Following is the Dockerfile used for this function:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;FROM fnproject/fn-java-fdk-build:jdk9-1.0.75 as build-stage 
+WORKDIR /function 
+ENV MAVEN_OPTS -Dhttp.proxyHost= -Dhttp.proxyPort= -Dhttps.proxyHost= -Dhttps.proxyPort= -Dhttp.nonProxyHosts= -Dmaven.repo.local=/usr/share/maven/ref/repository ADD pom.xml /function/pom.xml 
+RUN [&amp;quot;mvn&amp;quot;, &amp;quot;package&amp;quot;, &amp;quot;dependency:copy-dependencies&amp;quot;, &amp;quot;-DincludeScope=runtime&amp;quot;, &amp;quot;-DskipTests=true&amp;quot;, &amp;quot;-Dmdep.prependGroupId=true&amp;quot;, &amp;quot;-DoutputDirectory=target&amp;quot;, &amp;quot;--fail-never&amp;quot;]&#39; 
+ARG TENSORFLOW_VERSION=1.12.0 
+RUN echo &amp;quot;using tensorflow version &amp;quot; $TENSORFLOW_VERSION RUN curl -LJO [https://storage.googleapis.com/tensorflow/libtensorflow/libtensorflow-$TENSORFLOW_VERSION.jar](https://storage.googleapis.com/tensorflow/libtensorflow/libtensorflow-$TENSORFLOW_VERSION.jar) 
+RUN curl -LJO [https://storage.googleapis.com/tensorflow/libtensorflow/libtensorflow_jni-cpu-linux-x86_64-$TENSORFLOW_VERSION.tar.gz](https://storage.googleapis.com/tensorflow/libtensorflow/libtensorflow_jni-cpu-linux-x86_64-$TENSORFLOW_VERSION.tar.gz) RUN tar -xvzf libtensorflow_jni-cpu-linux-x86_64-$TENSORFLOW_VERSION.tar.gz 
+ADD src /function/src 
+RUN [&amp;quot;mvn&amp;quot;, &amp;quot;package&amp;quot;]
+
+FROM fnproject/fn-java-fdk:jdk9-1.0.75 
+ARG TENSORFLOW_VERSION=1.12.0 
+WORKDIR /function 
+COPY --from=build-stage /function/libtensorflow_jni.so /function/runtime/lib 
+COPY --from=build-stage /function/libtensorflow_framework.so /function/runtime/lib 
+COPY --from=build-stage /function/libtensorflow-$TENSORFLOW_VERSION.jar /function/app/ 
+COPY --from=build-stage /function/target/*.jar /function/app/ 
+CMD [&amp;quot;com.example.fn.LabelImageFunction::classify&amp;quot;]
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Notice the additional customization that it incorporates, in addition to the default steps like Maven build:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;Automates TensorFlow setup (&lt;a href=&#34;https://www.tensorflow.org/install/lang_java&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;per the instructions&lt;/a&gt;), extracts the TensorFlow Java SDK and the native JNI (.so) libraries&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;(as part of the second stage of the Docker build) Copies the JNI libraries to /function/runtime/lib and the SDK JAR to /function/app so that they are available to the function at runtime&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Deploying to Oracle Functions&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;deploying-to-oracle-functions&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#deploying-to-oracle-functions&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;As mentioned previously, you can use the open source &lt;a href=&#34;https://github.com/fnproject/cli/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Fn CLI&lt;/a&gt; to deploy to Oracle Functions. Ensure that you have the latest version.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;curl -LSs [https://raw.githubusercontent.com/fnproject/cli/master/install](https://raw.githubusercontent.com/fnproject/cli/master/install) | sh
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;​You can also download it directly from &lt;a href=&#34;https://github.com/fnproject/cli/releases&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;https://github.com/fnproject/cli/releases&lt;/a&gt;.&lt;/p&gt;
+&lt;h3&gt;Oracle Functions Context&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;oracle-functions-context&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#oracle-functions-context&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;Before using Oracle Functions, you have to configure the Fn Project CLI to connect to your Oracle Cloud Infrastructure tenancy.&lt;/p&gt;
+&lt;p&gt;When the Fn Project CLI is initially installed, it’s configured for a local development context. To configure the Fn Project CLI to connect to your Oracle Cloud Infrastructure tenancy instead, you have to create a new context. The context information is stored in a .yaml file in the ~/.fn/contexts directory. It specifies Oracle Functions endpoints, the OCID of the compartment to which deployed functions belong, the Oracle Cloud Infrastructure configuration file, and the address of the Docker registry to push images to and pull images from.&lt;/p&gt;
+&lt;p&gt;This is what a context file looks like:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;api-url: [https://functions.us-phoenix-1.oraclecloud.com](https://functions.us-phoenix-1.oraclecloud.com) oracle.compartment-id: &amp;lt;OCI_compartment_OCID&amp;gt; 
+oracle.profile: &amp;lt;profile_name_in_OCI_config&amp;gt; 
+provider: oracle 
+registry: &amp;lt;OCI_docker_registry&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h3&gt;Oracle Cloud Infrastructure Configuration&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;oracle-cloud-infrastructure-configuration&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#oracle-cloud-infrastructure-configuration&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;The &lt;a href=&#34;https://docs.cloud.oracle.com/iaas/Content/API/Concepts/sdkconfig.htm&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Oracle Cloud Infrastructure configuration file&lt;/a&gt; contains information about user credentials and the tenancy OCID. You can create multiple profiles with different values for these entries. Then, you can define the profile to be used by the CLI by using the oracle.profile attribute.&lt;/p&gt;
+&lt;p&gt;Here is an example configuration file:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;[DEFAULT] 
+user=ocid1.user.oc1..exampleuniqueID fingerprint=20:3b:97:13:55:1c:5b:0d:d3:37:d8:50:4e:c5:3a:34 key_file=~/.oci/oci_api_key.pem tenancy=ocid1.tenancy.oc1..exampleuniqueID pass_phrase=tops3cr3t region=us-ashburn-1
+
+[ORACLE_FUNCTIONS_USER] 
+user=ocid1.user.oc1..exampleuniqueID fingerprint=72:00:22:7f:d3:8b:47:a4:58:05:b8:95:84:31:dd:0e key_file=/.oci/admin_key.pem tenancy=ocid1.tenancy.oc1..exampleuniqueID pass_phrase=s3cr3t region=us-phoenix-1
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;You can define multiple contexts, each stored in a different context file. Switch to the correct context according to your Functions development environment:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;fn use context &amp;lt;context_name&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h3&gt;Create the Application&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;create-the-application&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#create-the-application&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;Start by cloning the contents of the GitHub repository:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;git clone [https://github.com/abhirockzz/fn-hello-tensorflow](https://github.com/abhirockzz/fn-hello-tensorflow)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Here is the command required to deploy an application:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;fn create app &amp;lt;app_name&amp;gt; --annotation oracle.com/oci/subnetIds=&#39;[&amp;quot;&amp;lt;subnet_ocid&amp;gt;&amp;quot;]&#39;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&amp;lt;app_name&amp;gt; is the name of the new application.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&amp;lt;subnet_ocid&amp;gt; is the OCID of the subnet in which to run your function.&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;For example:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;fn create app fn-tensorflow-app --annotation oracle.com/oci/subnetIds=&#39;[&amp;quot;ocid1.subnet.oc1.phx.exampleuniqueID&amp;quot;,&amp;quot;ocid1.subnet.oc1.phx.exampleuniqueID&amp;quot;,&amp;quot;ocid1.subnet.oc1.phx.exampleuniqueID&amp;quot;]&#39;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h3&gt;Deploy the Function&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;deploy-the-function&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#deploy-the-function&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;After you create the application, you can deploy your function with the following command:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;fn deploy --app &amp;lt;app_name&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&amp;lt;app_name&amp;gt; is the name of the application in Oracle Functions to which you want to add the function.&lt;/p&gt;
+&lt;p&gt;If you want to use TensorFlow version 1.12.0 (for Java SDK and corresponding native libraries), use the following command:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;fn -v deploy --app fn-tensorflow-app
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;You can also choose a specific version. Ensure that you specify it in pom.xml file before you build the function. For example, if you want to use version 1.11.0:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;&amp;lt;dependency&amp;gt; 
+ &amp;lt;groupId&amp;gt;org.tensorflow&amp;lt;/groupId&amp;gt;     &amp;lt;artifactId&amp;gt;tensorflow&amp;lt;/artifactId&amp;gt; 
+**&amp;lt;version&amp;gt;1.11.0&amp;lt;/version&amp;gt;** 
+&amp;lt;scope&amp;gt;provided&amp;lt;/scope&amp;gt; 
+&amp;lt;/dependency&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;To specify the version during function deployment, you can use — build-arg (build argument) as follows:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;fn -v deploy --app fn-tensorflow-app --build-arg TENSORFLOW_VERSION=&amp;lt;version&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;For example, if you want to use 1.11.0:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;fn -v deploy --app fn-tensorflow-app **--build-arg TENSORFLOW_VERSION=1.11.0**
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;When the deployment completes successfully, your function is ready to use. Use the fn ls apps command to list down the applications currently deployed. fn-tensorflow-app should be listed.&lt;/p&gt;
+&lt;h2&gt;Time to Classify Images!&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;time-to-classify-images&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#time-to-classify-images&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;As mentioned earlier, the function can accept an image as input and tell you what it is, along with the percentage accuracy.&lt;/p&gt;
+&lt;p&gt;You can start by downloading some of the &lt;a href=&#34;https://github.com/tensorflow/models/blob/master/samples/languages/java/label_image/download_sample_images.sh&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;recommended images&lt;/a&gt; or use images that you already have on your computer. All you need to do is pass them to the function while invoking it:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;cat &amp;lt;path to image&amp;gt; | fn invoke fn-tensorflow-app classify
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Ok, let’s try this. Can it detect the sombrero in this image?&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;cat /Users/abhishek/manwithhat.jpg | fn invoke fn-tensorflow-app classify
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://cdn-images-1.medium.com/max/NaN/1*SyHMX1YxueyyGfUyMXS4Ow.jpeg&#34; alt=&#34;*” (CC BY-NC-ND 2.0) by Pragmagraphr*&#34; loading=&#34;lazy&#34; /&gt;*&lt;a href=&#34;https://www.flickr.com/photos/sveinhal/2181363750/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;*“366 • 9 • Gringo&lt;/a&gt;” (&lt;a href=&#34;https://creativecommons.org/licenses/by-nc-nd/2.0/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;CC BY-NC-ND 2.0&lt;/a&gt;) by &lt;a href=&#34;https://www.flickr.com/people/sveinhal/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Pragmagraphr&lt;/a&gt;**&lt;/p&gt;
+&lt;p&gt;Result:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;This is a ‘sombrero’ Accuracy — 92%
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;How about a terrier?&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;cat /Users/abhishek/terrier.jpg | fn invoke fn-tensorflow-app classify
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://cdn-images-1.medium.com/max/NaN/1*3PCB69HYJWleCGrwikKBog.jpeg&#34; alt=&#34;*” (CC BY-NC 2.0) by No_*&#34; loading=&#34;lazy&#34; /&gt;*&lt;a href=&#34;https://www.flickr.com/photos/nwater/9683230812/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;*“Terrier&lt;/a&gt;” (&lt;a href=&#34;https://creativecommons.org/licenses/by-nc/2.0/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;CC BY-NC 2.0&lt;/a&gt;) by &lt;a href=&#34;https://www.flickr.com/people/nwater/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;No_Water&lt;/a&gt;**&lt;/p&gt;
+&lt;p&gt;Result:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;This is a &#39;West Highland white terrier&#39; Accuracy - 88%
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;What will you classify? :-)&lt;/p&gt;
+&lt;h2&gt;Summary&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;summary&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#summary&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;We just deployed a simple yet fully functional machine learning application in the cloud! Eager to try this out?&lt;/p&gt;
+&lt;p&gt;Oracle Functions will be generally available in 2019, but we are currently providing access to selected customers through our Cloud Native Limited Availability Program. To learn more about Oracle Functions or to request access, &lt;a href=&#34;https://go.oracle.com/LP=78019?elqCampaignId=179851&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;please register&lt;/a&gt;. You can also learn more about the underlying open source technology used in Oracle Functions at &lt;a href=&#34;http://fnproject.io/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;FnProject.io&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Originally published at &lt;a href=&#34;https://blogs.oracle.com/cloud-infrastructure/serverless-image-classification-with-oracle-functions-and-tensorflow&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;blogs.oracle.com&lt;/a&gt; on January 7, 2019.&lt;/em&gt;&lt;/p&gt;
+
+      </description>
+    </item>
+    
+  </channel>
+</rss>
