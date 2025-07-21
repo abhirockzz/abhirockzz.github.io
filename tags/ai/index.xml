@@ -1,0 +1,159 @@
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Abhishek Gupta&#39;s Blog – Ai</title>
+    <link>https://abhirockzz.github.io/tags/ai/</link>
+    <description>Recent content in Ai on Abhishek Gupta&#39;s Blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en</language>
+    <copyright>© Abhishek Gupta, 2025</copyright>
+    <lastBuildDate>Tue, 11 Mar 2025 00:00:00 +0000</lastBuildDate>
+    
+	  <atom:link href="https://abhirockzz.github.io/tags/ai/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+      
+        
+      
+    
+    
+    <item>
+      <title>Implementing Chat History for AI Applications Using Azure Cosmos DB Go SDK</title>
+      <link>https://abhirockzz.github.io/blog/implementing-chat-history-for-ai-applications-using-azure-cosmos-db-go-sdk/</link>
+      <pubDate>Tue, 11 Mar 2025 00:00:00 +0000</pubDate>
+      
+      <guid>https://abhirockzz.github.io/blog/implementing-chat-history-for-ai-applications-using-azure-cosmos-db-go-sdk/</guid>
+      <description>
+        
+        
+        &lt;p&gt;This blog post covers how to build a chat history implementation using &lt;a href=&#34;https://learn.microsoft.com/en-us/azure/cosmos-db/nosql/sdk-go&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Azure Cosmos DB for NoSQL Go SDK&lt;/a&gt; and &lt;a href=&#34;https://github.com/tmc/langchaingo&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;langchaingo&lt;/a&gt;. If you are new to the Go SDK, the sample chatbot application presented in the blog serves as a practical introduction, covering basic operations like &lt;a href=&#34;https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos#ContainerClient.ReadItem&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;read&lt;/a&gt;, &lt;a href=&#34;https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos#ContainerClient.UpsertItem&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;upsert&lt;/a&gt;, etc. It also demonstrates using the &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/emulator-linux&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Azure Cosmos DB Linux-based emulator&lt;/a&gt; (in preview at the time of writing) for integration tests with &lt;a href=&#34;https://golang.testcontainers.org/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Testcontainers for Go&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;Go developers looking to build AI applications can use &lt;code&gt;langchaingo&lt;/code&gt;, which is a framework for LLM-powered (Large Language Model) applications. It provides pluggable APIs for components like vector store, embedding, loading documents, chains (for composing multiple operations), chat history and more.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/qo7u77r6pf313shue9zt.png&#34; alt=&#34;Image description&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Before diving in, let’s take a step back to understand the basics.&lt;/p&gt;
+&lt;h2&gt;What is chat history and why it’s important for modern AI applications?&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;what-is-chat-history-and-why-its-important-for-modern-ai-applications&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#what-is-chat-history-and-why-its-important-for-modern-ai-applications&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;A common requirement for conversational AI applications is to be able to store and retrieve messages exchanged as part of conversations. This is often referred to as “chat history”. If you have used applications like ChatGPT (which also uses Azure Cosmos DB by the way!), you may be familiar with this concept. When a user logs in, they can start chatting and the messages exchanged as part of the conversation are saved. When they log in again, they can see their previous conversations and can continue from where they left off.&lt;/p&gt;
+&lt;p&gt;Chat history is obviously important for application end users, but let’s not forget about LLMs! As smart as LLMs might seem, they cannot recall past interactions due to lack of built-in memory (at least for now). Using chat history bridges this gap by providing previous conversations as additional context, enabling LLMs to generate more relevant and high-quality responses. This enhances the natural flow of conversations and significantly improves the user experience.&lt;/p&gt;
+&lt;p&gt;A simple example illustrates this: Suppose you ask an LLM via an API, &lt;code&gt;&amp;quot;Tell me about Azure Cosmos DB&amp;quot;&lt;/code&gt; and it responds with a lengthy paragraph. If you then make another API call saying, &lt;code&gt;&amp;quot;Break this down into bullet points for easier reading&amp;quot;&lt;/code&gt;, the LLM might get confused because it lacks context from the previous interaction. However, if you include the earlier message as part of the context in the second API call, the LLM is more likely to provide an accurate response (though not guaranteed, as LLM outputs are inherently non-deterministic).&lt;/p&gt;
+&lt;h2&gt;How to run the chatbot&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;how-to-run-the-chatbot&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#how-to-run-the-chatbot&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Like I mentioned earlier, the sample application is a useful way for you to explore &lt;code&gt;langchaingo&lt;/code&gt;, the Azure Cosmos DB chat history implementation, as well as the Go SDK.&lt;/p&gt;
+&lt;p&gt;Before exploring the implementation details, it’s a good idea to see the application in action. Refer to the &lt;a href=&#34;https://github.com/AzureCosmosDB/cosmosdb-chat-history-langchaingo&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;README section of the GitHub repository&lt;/a&gt; that provides instructions on how to configure, run and start conversing with the chatbot.&lt;/p&gt;
+&lt;h2&gt;Application overview&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;application-overview&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#application-overview&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;The chat application follows a straightforward domain model: users can initiate multiple conversations, and each conversation can contain multiple messages. Built in Go, the application includes both backend and frontend components.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Backend&lt;/strong&gt;: It has multiple sub-parts:
+&lt;ul&gt;
+&lt;li&gt;The Azure Cosmos DB chat history implementation.&lt;/li&gt;
+&lt;li&gt;Core operations like starting a chat, sending/receiving messages, and retrieving conversation history are exposed via a REST API.&lt;/li&gt;
+&lt;li&gt;The REST API leverages a &lt;code&gt;langchaingo&lt;/code&gt; chain to handle user messages. The chain automatically incorporates chat history to ensure past conversations are sent to the LLM. &lt;code&gt;langchaingo&lt;/code&gt; handles all orchestration – LLM invocation, chat history inclusion, and more without requiring manual implementation.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Frontend&lt;/strong&gt;: It is built using JavaScript, HTML, and CSS. It is packaged as part of the Go web server (using the embed package), and invokes the backend REST APIs in response to user interactions&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Chat history implementation using Azure Cosmos DB&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;chat-history-implementation-using-azure-cosmos-db&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#chat-history-implementation-using-azure-cosmos-db&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;&lt;code&gt;langchaingo&lt;/code&gt; is a pluggable framework, including its chat history (or memory) component. To integrate Azure Cosmos DB, you need to implement the schema.ChatMessageHistory interface, which provides methods to manage the chat history:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;AddMessage&lt;/code&gt; to add messages to a conversation (or start a new one).&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;Messages&lt;/code&gt; to retrieve all messages for a conversation.&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;Clear&lt;/code&gt; to delete all messages in a conversation.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;While you can directly instantiate a &lt;code&gt;CosmosDBChatMessageHistory&lt;/code&gt; instance and use these methods, the recommended approach is to integrate it into the &lt;code&gt;langchaingo&lt;/code&gt; application. Below is an example of using Azure Cosmos DB chat history with a &lt;code&gt;LLMChain&lt;/code&gt;:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;// Create a chat history instance&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nx&#34;&gt;cosmosChatHistory&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;err&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;:=&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;cosmosdb&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;NewCosmosDBChatMessageHistory&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;cosmosClient&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;databaseName&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;containerName&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;req&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;SessionID&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;req&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;UserID&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;k&#34;&gt;if&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;err&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;!=&lt;/span&gt; &lt;span class=&#34;kc&#34;&gt;nil&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;log&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Printf&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;Error creating chat history: %v&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;err&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nf&#34;&gt;sendErrorResponse&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;w&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;s&#34;&gt;&amp;#34;Failed to create chat session&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;http&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;StatusInternalServerError&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;k&#34;&gt;return&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;// Create a memory with the chat history&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nx&#34;&gt;chatMemory&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;:=&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;memory&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;NewConversationBuffer&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;memory&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;WithMemoryKey&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;chat_history&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;memory&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;WithChatHistory&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;cosmosChatHistory&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;// Create an LLM chain&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nx&#34;&gt;chain&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;:=&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;chains&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;LLMChain&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;Prompt&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;       &lt;span class=&#34;nx&#34;&gt;promptsTemplate&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;LLM&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;          &lt;span class=&#34;nx&#34;&gt;llm&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;Memory&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;       &lt;span class=&#34;nx&#34;&gt;chatMemory&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;OutputParser&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;outputparser&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;NewSimple&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(),&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;OutputKey&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;    &lt;span class=&#34;s&#34;&gt;&amp;#34;text&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;From an Azure Cosmos DB point of view, note that the implementation in this example is just one of many possible options. The one shown here is based on a combination of userid as the &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/partitioning-overview&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;partition key&lt;/a&gt; and conversation ID (also referred to as the session ID sometimes) being the &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/unique-keys&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;unique key&lt;/a&gt; (&lt;code&gt;id&lt;/code&gt; of an Azure Cosmos DB item).&lt;/p&gt;
+&lt;p&gt;This allows an application to:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Get all the messages for a conversation – This is a &lt;strong&gt;point read&lt;/strong&gt; using the unique id (conversation ID) and partition key (user ID).&lt;/li&gt;
+&lt;li&gt;Add a new message to a conversation – It uses an &lt;strong&gt;upsert&lt;/strong&gt; operation (instead of &lt;a href=&#34;https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos#ContainerClient.CreateItem&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;create&lt;/a&gt;) to avoid the need for a read before write.&lt;/li&gt;
+&lt;li&gt;Delete a specific conversation – It uses the &lt;a href=&#34;https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos#ContainerClient.DeleteItem&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;delete&lt;/a&gt; operation to remove a conversation (and all its messages).&lt;/li&gt;
+&lt;/ul&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;Although the &lt;code&gt;langchaingo&lt;/code&gt; interface does not expose it, when integrating this as a part of an application, you can also issue a separate query to get all the conversations for a user. This is also efficient since its scoped to a single partition.&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;h2&gt;Simplify testing with Azure Cosmos DB emulator and testcontainers&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;simplify-testing-with-azure-cosmos-db-emulator-and-testcontainers&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#simplify-testing-with-azure-cosmos-db-emulator-and-testcontainers&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;The sample application includes basic test cases for both Azure Cosmos DB chat history and the main application. It is worth highlighting the use of &lt;a href=&#34;https://github.com/testcontainers/testcontainers-go&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;testcontainers-go&lt;/a&gt; to integrate the Azure Cosmos DB Linux-based emulator docker container.&lt;/p&gt;
+&lt;p&gt;This is great for integration tests since the database is available locally and the tests run much faster (let’s not forget the cost savings as well!). An icing on top is that you do not need to manage the Docker container lifecycle manually. This is taken care as part of the test suite, thanks to the &lt;code&gt;testcontainers-go API&lt;/code&gt; which makes it convenient to start the container before the tests run and terminate it once they complete.&lt;/p&gt;
+&lt;p&gt;You can refer to the test cases in the sample application for more details. Here is a snippet of how &lt;code&gt;testcontainers-go&lt;/code&gt; is used:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;kd&#34;&gt;func&lt;/span&gt; &lt;span class=&#34;nf&#34;&gt;setupCosmosEmulator&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;ctx&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;context&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;Context&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;testcontainers&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;Container&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;kt&#34;&gt;error&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;req&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;:=&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;testcontainers&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;ContainerRequest&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;nx&#34;&gt;Image&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;        &lt;span class=&#34;nx&#34;&gt;emulatorImage&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;nx&#34;&gt;ExposedPorts&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;[]&lt;/span&gt;&lt;span class=&#34;kt&#34;&gt;string&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;emulatorPort&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;+&lt;/span&gt; &lt;span class=&#34;s&#34;&gt;&amp;#34;:8081&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;s&#34;&gt;&amp;#34;1234:1234&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;},&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;nx&#34;&gt;WaitingFor&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;   &lt;span class=&#34;nx&#34;&gt;wait&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;ForListeningPort&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;nat&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Port&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;emulatorPort&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)),&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;container&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;err&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;:=&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;testcontainers&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;GenericContainer&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;ctx&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;testcontainers&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;GenericContainerRequest&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;nx&#34;&gt;ContainerRequest&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;req&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;nx&#34;&gt;Started&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;         &lt;span class=&#34;kc&#34;&gt;true&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;p&#34;&gt;})&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;k&#34;&gt;if&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;err&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;!=&lt;/span&gt; &lt;span class=&#34;kc&#34;&gt;nil&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;k&#34;&gt;return&lt;/span&gt; &lt;span class=&#34;kc&#34;&gt;nil&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;fmt&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Errorf&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;failed to start container: %w&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;err&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;c1&#34;&gt;// Give the emulator a bit more time to fully initialize&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;time&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Sleep&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;mi&#34;&gt;5&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;*&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;time&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;Second&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;k&#34;&gt;return&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;container&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;kc&#34;&gt;nil&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;If you’re interested in using the Azure Cosmos DB Emulator in CI pipelines, check out the blog post – &lt;a href=&#34;https://devblogs.microsoft.com/cosmosdb/linux-emulator-github-actions/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Using the Azure Cosmos DB Emulator in CI/CD Pipelines&lt;/a&gt;.&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;h2&gt;Wrapping Up&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;wrapping-up&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#wrapping-up&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Being able to store chat history is an important part of conversational AI apps. They can serve as a great add-on to existing techniques such as RAG (Retrieval Augmented Generation). Do try out the chatbot application and let us know what you think!&lt;/p&gt;
+&lt;p&gt;While the implementation in the sample application is relatively simple, how you model the chat history data depends on the requirements. One such scenario has been presented is this excellent blog post on &lt;a href=&#34;https://devblogs.microsoft.com/cosmosdb/how-microsoft-copilot-scales-to-millions-of-users-with-azure-cosmos-db/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;How Microsoft Copilot scales to millions of users with Azure Cosmos DB&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;Some of your requirements might include:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Storing metadata, such as reactions (in addition to messages)&lt;/li&gt;
+&lt;li&gt;Showing top N recent messages&lt;/li&gt;
+&lt;li&gt;Considering chat history data retention period (using TTL)&lt;/li&gt;
+&lt;li&gt;Incorporating additional analytics (on user interactions) based on the chat history data, and more.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Irrespective of the implementation, always make sure to incorporate best practices for data modeling. Refer &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/nosql/model-partition-example&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;How to model and partition data on Azure Cosmos DB using a real-world example&lt;/a&gt; for guidelines.&lt;/p&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;Are you already using or planning to leverage Azure Cosmos DB for your Go applications? We would love to hear from you! Send us your questions and feedback.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+      </description>
+    </item>
+    
+  </channel>
+</rss>

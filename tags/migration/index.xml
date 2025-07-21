@@ -1,0 +1,55 @@
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Abhishek Gupta&#39;s Blog – Migration</title>
+    <link>https://abhirockzz.github.io/tags/migration/</link>
+    <description>Recent content in Migration on Abhishek Gupta&#39;s Blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en</language>
+    <copyright>© Abhishek Gupta, 2025</copyright>
+    <lastBuildDate>Tue, 25 Feb 2025 00:00:00 +0000</lastBuildDate>
+    
+	  <atom:link href="https://abhirockzz.github.io/tags/migration/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+      
+        
+      
+    
+    
+    <item>
+      <title>Migrating data from DynamoDB to Azure Cosmos DB</title>
+      <link>https://abhirockzz.github.io/blog/migrating-data-from-dynamodb-to-azure-cosmos-db/</link>
+      <pubDate>Tue, 25 Feb 2025 00:00:00 +0000</pubDate>
+      
+      <guid>https://abhirockzz.github.io/blog/migrating-data-from-dynamodb-to-azure-cosmos-db/</guid>
+      <description>
+        
+        
+        &lt;p&gt;Migrating stateful systems, such as databases, is a complex process. A frequent requirement for customers is to transfer data from DynamoDB to Azure Cosmos DB for NoSQL. This process involves several stages, including exporting data from DynamoDB, performing necessary transformations, and importing the data into Azure Cosmos DB.&lt;/p&gt;
+&lt;h2&gt;Common Migration Techniques: Offline and Online&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;common-migration-techniques-offline-and-online&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#common-migration-techniques-offline-and-online&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Migration strategies include offline and online approaches, which can be used independently or combined based on your needs. Online migration is ideal for applications requiring real-time data transfer with zero downtime, while offline migration suits scenarios where applications can be paused during a maintenance window, allowing data to be exported from DynamoDB to an intermediate location before importing it into Azure Cosmos DB. You could also use a hybrid approach where bulk data migration occurs offline, followed by real-time synchronization to maintain consistency if you need to (temporarily) continue using DynamoDB in parallel with Azure Cosmos DB.&lt;/p&gt;
+&lt;h2&gt;Offline Data Migration from DynamoDB to Azure Cosmos DB for NoSQL&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;offline-data-migration-from-dynamodb-to-azure-cosmos-db-for-nosql&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#offline-data-migration-from-dynamodb-to-azure-cosmos-db-for-nosql&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;One of the approaches involves using a combination of Azure Data Factory, Azure Storage (with Azure Data Lake Storage Gen v2), and Apache Spark on Azure Databricks.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/3w3y73kan62ntchmhknt.jpg&#34; alt=&#34;Image description&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;First, data from DynamoDB table is exported to S3 (in DynamoDB JSON format) using native DynamoDB export capability. The DynamoDB table data in S3 is written to Azure Data Lake Storage (ADLS Gen v2) using an Azure Data Factory (ADF) pipeline. Finally, data in Azure storage is processed with Spark on Azure Databricks and written to Azure Cosmos DB using the &lt;a href=&#34;https://github.com/Azure/azure-cosmosdb-spark&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Azure Cosmos DB Spark connector for NoSQL API&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;This approach decouples storage and processing, which can be beneficial when dealing with large datasets. With Apache Spark you can scale data processing across multiple worker nodes, and it also provides a lot of flexibility when it comes to data transformations. However, the downside of this approach includes a multi-stage process which increases complexity, and overall latency. It also requires knowledge of Apache Spark and could introduce a learning curve depending on the skillset of your team.&lt;/p&gt;
+&lt;h3&gt;Alternative options&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;alternative-options&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#alternative-options&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;You can also explore other approaches such as exporting from DynamoDB to S3, and directly use ADF to read from S3 and write to Azure Cosmos DB. You could also leverage Spark on Azure Databricks to read from DynamoDB and write to Azure Cosmos DB. Both these options have their pros and cons.&lt;/p&gt;
+&lt;h2&gt;Online Migration Approaches&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;online-migration-approaches&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#online-migration-approaches&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Online migration from DynamoDB typically employs a Change-Data-Capture (CDC) mechanism to stream data changes from DynamoDB. Although this is a near real-time process, you will need to build additional component to process the streaming data and write it to Azure Cosmos DB. This could be an AWS Lambda function that gets triggered by DynamoDB Streams or use Kinesis Data Streams and process the data with Kinesis or Flink.&lt;/p&gt;
+&lt;p&gt;As always, each approach has its strengths and weaknesses. For example, DynamoDB Streams provides ordering guarantees, but has a data retention for 24 hours, which may or may not be suitable if you are migrating large data volumes to Azure Cosmos DB. On the other hand, you can write Flink job(s) to consume from Kinesis Data Streams and perform complex aggregations on data before writing it to Azure Cosmos DB. However, note that Kinesis Data Streams does not provide ordering guarantee.&lt;/p&gt;
+&lt;h2&gt;Want to Dive in Deeper?&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;want-to-dive-in-deeper&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#want-to-dive-in-deeper&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;If you are interested in exploring this further, I would encourage you to documentation page for &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/nosql/dynamodb-data-migration-cosmos-db&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Data migration from DynamoDB to Azure Cosmos DB for NoSQL&lt;/a&gt; that covers a complete walkthrough of an offline migration approach and explores the pros/cons of some of the offline/online migration options. You can also access the Spark notebook and the ADF pipeline from the &lt;a href=&#34;https://github.com/AzureCosmosDB/migration-dynamodb-to-cosmosdb-nosql&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;migration-dynamodb-to-cosmosdb-nosql&lt;/a&gt; GitHub repository and tweak it based on your requirements.&lt;/p&gt;
+&lt;p&gt;Let us know how that goes!&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2&gt;Leave a Review&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;leave-a-review&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#leave-a-review&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Tell us about your Azure Cosmos DB experience! Leave a review on &lt;strong&gt;PeerSpot&lt;/strong&gt;, and we’ll gift you &lt;strong&gt;$50&lt;/strong&gt;. &lt;a href=&#34;https://peerspot.com&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Get started here&lt;/a&gt;.&lt;/p&gt;
+&lt;h2&gt;About Azure Cosmos DB&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;about-azure-cosmos-db&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#about-azure-cosmos-db&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Azure Cosmos DB is a fully managed and serverless NoSQL and vector database for modern app development, including AI applications. With its SLA-backed speed and availability as well as instant dynamic scalability, it is ideal for real-time NoSQL and MongoDB applications that require high performance and distributed computing over massive volumes of NoSQL and vector data.&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://cosmos.azure.com/try/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Try Azure Cosmos DB for free here&lt;/a&gt;. To stay in the loop on Azure Cosmos DB updates, follow us on &lt;a href=&#34;https://twitter.com/AzureCosmosDB&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;X&lt;/a&gt;, &lt;a href=&#34;https://aka.ms/AzureCosmosDBYouTube&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;YouTube&lt;/a&gt;, and &lt;a href=&#34;https://www.linkedin.com/company/azure-cosmos-db/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;LinkedIn&lt;/a&gt;.&lt;/p&gt;
+
+      </description>
+    </item>
+    
+  </channel>
+</rss>
