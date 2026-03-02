@@ -6,7 +6,7 @@
     <generator>Hugo -- gohugo.io</generator>
     <language>en</language>
     <copyright>© Abhishek Gupta, 2025</copyright>
-    <lastBuildDate>Sat, 24 Jan 2026 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Mon, 02 Mar 2026 00:00:00 +0000</lastBuildDate>
     
 	  <atom:link href="https://abhirockzz.github.io/blog/index.xml" rel="self" type="application/rss+xml" />
     
@@ -15,6 +15,142 @@
         
       
     
+    
+    <item>
+      <title>Build a Time Tracking App with GitHub Copilot SDK</title>
+      <link>https://abhirockzz.github.io/blog/flight-log-app-with-copilot-sdk/</link>
+      <pubDate>Mon, 02 Mar 2026 00:00:00 +0000</pubDate>
+      
+      <guid>https://abhirockzz.github.io/blog/flight-log-app-with-copilot-sdk/</guid>
+      <description>
+        
+        
+        &lt;p&gt;&lt;strong&gt;Build a Time Tracking App with GitHub Copilot SDK&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;logo.png&#34; alt=&#34;&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;The &lt;a href=&#34;https://github.com/github/copilot-sdk&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;GitHub Copilot SDK&lt;/a&gt; lets you embed Copilot&amp;rsquo;s agentic workflows directly into your apps, and it&amp;rsquo;s available for Python, TypeScript, Go, and .NET.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;TimeTrack&lt;/strong&gt; is a desktop app built with the GitHub Copilot SDK (TypeScript) and &lt;a href=&#34;https://learn.microsoft.com/en-us/azure/cosmos-db/introduction&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Azure Cosmos DB&lt;/a&gt;. You can:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;⏱️ Track time with a start/stop timer, projects, and tags&lt;/li&gt;
+&lt;li&gt;🗣️ Ask questions about your time data in plain English — Copilot generates and runs Cosmos DB SQL queries behind the scenes&lt;/li&gt;
+&lt;li&gt;📊 View reports and charts across multiple users&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;Here is a demo of the app in action&lt;/strong&gt;:&lt;/p&gt;
+&lt;p&gt;&lt;video src=&#34;https://abhirockzz.github.io/videos/timetrack_app_demo.mp4&#34; controls width=&#34;100%&#34;&gt;&lt;/video&gt;&lt;/p&gt;
+&lt;p&gt;If you want to try it yourself, the code is on &lt;a href=&#34;https://github.com/abhirockzz/cosmosdb-copilot-sdk-time-tracker&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;GitHub&lt;/a&gt;. Works with Azure Cosmos DB or the vNext emulator — clone, configure, and &lt;code&gt;npm start&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;For local development, you don&amp;rsquo;t need an Azure account. The &lt;a href=&#34;https://learn.microsoft.com/en-us/azure/cosmos-db/emulator-linux&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Cosmos DB vNext emulator&lt;/a&gt; runs as a Docker container, so you can seed sample data and start querying right away.&lt;/p&gt;
+&lt;h2&gt;Behind the Scenes&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;behind-the-scenes&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#behind-the-scenes&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;What makes this interesting is the SDK&amp;rsquo;s tool calling. You define a tool using &lt;code&gt;defineTool&lt;/code&gt; with a schema (powered by Zod), and Copilot decides when to call it. Here&amp;rsquo;s what the core of it looks like:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-typescript&#34; data-lang=&#34;typescript&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;kr&#34;&gt;const&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;queryTool&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;defineTool&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;query_time_data&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;nx&#34;&gt;description&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;Execute a read-only Cosmos DB SQL query against time entries&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;nx&#34;&gt;parameters&lt;/span&gt;: &lt;span class=&#34;kt&#34;&gt;z.object&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;({&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;nx&#34;&gt;query&lt;/span&gt;: &lt;span class=&#34;kt&#34;&gt;z.string&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;().&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;describe&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;Cosmos DB SQL query&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;p&#34;&gt;}),&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;nx&#34;&gt;handler&lt;/span&gt;: &lt;span class=&#34;kt&#34;&gt;async&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;({&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;query&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;})&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&amp;gt;&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;c1&#34;&gt;// query is scoped to the user&amp;#39;s partition key
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;&lt;/span&gt;    &lt;span class=&#34;kr&#34;&gt;const&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;result&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;k&#34;&gt;await&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;runQuery&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;userId&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;query&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;);&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;k&#34;&gt;return&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;JSON&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;stringify&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;result&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;);&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;p&#34;&gt;},&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;});&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nx&#34;&gt;session&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;k&#34;&gt;await&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;client&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;createSession&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;({&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;nx&#34;&gt;tools&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;[&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;queryTool&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;],&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;nx&#34;&gt;systemMessage&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;mode&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;replace&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;content&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;...&amp;#34;&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;},&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;});&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;When a user asks &lt;em&gt;&amp;ldquo;what was my most productive day this week?&amp;rdquo;&lt;/em&gt;, the model generates a SQL query, executes it against Cosmos DB (scoped to the user&amp;rsquo;s partition key), and returns a conversational answer. If the generated SQL hits a Cosmos DB error — say, an unsupported &lt;code&gt;ORDER BY&lt;/code&gt; on an aggregate alias — the error is returned to the model as a tool result. The model reads it, adjusts the query, and retries. This usually succeeds within 1–2 attempts, with no user intervention.&lt;/p&gt;
+&lt;p&gt;Here&amp;rsquo;s the overall flow:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;pre&gt;&lt;code&gt;&amp;#43;--------------&amp;#43;     &amp;#43;----------------&amp;#43;     &amp;#43;-------------&amp;#43;
+|  Electron UI | --&amp;gt; |  Copilot SDK   | --&amp;gt; | Copilot CLI |
+|  (renderer)  |     |  (main process)|     |  (sidecar)  |
+&amp;#43;--------------&amp;#43;     &amp;#43;----------------&amp;#43;     &amp;#43;------&amp;#43;------&amp;#43;
+       ^                                           |
+       |                                    tool call: query_time_data
+       |                                           |
+       |                                    &amp;#43;------v------&amp;#43;
+       |                                    |  Cosmos DB  |
+       |                                    &amp;#43;------&amp;#43;------&amp;#43;
+       |                                           |
+       |                                     result or error
+       |                                           |
+       |                                    &amp;#43;------v------&amp;#43;
+       |                                    |    Model    |
+       |                                    | (interpret) |
+       |                                    &amp;#43;------&amp;#43;------&amp;#43;
+       |                                      |         |
+       |                                success?     SQL error?
+       |                                   |          retry with
+       |                                   |        corrected SQL
+       |                                   |             |
+       &amp;#43;---  AI response  &amp;lt;---------------&amp;#43;     (back to Cosmos DB)&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;Because the AI writes arbitrary SQL rather than picking from canned reports, the range of questions is wide. A few examples:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;em&gt;Do I tend to work longer hours early in the week or late in the week?&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;&lt;em&gt;How does my Monday workload compare to Friday?&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;&lt;em&gt;Compare my total hours this week vs last week&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;&lt;em&gt;Rank my projects by total hours and show the percentage each represents&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;&lt;em&gt;Summarize my last two weeks in 3 bullet points&lt;/em&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/kw68kk9he0c8808x1pqr.png&#34; alt=&#34;Report view and AI-generated query results&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;The app uses GPT-4.1 by default, but you can switch to any &lt;a href=&#34;https://docs.github.com/en/copilot/reference/ai-models/supported-models&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;supported Copilot model&lt;/a&gt; — &lt;code&gt;gpt-5&lt;/code&gt;, &lt;code&gt;claude-sonnet-4.5&lt;/code&gt;, etc. — by setting &lt;code&gt;COPILOT_MODEL&lt;/code&gt; in &lt;code&gt;.env&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;If you want to go beyond Copilot&amp;rsquo;s model lineup entirely, the app supports &lt;a href=&#34;https://github.com/github/copilot-sdk/blob/main/docs/guides/setup/byok.md&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;BYOK&lt;/a&gt; (Bring Your Own Key). Point it at your own &lt;a href=&#34;https://learn.microsoft.com/en-us/azure/ai-foundry/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Azure AI Foundry&lt;/a&gt; deployment — set your endpoint, API key, and deployment name in &lt;code&gt;.env&lt;/code&gt; and the SDK routes all AI calls to your model. The tool calling, session management, and agent runtime stay identical. You control the model, the billing, and the identity layer; the SDK provides the agentic infrastructure.&lt;/p&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;The app also has experimental support for local OpenAI-compatible servers (Ollama, Foundry Local), though results vary depending on the model&amp;rsquo;s tool calling capabilities, and your environment setup (GPU, etc).&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;h2&gt;Try It Yourself&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;try-it-yourself&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#try-it-yourself&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;The full source code is on &lt;a href=&#34;https://github.com/abhirockzz/cosmosdb-copilot-sdk-time-tracker&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;GitHub&lt;/a&gt;. You can run it with the &lt;a href=&#34;https://learn.microsoft.com/en-us/azure/cosmos-db/emulator-linux&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Cosmos DB vNext emulator&lt;/a&gt; — no Azure account needed — seed sample data, and start asking questions in natural language. Swap in your own model via BYOK if you want full control over the AI layer.&lt;/p&gt;
+&lt;p&gt;The Copilot SDK is open source and available for TypeScript, Python, Go, and .NET. Check out the &lt;a href=&#34;https://github.com/github/copilot-sdk/tree/main/docs&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;docs&lt;/a&gt; to see what else you can build with it.&lt;/p&gt;
+
+      </description>
+    </item>
+    
+    <item>
+      <title>Agentic Apps with GitHub Copilot SDK</title>
+      <link>https://abhirockzz.github.io/blog/time-tracker-with-copilot-sdk/</link>
+      <pubDate>Mon, 02 Feb 2026 00:00:00 +0000</pubDate>
+      
+      <guid>https://abhirockzz.github.io/blog/time-tracker-with-copilot-sdk/</guid>
+      <description>
+        
+        
+        &lt;p&gt;&lt;strong&gt;Agentic Apps with GitHub Copilot SDK&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;logo.png&#34; alt=&#34;&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;The GitHub Copilot SDK lets you embed Copilot&amp;rsquo;s AI capabilities directly into your apps — available for Go, Python, TypeScript, and .NET.&lt;/p&gt;
+&lt;p&gt;Here&amp;rsquo;s a quick demo of building an agentic application with the &lt;a href=&#34;https://github.com/github/copilot-sdk&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;SDK&lt;/a&gt; and &lt;a href=&#34;https://learn.microsoft.com/en-us/azure/cosmos-db/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Azure Cosmos DB&lt;/a&gt;.&lt;/p&gt;
+&lt;div style=&#34;position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden;&#34;&gt;
+      &lt;iframe allow=&#34;accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen&#34; loading=&#34;eager&#34; referrerpolicy=&#34;strict-origin-when-cross-origin&#34; src=&#34;https://www.youtube.com/embed/uDsfdOG-PjU?autoplay=0&amp;amp;controls=1&amp;amp;end=0&amp;amp;loop=0&amp;amp;mute=0&amp;amp;start=0&#34; style=&#34;position: absolute; top: 0; left: 0; width: 100%; height: 100%; border:0;&#34; title=&#34;YouTube video&#34;&gt;&lt;/iframe&gt;
+    &lt;/div&gt;
+
+&lt;p&gt;&lt;strong&gt;Flight Diary&lt;/strong&gt; is a sample app where you can:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;📸 Upload a boarding pass image → Copilot extracts flight details automatically (no separate OCR/vision API needed)&lt;/li&gt;
+&lt;li&gt;🗣️ Query your flight history in plain English → Copilot generates and runs Cosmos DB SQL queries behind the scenes&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;The part I find interesting is how the SDK handles tool calling. You define the tools, Copilot figures out when and how to use them. For example, when extracting from a boarding pass, it parses the image and calls the save function — all from a single prompt.&lt;/p&gt;
+&lt;p&gt;If you want to try it yourself, the code is on &lt;a href=&#34;https://github.com/abhirockzz/cosmosdb_copilot_sdk_demo_app&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;GitHub&lt;/a&gt;. It also works with the &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/emulator-linux&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Cosmos DB vNext emulator&lt;/a&gt; for local development.&lt;/p&gt;
+
+      </description>
+    </item>
     
     <item>
       <title>GitHub Copilot CLI &#43; MCP: Talk to Your Database in Plain English</title>
@@ -16483,102 +16619,6 @@ Happy coding!&lt;/p&gt;
 &lt;h2&gt;Conclusion&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;conclusion&#34;&gt;&lt;/span&gt;
     &lt;a href=&#34;#conclusion&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;You configured and deployed a serverless backend for Slack and in the process, learnt about some of the aspects of Lambda Function URLs through the lens of this sample app. I would encourage you to explore other capabilities such as &lt;a href=&#34;https://docs.aws.amazon.com/lambda/latest/dg/urls-auth.html#urls-auth-iam&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;AWS_IAM authentication&lt;/a&gt;, &lt;a href=&#34;https://docs.aws.amazon.com/lambda/latest/dg/urls-configuration.html#urls-cors&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;CORS config&lt;/a&gt;, &lt;a href=&#34;https://docs.aws.amazon.com/lambda/latest/dg/urls-configuration.html#urls-throttling&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;throttling limits&lt;/a&gt;, &lt;a href=&#34;https://docs.aws.amazon.com/lambda/latest/dg/urls-monitoring.html&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;monitoring&lt;/a&gt; etc.&lt;/p&gt;
 &lt;p&gt;Happy coding!&lt;/p&gt;
-
-      </description>
-    </item>
-    
-    <item>
-      <title>Now Generally Available – Partial Document Update in Azure Cosmos DB</title>
-      <link>https://abhirockzz.github.io/blog/cosmosdb-partial-doc-update/</link>
-      <pubDate>Tue, 02 Nov 2021 00:00:00 +0000</pubDate>
-      
-      <guid>https://abhirockzz.github.io/blog/cosmosdb-partial-doc-update/</guid>
-      <description>
-        
-        
-        &lt;p&gt;&lt;em&gt;Originally posted on &lt;a href=&#34;https://devblogs.microsoft.com/cosmosdb/partial-document-update-ga/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;https://devblogs.microsoft.com/cosmosdb/partial-document-update-ga/&lt;/a&gt;&lt;/em&gt;&lt;/p&gt;
-&lt;p&gt;We’re excited to announce the general availability of &lt;a href=&#34;https://docs.microsoft.com/en-us/azure/cosmos-db/partial-document-update&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;partial document update&lt;/a&gt; for the Azure Cosmos DB Core (SQL) API, which was announced at Microsoft Ignite! This new feature makes it possible to perform path-level updates to specific fields/properties in a single document without needing to perform a full document read-replace operation. Partial document update is currently supported in Azure Cosmos DB &lt;a href=&#34;https://docs.microsoft.com/azure/cosmos-db/sql/sql-api-sdk-dotnet-standard&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;.NET SDK&lt;/a&gt;, &lt;a href=&#34;https://docs.microsoft.com/azure/cosmos-db/sql/sql-api-sdk-java-v4&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Java SDK&lt;/a&gt;, &lt;a href=&#34;https://docs.microsoft.com/azure/cosmos-db/sql/sql-api-sdk-node&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Node SDK&lt;/a&gt;, and &lt;a href=&#34;https://docs.microsoft.com/azure/cosmos-db/sql/how-to-write-stored-procedures-triggers-udfs?tabs=javascript&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;stored procedures&lt;/a&gt;.&lt;/p&gt;
-&lt;h2&gt;Document updates – then and now&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;document-updates--then-and-now&#34;&gt;&lt;/span&gt;
-    &lt;a href=&#34;#document-updates--then-and-now&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;To put things in context, here is a refresher on how one would typically use a document replace operation: Read the document, update it locally (client side) including any &lt;a href=&#34;https://docs.microsoft.com/azure/cosmos-db/sql/database-transactions-optimistic-concurrency#optimistic-concurrency-control&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;optimistic concurrency control&lt;/a&gt; (OCC) checks if necessary and, finally call the replace operation along with the updated document.&lt;/p&gt;
-&lt;p&gt;Here is a trimmed down example of how one would use partial document update (using the Java SDK):&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-java&#34; data-lang=&#34;java&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;//step 1&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;UserInfo&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;user&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;container&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;na&#34;&gt;readItem&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;user&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;na&#34;&gt;getId&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(),&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;new&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;PartitionKey&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;user&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;na&#34;&gt;getEmail&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;()),&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;UserInfo&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;na&#34;&gt;class&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;);&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; 
-&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;c1&#34;&gt;//step 2 &lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;CosmosPatchOperations&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;patchOps&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;CosmosPatchOperations&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;na&#34;&gt;create&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;().&lt;/span&gt;&lt;span class=&#34;na&#34;&gt;add&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;/phone/2&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;12345&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;).&lt;/span&gt;&lt;span class=&#34;na&#34;&gt;set&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;/address&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;123 Foobar&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;);&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; 
-&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt; 
-&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;c1&#34;&gt;//step 3 &lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;container&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;na&#34;&gt;patchItem&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;user&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;na&#34;&gt;getId&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(),&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;new&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;PartitionKey&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;user&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;na&#34;&gt;getEmail&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;()),&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;patchOps&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;reqOps&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;UserInfo&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;na&#34;&gt;class&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;);&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;ul&gt;
-&lt;li&gt;Read the document (this is the same as replace) with readItem method.&lt;/li&gt;
-&lt;li&gt;Define the updates you want to make (in form of a CosmosPatchOperations object – in this case we add a phone number (an array) and set the address to a different one.&lt;/li&gt;
-&lt;li&gt;Invoke the patchItem method.&lt;/li&gt;
-&lt;/ul&gt;
-&lt;h2&gt;Benefits of partial document update&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;benefits-of-partial-document-update&#34;&gt;&lt;/span&gt;
-    &lt;a href=&#34;#benefits-of-partial-document-update&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;When compared with the replace operation, the overhead of serializing the entire document is eliminated since the client application only needs to deal with properties to be updated (phone and address in this example). This becomes significant when your application makes frequent updates to only a few properties in your documents, such as incrementing counters, toggling true/false flags or similar types of changes.&lt;/p&gt;
-&lt;p&gt;Not having to send the entire document over the wire impacts overall application performance – reduced network bandwidth usage, lower end-to end-latency and savings of CPU cycles on the Azure Cosmos DB SDK client hosts.&lt;/p&gt;
-&lt;p&gt;Some of the other developer productivity benefits that are a by-product of the flexible programming model enabled by partial document update:&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;Combining multiple operations: Partial document update supports different types of operations (see next section). Depending on your requirements, you can combine multiple such operations as part of a single invocation as opposed to incurring cost of round trips for separate operation type.&lt;/li&gt;
-&lt;li&gt;Conditional update: If you want the partial update to depend on a pre-condition, you can define it using a SQL-like filter predicate (for example, from c where c.taskNum = 3). The partial update operation will fail if the pre-condition specified in the predicate is not satisfied.&lt;/li&gt;
-&lt;li&gt;Transactions support: Partial document update works in the context of a &lt;a href=&#34;https://docs.microsoft.com/en-us/azure/cosmos-db/sql/transactional-batch&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Transactional batch&lt;/a&gt; as well. This means that multiple documents within the same partition key can be patched (partially updated) as part of a transaction (along with other operations such as create). The transaction will be committed only if all the operations succeed. If any operation fails, the entire transaction is rolled back.&lt;/li&gt;
-&lt;li&gt;Transparent conflict resolution: If your Azure Cosmos DB account is configured with multiple write regions, &lt;a href=&#34;https://docs.microsoft.com/azure/cosmos-db/conflict-resolution-policies&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;conflicts and respective resolution policies&lt;/a&gt; are applicable at the document level (with Last Write Wins being the default conflict resolution policy). This works differently in case of partial document updates – conflicts that occur due to concurrent patch operations to the same document across multiple regions will be detected and resolved at the path-level. This means that as long as you’re updating different properties (paths) in the same document, they will be merged successfully.&lt;/li&gt;
-&lt;/ul&gt;
-&lt;h2&gt;Partial document update operations&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;partial-document-update-operations&#34;&gt;&lt;/span&gt;
-    &lt;a href=&#34;#partial-document-update-operations&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Although Partial document update is a top-level operation (just like Replace), it supports sub-operations (the code snippet above used add and set). You can &lt;a href=&#34;https://docs.microsoft.com/azure/cosmos-db/partial-document-update#supported-operations&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;refer to the documentation&lt;/a&gt; for details, but here is a summary:&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;Add: Creates a new element (if it does not already exist).&lt;/li&gt;
-&lt;li&gt;Set: Updates an element (creates one if it does not already exist).&lt;/li&gt;
-&lt;li&gt;Replace: Updates an element only if it already exists.&lt;/li&gt;
-&lt;li&gt;Remove: Deletes an existing element.&lt;/li&gt;
-&lt;li&gt;Increment: Increases/decreases by specified value (use negative value to decrease).&lt;/li&gt;
-&lt;/ul&gt;
-&lt;h2&gt;Learn more&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;learn-more&#34;&gt;&lt;/span&gt;
-    &lt;a href=&#34;#learn-more&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Find out more about Azure Cosmos DB partial document update:&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;&lt;a href=&#34;https://docs.microsoft.com/azure/cosmos-db/partial-document-update&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Read the concepts&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href=&#34;https://docs.microsoft.com/azure/cosmos-db/partial-document-update-getting-started&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Code samples&lt;/a&gt; to get you started&lt;/li&gt;
-&lt;li&gt;Add/Set/Replace operations – &lt;a href=&#34;https://docs.microsoft.com/azure/cosmos-db/partial-document-update#similarities-and-differences&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;how are they similar, yet different&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href=&#34;https://docs.microsoft.com/azure/cosmos-db/partial-document-update-faq&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Frequently asked questions&lt;/a&gt;&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;&lt;a href=&#34;https://azure.microsoft.com/services/cosmos-db/#overview&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Get started free&lt;/a&gt; with Azure Cosmos DB.&lt;/p&gt;
-
-      </description>
-    </item>
-    
-    <item>
-      <title>Extracting Value from IoT Using Azure Cosmos DB, Azure Synapse Analytics, and Confluent Cloud</title>
-      <link>https://abhirockzz.github.io/blog/iot-cosmosdb-confluent/</link>
-      <pubDate>Wed, 06 Oct 2021 00:00:00 +0000</pubDate>
-      
-      <guid>https://abhirockzz.github.io/blog/iot-cosmosdb-confluent/</guid>
-      <description>
-        
-        
-        &lt;p&gt;It&amp;rsquo;s possible to build seamless device-to-cloud experience with the integrations between Azure and Confluent Cloud. The example provided in this blog post showcases how the following capabilities of Azure and Confluent Cloud are leveraged:&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;A fully managed platform for data in motion and self-managed connectors from Confluent&lt;/li&gt;
-&lt;li&gt;A secure connection from Confluent to Azure&lt;/li&gt;
-&lt;li&gt;A highly distributed and scalable data management solution from Azure&lt;/li&gt;
-&lt;li&gt;A limitless analytics service offered by Azure that brings together data integration, enterprise data warehousing, and big data analytics&lt;/li&gt;
-&lt;li&gt;A fully managed microservice development platform on Azure&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;The following diagram provides high-level architecture of the end-to-end solution:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;https://cdn.confluent.io/wp-content/uploads/azure-and-confluent-use-case-architecture.jpg&#34; alt=&#34;&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
-&lt;blockquote&gt;
-  &lt;p&gt;You can check out the blog post in its entirety here - &lt;a href=&#34;https://www.confluent.io/blog/real-time-iot-data-integration-and-analytics-with-confluent-cloud-and-azure/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;https://www.confluent.io/blog/real-time-iot-data-integration-and-analytics-with-confluent-cloud-and-azure/&lt;/a&gt;&lt;/p&gt;
-&lt;/blockquote&gt;
 
       </description>
     </item>
