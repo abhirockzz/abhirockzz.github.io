@@ -6,7 +6,7 @@
     <generator>Hugo -- gohugo.io</generator>
     <language>en</language>
     <copyright>© Abhishek Gupta, 2025</copyright>
-    <lastBuildDate>Tue, 02 Jun 2026 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Mon, 22 Jun 2026 00:00:00 +0000</lastBuildDate>
     
 	  <atom:link href="https://abhirockzz.github.io/index.xml" rel="self" type="application/rss+xml" />
     
@@ -14,6 +14,310 @@
       
       
     
+    
+    <item>
+      <title>How to Use Deep Agents with Azure Cosmos DB – Plan, act, and verify against operational data</title>
+      <link>https://abhirockzz.github.io/blog/deep-agents-plan-act-verify/</link>
+      <pubDate>Mon, 22 Jun 2026 00:00:00 +0000</pubDate>
+      
+      <guid>https://abhirockzz.github.io/blog/deep-agents-plan-act-verify/</guid>
+      <description>
+        
+        
+        &lt;p&gt;&lt;em&gt;Originally posted on &lt;a href=&#34;https://devblogs.microsoft.com/cosmosdb/deep-agents-to-plan-act-verify-against-operational-data/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;https://devblogs.microsoft.com/cosmosdb/deep-agents-to-plan-act-verify-against-operational-data/&lt;/a&gt;&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://docs.langchain.com/oss/python/deepagents/overview&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Deep Agents&lt;/a&gt; is an agent harness built on &lt;a href=&#34;http://docs.langchain.com/oss/python/langgraph/overview&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;LangGraph&lt;/a&gt;, for agents that need to work through a task over many steps instead of a single LLM call. The agent runs tools, looks at the results, and uses that to pick the next one, keeping a todo list as it goes. On top of that loop the harness brings what a longer-running agent needs. It can load instructions on demand instead of holding everything in the prompt (skills), offload large tool outputs so they don&amp;rsquo;t fill the context window, and pause for human approval in apps that need an approval gate before data changes.&lt;/p&gt;
+&lt;p&gt;Support Ops Agent is a sample app that puts this to work on a customer-support ticket queue. We can ask it which tickets are at risk, who&amp;rsquo;s overloaded, or whether a run of similar complaints is really one outage. When a ticket needs to change, it updates the ticket and reads it back to confirm. Most requests become a handful of reads against the queue. Requests that change a ticket add a patch and a verification read.&lt;/p&gt;
+&lt;p&gt;That queue lives in &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/nosql/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Azure Cosmos DB&lt;/a&gt;, the operational database the support team already runs on. The agent reads and writes that same store through the Azure Cosmos DB SDK, so it works on the live tickets, with no side index to keep in sync. Each ticket is an Azure Cosmos DB item, with its tags and history kept right inside it, and the agent updates that item directly. With the partition key doing its job, point reads and customer-scoped queries stay cheap. Queue-wide investigations spend RUs based on the cross-partition work they do, which is why the tools project only the fields they need. The schema is flexible, so the agent can add a tag or append to a history array without a migration.&lt;/p&gt;
+&lt;p&gt;The code is on &lt;a href=&#34;https://github.com/abhirockzz/deepagents-cosmosdb-support-ops&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;GitHub&lt;/a&gt; with instructions to run it against your own Azure Cosmos DB account. In this post, I&amp;rsquo;ll go through:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;what the agent can do, and the Azure Cosmos DB operation behind each kind of request&lt;/li&gt;
+&lt;li&gt;why Deep Agents and Azure Cosmos DB fit this problem&lt;/li&gt;
+&lt;li&gt;the tools it uses to work on the ticket queue&lt;/li&gt;
+&lt;li&gt;practical examples of how the agent works: morning triage, resolving a ticket, and spotting an incident&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Agent capabilities&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;agent-capabilities&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#agent-capabilities&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;The requests in this sample all come down to a few Azure Cosmos DB operations. Some questions only need reads. Others need the agent to read first, decide what changed, and then patch the ticket.&lt;/p&gt;
+&lt;table&gt;
+  &lt;thead&gt;
+      &lt;tr&gt;
+          &lt;th&gt;Ask it to…&lt;/th&gt;
+          &lt;th&gt;What the agent does&lt;/th&gt;
+          &lt;th&gt;Cosmos DB operations&lt;/th&gt;
+      &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;tbody&gt;
+      &lt;tr&gt;
+          &lt;td&gt;Triage the queue&lt;/td&gt;
+          &lt;td&gt;Finds the at-risk tickets (high priority, still active, gone stale) and reports the handful that actually matter&lt;/td&gt;
+          &lt;td&gt;cross-partition query, filter, ORDER BY&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+          &lt;td&gt;Resolve a ticket&lt;/td&gt;
+          &lt;td&gt;Point-reads the ticket, checks related ones from the same customer, updates status, owner, and history, then re-reads to confirm&lt;/td&gt;
+          &lt;td&gt;point read, related-item query, update, verify&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+          &lt;td&gt;Spot an incident&lt;/td&gt;
+          &lt;td&gt;Searches for a cluster across customers, including symptoms filed under the wrong area, and can tag the group as a known issue&lt;/td&gt;
+          &lt;td&gt;multi-step query, repeated patches&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+          &lt;td&gt;Check queue health&lt;/td&gt;
+          &lt;td&gt;Summarizes the queue by status, by area, and by who is carrying the load&lt;/td&gt;
+          &lt;td&gt;grouped counts&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+          &lt;td&gt;Cover for someone&lt;/td&gt;
+          &lt;td&gt;Takes an absent agent&amp;rsquo;s active tickets and moves them to whoever has the lightest load, then confirms the rebalance&lt;/td&gt;
+          &lt;td&gt;grouped counts, repeated patches&lt;/td&gt;
+      &lt;/tr&gt;
+  &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;I&amp;rsquo;ll walk through the first three below. The other two use the same tools, so they are useful checks when you run the sample yourself.&lt;/p&gt;
+&lt;h2&gt;Approach: Agentic vs Static&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;approach-agentic-vs-static&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#approach-agentic-vs-static&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Most ticket questions don&amp;rsquo;t have a one-query answer. Take &amp;ldquo;is something breaking across customers.&amp;rdquo; We run a query, look at what comes back, and only then know whether a second, narrower query is worth running. &lt;a href=&#34;https://docs.langchain.com/oss/python/deepagents/overview&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Deep Agents&lt;/a&gt; handles exactly that kind of back-and-forth. It plans the work as a short todo list, calls tools, reads results, and decides the next step, instead of trying to answer in a single pass. It also keeps the agent&amp;rsquo;s instructions lean: the role and the ticket schema stay loaded at all times, while the longer how-to guides load only when a task needs them.&lt;/p&gt;
+&lt;p&gt;Every ticket is stored under its customer (&lt;code&gt;/customerId&lt;/code&gt;), so anything scoped to one customer, like reading a single ticket or pulling everything for ACME, stays inside one partition and querying it cost-effective. Queue-wide questions like triage or incident detection read across partitions instead, which is the right call when we&amp;rsquo;re asking about every customer at once. The agent picks single-partition or cross-partition to match the question.&lt;/p&gt;
+&lt;h3&gt;How it works&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;how-it-works&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#how-it-works&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;Everything the agent does to the queue goes through the tools, each a thin wrapper over a single Azure Cosmos DB operation: a query, a point read, a grouped count, and a write. The agent never gets a raw database connection. It works the queue with the same handful of operations a support lead would, and decides which one each request calls for.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;req-flow.png&#34; alt=&#34;Diagram showing a support request flowing to a Support Ops Agent that plans, acts, and verifies one tool call at a time using query, point-read, aggregation, and ticket-update tools connected to an Azure Cosmos DB for NoSQL support-ticket container partitioned by customer ID.&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;run_query&lt;/code&gt; is the one the agent reaches for most. It takes a &lt;code&gt;SELECT&lt;/code&gt; and runs it cross-partition, which is what lets the agent search the whole queue. It&amp;rsquo;s read-only: anything that isn&amp;rsquo;t a &lt;code&gt;SELECT&lt;/code&gt; is refused, and so is a cross-partition &lt;code&gt;GROUP BY&lt;/code&gt; (more on that below). Writes have their own tool.&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-python&#34; data-lang=&#34;python&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nd&#34;&gt;@tool&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;k&#34;&gt;def&lt;/span&gt; &lt;span class=&#34;nf&#34;&gt;run_query&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;query&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nb&#34;&gt;str&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;parameters&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nb&#34;&gt;str&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;[]&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;-&amp;gt;&lt;/span&gt; &lt;span class=&#34;nb&#34;&gt;str&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;s2&#34;&gt;&amp;#34;&amp;#34;&amp;#34;Run a read-only Cosmos DB NoSQL SELECT over the tickets container.&amp;#34;&amp;#34;&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;n&#34;&gt;stripped&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;query&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;strip&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;()&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;k&#34;&gt;if&lt;/span&gt; &lt;span class=&#34;ow&#34;&gt;not&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;stripped&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;upper&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;()&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;startswith&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;SELECT&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;):&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;k&#34;&gt;return&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;Error: only SELECT queries are allowed. Use update_ticket for writes.&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;n&#34;&gt;items&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;_get_container&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;()&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;query_items&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;n&#34;&gt;query&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;stripped&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;n&#34;&gt;parameters&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;json&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;loads&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;parameters&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt; &lt;span class=&#34;ow&#34;&gt;or&lt;/span&gt; &lt;span class=&#34;kc&#34;&gt;None&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;n&#34;&gt;enable_cross_partition_query&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;kc&#34;&gt;True&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; &lt;span class=&#34;o&#34;&gt;...&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;&lt;code&gt;read_ticket&lt;/code&gt; is the cheap path. When the agent already knows the ticket id and the customer, it does a point read on the partition key for around 1 RU instead of running a query.&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;update_ticket&lt;/code&gt; is the only way the agent writes. It patches a ticket in place, always refreshes &lt;code&gt;updatedAt&lt;/code&gt;, and appends an entry to the ticket&amp;rsquo;s history array, so every change it makes stays traceable.&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-python&#34; data-lang=&#34;python&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;n&#34;&gt;ops&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;[{&lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;op&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;set&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;path&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;sa&#34;&gt;f&lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;/&lt;/span&gt;&lt;span class=&#34;si&#34;&gt;{&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;k&lt;/span&gt;&lt;span class=&#34;si&#34;&gt;}&lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;value&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;v&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;}&lt;/span&gt; &lt;span class=&#34;k&#34;&gt;for&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;k&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;v&lt;/span&gt; &lt;span class=&#34;ow&#34;&gt;in&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;fields&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;items&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;()]&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;n&#34;&gt;ops&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;append&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;({&lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;op&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;set&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;path&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;/updatedAt&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;value&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;now&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;})&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;k&#34;&gt;if&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;history_note&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;n&#34;&gt;ops&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;append&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;({&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;s2&#34;&gt;&amp;#34;op&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;add&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;path&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;/history/-&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;s2&#34;&gt;&amp;#34;value&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;at&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;now&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;by&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;history_by&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;note&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;history_note&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;},&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;p&#34;&gt;})&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;n&#34;&gt;_get_container&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;()&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;patch_item&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;n&#34;&gt;item&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;ticket_id&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;partition_key&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;customer_id&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;patch_operations&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;ops&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;&lt;code&gt;aggregate_tickets&lt;/code&gt; answers the queue-health questions: how many tickets sit in each status, which area is busiest, who is carrying the most load. It counts tickets across the whole queue, grouped by a single field.&lt;/p&gt;
+&lt;p&gt;You might expect that to be a plain &lt;code&gt;GROUP BY&lt;/code&gt;, and in Azure Cosmos DB&amp;rsquo;s query language it is. The catch is in the SDK. The &lt;code&gt;azure-cosmos&lt;/code&gt; Python SDK runs a &lt;code&gt;GROUP BY&lt;/code&gt; fine within a single partition, but refuses one that spans partitions, returning &lt;code&gt;&amp;quot;Cross partition query only supports &#39;VALUE&#39; for aggregates.&amp;quot;&lt;/code&gt;&lt;/p&gt;
+&lt;p&gt;The support queue spans every customer, so the grouped counts have to come some other way. &lt;code&gt;aggregate_tickets&lt;/code&gt; projects the one field across partitions and counts the values in Python instead, and &lt;code&gt;run_query&lt;/code&gt; points the agent here whenever it reaches for a &lt;code&gt;GROUP BY&lt;/code&gt;.&lt;/p&gt;
+&lt;h2&gt;Support Ops agent in action&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;support-ops-agent-in-action&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#support-ops-agent-in-action&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;I&amp;rsquo;ll use three requests from the sample runs to show what that looks like. They start the way a support lead would ask them, and the agent has to turn each one into the right mix of queries, reads, and updates.&lt;/p&gt;
+&lt;h3&gt;Morning triage&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;morning-triage&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#morning-triage&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;pre&gt;&lt;code&gt;I just got in, what should I look at first?&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;There&amp;rsquo;s no single query for &amp;ldquo;what should I look at first.&amp;rdquo; The agent reads it as a question about risk: which active tickets are closest to slipping. A ticket has no &amp;ldquo;at risk&amp;rdquo; field to sort by, so the agent has to decide what at-risk means and turn that into a query. It settles on the tickets that are high priority, still active, and have gone untouched for a few days, and asks Azure Cosmos DB for those, oldest first.&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-sql&#34; data-lang=&#34;sql&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;k&#34;&gt;SELECT&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;c&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;id&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;c&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;customerId&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;c&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;priority&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;c&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;status&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;c&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;area&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;c&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;assignee&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;c&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;updatedAt&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;FROM&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;c&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;WHERE&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;c&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;priority&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;IN&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s1&#34;&gt;&amp;#39;P1&amp;#39;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;&lt;span class=&#34;s1&#34;&gt;&amp;#39;P2&amp;#39;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;AND&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;c&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;status&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;IN&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s1&#34;&gt;&amp;#39;open&amp;#39;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;&lt;span class=&#34;s1&#34;&gt;&amp;#39;in-progress&amp;#39;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;AND&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;c&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;updatedAt&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;o&#34;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;o&#34;&gt;@&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;staleBefore&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;ORDER&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;BY&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;c&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;updatedAt&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;ASC&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;It doesn&amp;rsquo;t stop at the list. It also runs a few grouped counts to size up the rest of the queue behind those tickets, then reports the handful that matter with a one-line reason each and a suggested order to work them:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;pre&gt;&lt;code&gt;Start with the stale high-priority active tickets:
+
+- TICKET-1004 (UMBRELLA): P1 open, unassigned, data issue, untouched since
+  Jun 5. Oldest urgent ticket in the queue.
+- TICKET-1003 (INITECH): P2 open, unassigned, login lockout, untouched since
+  Jun 7. Customer access issue and stale.
+- TICKET-1001 (ACME): P1 open, unassigned, billing, untouched since Jun 8.
+  Revenue-impacting and still idle.
+- TICKET-1002 (GLOBEX): P1 in-progress, performance, with agent.lee, untouched
+  since Jun 9. Already owned, but stale enough to need a status check.
+- TICKET-1010 (INITECH): P2 open, unassigned, performance, untouched since
+  Jun 11.
+
+Queue health in brief: 93 active tickets (57 open, 36 in-progress), and 72 of
+them are unassigned. Hottest active area is api (22), then billing (21).&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;Note how the user didn&amp;rsquo;t define &amp;ldquo;at risk&amp;rdquo; up front – the agent had to turn that into something Azure Cosmos DB could query.&lt;/p&gt;
+&lt;h3&gt;Resolve a ticket&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;resolve-a-ticket&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#resolve-a-ticket&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;The next request names a specific ticket and expects something done about it:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;pre&gt;&lt;code&gt;GLOBEX is unhappy about TICKET-1050, can you pick it up and move it forward?&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;The agent starts with a point read on the ticket. It knows the id and the customer, so this stays inside GLOBEX&amp;rsquo;s partition. The ticket comes back as a login issue, open and unassigned. Before touching it, the agent looks for context: it pulls GLOBEX&amp;rsquo;s other tickets, then checks the active login tickets across the rest of the queue, and notices this isn&amp;rsquo;t an isolated report. Several customers have similar authentication problems open right now.&lt;/p&gt;
+&lt;p&gt;With that picture, it does the obvious thing: the ticket needs an owner and a status update. It applies the change through &lt;code&gt;update_ticket&lt;/code&gt;, which patches the fields, refreshes &lt;code&gt;updatedAt&lt;/code&gt;, and appends a history note in one write so the trail is clear.&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;pre&gt;&lt;code&gt;status → in-progress
+assignee → agent.dana
+tags &amp;#43;= login, auth, needs-investigation
+history &amp;#43;= &amp;#34;Picked up after customer escalation; flagged for auth investigation.&amp;#34;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;Then it reads the ticket back to confirm the change landed, rather than trusting the write went through, and reports what it did and why:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;pre&gt;&lt;code&gt;TICKET-1050 (GLOBEX) is now in progress with agent.dana assigned.
+
+Why this move:
+- It was a stale P2 login issue sitting open and unassigned.
+- There are similar active login/auth tickets across other customers, so this
+may be part of a broader authentication pattern rather than an isolated report.
+
+Verified state: status in-progress, assignee agent.dana, tags
+login / auth / needs-investigation, history note added.&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;For &lt;code&gt;TICKET-1050&lt;/code&gt;, the agent didn&amp;rsquo;t just assign an owner. It checked the customer context, looked for similar login issues, made the update, and then read the ticket back. The agent should not report a write until it has read the updated ticket and seen the new status, assignee, tags, and history note.&lt;/p&gt;
+&lt;h3&gt;Spot an incident&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;spot-an-incident&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#spot-an-incident&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;Now try a login related request that starts broad:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;pre&gt;&lt;code&gt;Logins feel shaky this week, dig in and flag anything related.&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;The agent pulls in its incident-search guide before it starts querying. Its first pass is the obvious one: active tickets in the login area. That catches part of the problem, but not all of it. People describe the same symptom in different words, and some login tickets land under another area. So the agent runs a second query against the ticket text, looking for authentication symptoms that landed somewhere else.&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-sql&#34; data-lang=&#34;sql&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;k&#34;&gt;SELECT&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;c&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;id&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;c&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;area&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;c&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;title&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;FROM&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;c&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;WHERE&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;c&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;area&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;o&#34;&gt;!=&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;s1&#34;&gt;&amp;#39;login&amp;#39;&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;AND&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;c&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;status&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;IN&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s1&#34;&gt;&amp;#39;open&amp;#39;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;&lt;span class=&#34;s1&#34;&gt;&amp;#39;in-progress&amp;#39;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;AND&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;CONTAINS&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;LOWER&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;c&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;description&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;s1&#34;&gt;&amp;#39;authentication&amp;#39;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;       &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;OR&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;CONTAINS&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;LOWER&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;c&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;description&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;s1&#34;&gt;&amp;#39;sign in&amp;#39;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;       &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;OR&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;CONTAINS&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;LOWER&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;c&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;description&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;s1&#34;&gt;&amp;#39;log in&amp;#39;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;))&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;That second query turns up TICKET-1052 (STARK), filed under other as &amp;ldquo;Authentication errors on mobile app&amp;rdquo;, which an &lt;code&gt;area = &#39;login&#39;&lt;/code&gt; filter would have missed entirely. A few more queries (grouped counts by customer, and a check on how recent these are) confirm the issue:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;pre&gt;&lt;code&gt;There is a real login/auth cluster.
+
+7 active tickets across 6 customers, 6 of them created this week and 4 landed on
+Jun 13 alone. The most urgent:
+
+- TICKET-1051 (HOOLI): P1 open, &amp;#34;Multiple users can&amp;#39;t log in this morning&amp;#34;
+- TICKET-1053 (UMBRELLA): P2 open, &amp;#34;SSO login broken after update&amp;#34;
+- TICKET-1052 (STARK): P2 open, area `other`, &amp;#34;Authentication errors on mobile app&amp;#34;
+- TICKET-1050 (GLOBEX): P2 open, &amp;#34;Cannot sign in - authentication failing&amp;#34;
+- TICKET-1042 (ACME): P2 open, &amp;#34;Unable to log in after MFA enabled&amp;#34;
+
+One relevant ticket is misfiled under `other`, so a pure area = &amp;#39;login&amp;#39; view
+undercounts the issue.
+
+If you want, I can tag these 7 with a shared marker like known-issue:login-surge
+so the cluster is easier to track.&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;Tagging seven tickets is different from updating one, so the agent stops and asks first. If the user confirms, it could have made the &lt;code&gt;update_ticket&lt;/code&gt; patch on each one, append the tag and a history note. The login surge only becomes visible after the active-login query, the text search, the customer counts, and the dates are looked at together.&lt;/p&gt;
+&lt;h2&gt;Try it, and build your own&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;try-it-and-build-your-own&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#try-it-and-build-your-own&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;The repo has everything to run this against your own Azure Cosmos DB account: the tools, the seed data, and a CLI that streams each step as the agent works. The &lt;a href=&#34;https://github.com/abhirockzz/deepagents-cosmosdb-support-ops/blob/main/README.md&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;README&lt;/a&gt; walks through setup and the az login auth. Run &lt;code&gt;python seed.py&lt;/code&gt; to load the support queue data, then replay the runs above or ask the agent your own questions.&lt;/p&gt;
+&lt;p&gt;Once you have the sample running, try the same idea with data from one of your own workflows. Start with read-only questions and watch how the agent breaks them into Azure Cosmos DB operations. Then add scoped writes when the boundary is clear: what the agent can change, what history it should leave, and how it verifies the result. That could be support tickets, incidents, orders, devices, or any other operational data where a multi-step agent can help.&lt;/p&gt;
+&lt;h2&gt;Learn more&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;learn-more&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#learn-more&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;ul&gt;
+&lt;li&gt;For the agent framework, start with the &lt;a href=&#34;https://docs.langchain.com/oss/python/deepagents/overview&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Deep Agents docs&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/ai-agents&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;AI agents in Azure Cosmos DB&lt;/a&gt; is a good place to step back and review the broader agent concepts: planning, tool use, memory, copilots, autonomous agents, and multi-agent systems.&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/gen-ai/agentic-retrieval&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Agentic Retrieval Toolkit&lt;/a&gt; shows how to ground answers with multi-step retrieval over Cosmos DB data&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/gen-ai/agent-memory-toolkit&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Agent Memory Toolkit&lt;/a&gt; covers durable agent memory backed by Cosmos DB.&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/gen-ai/model-context-protocol-toolkit&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;MCP Toolkit for Azure Cosmos DB&lt;/a&gt; shows another way to expose Cosmos DB capabilities to agentic applications.&lt;/li&gt;
+&lt;/ul&gt;
+
+      </description>
+    </item>
     
     <item>
       <title>Announcing General availability of the Azure Cosmos DB vNext emulator</title>
@@ -13404,335 +13708,6 @@ Content-Type: text/plain; charset=utf-8
 &lt;h2&gt;Wrap up..&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;wrap-up&#34;&gt;&lt;/span&gt;
     &lt;a href=&#34;#wrap-up&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Combining AWS Controllers for Kubernetes and &lt;code&gt;cdk8s&lt;/code&gt; can prove useful if you want to manage AWS services as well as the Kubernetes applications - using code (not &lt;code&gt;yaml&lt;/code&gt;). In this blog you saw how to do this in the context of &lt;code&gt;MemoryDB&lt;/code&gt; and an application that was composed of a &lt;code&gt;Deployment&lt;/code&gt; and &lt;code&gt;Service&lt;/code&gt;. I encourage you to try out other AWS services as well - &lt;a href=&#34;https://aws-controllers-k8s.github.io/community/docs/community/services/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;here is a complete list&lt;/a&gt;.&lt;/p&gt;
 &lt;p&gt;Until then, Happy Building!&lt;/p&gt;
-
-      </description>
-    </item>
-    
-    <item>
-      <title>Use AWS App Runner, DynamoDB and CDK to deploy and run a Cloud native Go app</title>
-      <link>https://abhirockzz.github.io/blog/url-shortener-dynamodb-apprunner/</link>
-      <pubDate>Wed, 17 Aug 2022 00:00:00 +0000</pubDate>
-      
-      <guid>https://abhirockzz.github.io/blog/url-shortener-dynamodb-apprunner/</guid>
-      <description>
-        
-        
-        &lt;p&gt;Earlier, I wrote about a &lt;a href=&#34;url-shortener-dynamodb-lambda-go.md&#34; &gt;Serverless URL shortener&lt;/a&gt; application on AWS using &lt;code&gt;DynamoDB&lt;/code&gt;, AWS Lambda and API Gateway.&lt;/p&gt;
-&lt;p&gt;In this blog post, we will deploy that as a REST API on &lt;a href=&#34;https://docs.aws.amazon.com/apprunner/latest/dg/what-is-apprunner.html&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;AWS App Runner&lt;/a&gt; and continue to use &lt;code&gt;DynamoDB&lt;/code&gt; as the database. AWS App Runner is a compute service that makes it easy to deploy applications from a container image (or source code), manage their scalability, deployment pipelines and more.&lt;/p&gt;
-&lt;p&gt;With the help of a practical example presented in this blog, you will:&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;Learn about AWS App Runner, how to integrate it with &lt;code&gt;DynamoDB&lt;/code&gt;&lt;/li&gt;
-&lt;li&gt;Run simple benchmarks to explore the scalability characteristics of your App Runner service as well as &lt;code&gt;DynamoDB&lt;/code&gt;&lt;/li&gt;
-&lt;li&gt;Apply &amp;ldquo;Infrastructure-as-Code&amp;rdquo; with &lt;a href=&#34;https://docs.aws.amazon.com/cdk/v2/guide/work-with-cdk-go.html&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;AWS CDK Go&lt;/a&gt; and deploy the entire stack, including the database, application and other AWS resources.&lt;/li&gt;
-&lt;li&gt;Also see the &lt;a href=&#34;https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/dynamodb&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;DynamoDB Go SDK&lt;/a&gt; (v2) in action and some of the basic operations such as &lt;code&gt;PutItem&lt;/code&gt;, &lt;code&gt;GetItem&lt;/code&gt;.&lt;/li&gt;
-&lt;/ul&gt;
-&lt;h2&gt;Let&amp;rsquo;s start by deploying the URL shortener application&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;lets-start-by-deploying-the-url-shortener-application&#34;&gt;&lt;/span&gt;
-    &lt;a href=&#34;#lets-start-by-deploying-the-url-shortener-application&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;blockquote&gt;
-  &lt;p&gt;Before you begin, make sure you have the &lt;a href=&#34;https://go.dev/dl/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Go programming language&lt;/a&gt; (&lt;strong&gt;v1.16&lt;/strong&gt; or higher) and &lt;a href=&#34;https://docs.aws.amazon.com/cdk/v2/guide/getting_started.html#getting_started_install&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;AWS CDK&lt;/a&gt; installed.&lt;/p&gt;
-&lt;/blockquote&gt;
-&lt;p&gt;Clone the project and change to the right directory:&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;git clone https://github.com/abhirockzz/apprunner-dynamodb-golang
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;cd&lt;/span&gt; cdk&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;&lt;strong&gt;To start the deployment&amp;hellip;&lt;/strong&gt;&lt;/p&gt;
-&lt;p&gt;Run &lt;code&gt;cdk deploy&lt;/code&gt; and provide your confirmation to proceed. The subsequent sections will provide a walk through of the CDK code for you to better understand what&amp;rsquo;s going on.&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;cdk deploy&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/nt1obuvpqfot59tb3f55.png&#34; alt=&#34;Image description&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
-&lt;p&gt;This will start creating the AWS resources required for our application.&lt;/p&gt;
-&lt;blockquote&gt;
-  &lt;p&gt;If you want to see the AWS CloudFormation template which will be used behind the scenes, run &lt;code&gt;cdk synth&lt;/code&gt; and check the &lt;code&gt;cdk.out&lt;/code&gt; folder&lt;/p&gt;
-&lt;/blockquote&gt;
-&lt;p&gt;You can keep track of the progress in the terminal or navigate to AWS console: &lt;code&gt;CloudFormation &amp;gt; Stacks &amp;gt; DynamoDBAppRunnerStack&lt;/code&gt;&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/c49d7m4zpc3ljtipg9c7.png&#34; alt=&#34;Image description&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
-&lt;p&gt;Once all the resources are created, you should have the &lt;code&gt;DynamoDB&lt;/code&gt; table, the App Runner Service (along with the related IAM roles etc.).&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;URL shortener service on App Runner&lt;/strong&gt;&lt;/p&gt;
-&lt;p&gt;You should see the landing page of the App Runner service that was just deployed.&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/iph48op971lzi7e6vjfh.png&#34; alt=&#34;Image description&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
-&lt;p&gt;Also look at the &lt;strong&gt;Service Settings&lt;/strong&gt; under &lt;strong&gt;Configuration&lt;/strong&gt; which shows the environment variables (configured at runtime by CDK) as well as the compute resources (1 &lt;code&gt;VCPU&lt;/code&gt; and 2 &lt;code&gt;GB&lt;/code&gt;) that we specified&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/ozdgw81kha28yqa51unv.png&#34; alt=&#34;Image description&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
-&lt;h3&gt;Our URL shortener is ready!&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;our-url-shortener-is-ready&#34;&gt;&lt;/span&gt;
-    &lt;a href=&#34;#our-url-shortener-is-ready&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;The application is relatively simple and exposes two endpoints:&lt;/p&gt;
-&lt;ol&gt;
-&lt;li&gt;To create a short link for a URL&lt;/li&gt;
-&lt;li&gt;Access the original URL via the short link&lt;/li&gt;
-&lt;/ol&gt;
-&lt;p&gt;To try out the application, you need to get the endpoint URL provider by the App Runner service. It&amp;rsquo;s available in the stack output (in the terminal or the &lt;strong&gt;Outputs&lt;/strong&gt; tab in the AWS CloudFormation console for your Stack):&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/kqosg5bz3vlauqytonb1.png&#34; alt=&#34;Image description&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
-&lt;p&gt;First, export the App Runner service endpoint as an environment variable,&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;export&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;APP_URL&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&amp;lt;enter App Runner service URL&amp;gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# example&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;export&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;APP_URL&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;https://jt6jjprtyi.us-east-1.awsapprunner.com&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;Invoke it with a URL that you want to access via a short link.&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;curl -i -X POST -d &lt;span class=&#34;s1&#34;&gt;&amp;#39;https://abhirockzz.github.io/&amp;#39;&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;$APP_URL&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# output&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;HTTP/1.1 &lt;span class=&#34;m&#34;&gt;200&lt;/span&gt; OK
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Date: Thu, &lt;span class=&#34;m&#34;&gt;21&lt;/span&gt; Jul &lt;span class=&#34;m&#34;&gt;2022&lt;/span&gt; 11:03:40 GMT
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Content-Length: &lt;span class=&#34;m&#34;&gt;25&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Content-Type: text/plain&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;charset&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;utf-8
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;o&#34;&gt;{&lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;ShortCode&amp;#34;&lt;/span&gt;:&lt;span class=&#34;s2&#34;&gt;&amp;#34;ae1e31a6&amp;#34;&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;You should get a &lt;code&gt;JSON&lt;/code&gt; response with a short code and see an item in the &lt;code&gt;DynamoDB&lt;/code&gt; table as well:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/xkjxc4kbroznezx4x7ww.png&#34; alt=&#34;Image description&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
-&lt;p&gt;You can continue to test the application with a few other URLs.&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;To access the URL associated with the short code&lt;/strong&gt;&lt;/p&gt;
-&lt;p&gt;&amp;hellip; enter the following in your browser &lt;code&gt;http://&amp;lt;enter APP_URL&amp;gt;/&amp;lt;shortcode&amp;gt;&lt;/code&gt;&lt;/p&gt;
-&lt;p&gt;For example, when you enter &lt;code&gt;https://jt6jjprtyi.us-east-1.awsapprunner.com/ae1e31a6&lt;/code&gt;, you will be re-directed to the original URL.&lt;/p&gt;
-&lt;p&gt;You can also use &lt;code&gt;curl&lt;/code&gt;. Here is an example:&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;export&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;APP_URL&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;https://jt6jjprtyi.us-east-1.awsapprunner.com
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;curl -i &lt;span class=&#34;nv&#34;&gt;$APP_URL&lt;/span&gt;/ae1e31a6
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# output&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;HTTP/1.1 &lt;span class=&#34;m&#34;&gt;302&lt;/span&gt; Found
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Location: https://abhirockzz.github.io/
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Date: Thu, &lt;span class=&#34;m&#34;&gt;21&lt;/span&gt; Jul &lt;span class=&#34;m&#34;&gt;2022&lt;/span&gt; 11:07:58 GMT
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Content-Length: &lt;span class=&#34;m&#34;&gt;0&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;h2&gt;Auto-scaling in action&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;auto-scaling-in-action&#34;&gt;&lt;/span&gt;
-    &lt;a href=&#34;#auto-scaling-in-action&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Both App Runner and &lt;code&gt;DynamoDB&lt;/code&gt; are capable of scaling up (and down) according to workload.&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;AWS App Runner&lt;/strong&gt;&lt;/p&gt;
-&lt;p&gt;AWS App Runner automatically scales up the number of instances in response to an increase in traffic and scales them back when the traffic decreases.&lt;/p&gt;
-&lt;blockquote&gt;
-  &lt;p&gt;This is based on AutoScalingConfiguration which is driven by the following user-defined properties - Max concurrency, Max size and Min size. For details, refer to &lt;a href=&#34;https://docs.aws.amazon.com/apprunner/latest/dg/manage-autoscaling.html&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Managing App Runner automatic scaling&lt;/a&gt;&lt;/p&gt;
-&lt;/blockquote&gt;
-&lt;p&gt;Here is the auto-scale configuration for the URL shortener App Runner Service:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/e7ft2uy31myffindci75.png&#34; alt=&#34;Image description&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;DynamoDB&lt;/strong&gt;&lt;/p&gt;
-&lt;p&gt;In case of &lt;a href=&#34;https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.ReadWriteCapacityMode.html#HowItWorks.OnDemand&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;On-demand mode&lt;/a&gt;, &lt;code&gt;DynamoDB&lt;/code&gt; instantly accommodates your workloads as they ramp up or down to any previously reached traffic level. &lt;a href=&#34;https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.ReadWriteCapacityMode.html#HowItWorks.ProvisionedThroughput.Manual&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Provisioned mode&lt;/a&gt; requires us to specify the number of reads and writes per second that you require for your application, but you can use auto scaling to adjust your table’s provisioned capacity automatically in response to traffic changes.&lt;/p&gt;
-&lt;h3&gt;Lets run some tests&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;lets-run-some-tests&#34;&gt;&lt;/span&gt;
-    &lt;a href=&#34;#lets-run-some-tests&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;We can run a simple benchmarks and witness how our service reacts. I will be using a load testing tool called &lt;a href=&#34;https://github.com/rakyll/hey#installation&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;hey&lt;/a&gt; but you can also do use Apache Bench etc.&lt;/p&gt;
-&lt;p&gt;Here is what we&amp;rsquo;ll do:&lt;/p&gt;
-&lt;ol&gt;
-&lt;li&gt;Start off with a simple test and examine the response.&lt;/li&gt;
-&lt;li&gt;Ramp up the load such that it breaches the provisioned capacity for the &lt;code&gt;DynamoDB&lt;/code&gt; table.&lt;/li&gt;
-&lt;li&gt;Update the &lt;code&gt;DynamoDB&lt;/code&gt; table capacity and repeat.&lt;/li&gt;
-&lt;/ol&gt;
-&lt;p&gt;&lt;a href=&#34;https://github.com/rakyll/hey#installation&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Install hey&lt;/a&gt; and execute a basic test - &lt;code&gt;200&lt;/code&gt; requests with &lt;code&gt;50&lt;/code&gt; workers concurrently (as per default settings):&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;hey &lt;span class=&#34;nv&#34;&gt;$APP_URL&lt;/span&gt;/&amp;lt;enter the short code&amp;gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;#example&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;hey https://jt6jjprtyi.us-east-1.awsapprunner.com/ae1e31a6&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;This should be well within the capacity of our stack. Let&amp;rsquo;s bump it to &lt;code&gt;500&lt;/code&gt; concurrent workers to execute requests for a &lt;em&gt;sustained&lt;/em&gt; period of 4 minutes.&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;hey -c &lt;span class=&#34;m&#34;&gt;500&lt;/span&gt; -z 4m &lt;span class=&#34;nv&#34;&gt;$APP_URL&lt;/span&gt;/&amp;lt;enter the short code&amp;gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;#example&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;hey -c &lt;span class=&#34;m&#34;&gt;500&lt;/span&gt; -z 4m https://jt6jjprtyi.us-east-1.awsapprunner.com/ae1e31a6&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;&lt;strong&gt;How is DynamoDB doing?&lt;/strong&gt;&lt;/p&gt;
-&lt;p&gt;In &lt;code&gt;DynamoDB&lt;/code&gt; console under &lt;strong&gt;Table capacity metrics&lt;/strong&gt;, check &lt;strong&gt;Read usage (average units/second)&lt;/strong&gt;:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/xog3sk5bl1t1msfguich.png&#34; alt=&#34;Image description&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
-&lt;p&gt;More importantly, check &lt;strong&gt;Read throttled events (count)&lt;/strong&gt;:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/81a2jjwup3thdocbjax0.png&#34; alt=&#34;Image description&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
-&lt;p&gt;Since our table was in &lt;code&gt;Provisioned&lt;/code&gt; capacity mode (with 5 &lt;code&gt;RCU&lt;/code&gt; and &lt;code&gt;WCU&lt;/code&gt;), the requests got throttled and some of them failed.&lt;/p&gt;
-&lt;p&gt;Edit the table to change its mode to &lt;strong&gt;On-demand&lt;/strong&gt;, re-run the load test. You should not see throttling errors now since &lt;code&gt;DynamoDB&lt;/code&gt; will auto-scale in response to the load.&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/59vxiaszir8bmpblquuc.png&#34; alt=&#34;Image description&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;What about App Runner??&lt;/strong&gt;&lt;/p&gt;
-&lt;p&gt;In the &lt;strong&gt;Metrics&lt;/strong&gt; seton in App Runner console, check the &lt;strong&gt;Active Instances&lt;/strong&gt; count.&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/g4uahxo7sh87ugtdqxqj.png&#34; alt=&#34;Image description&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
-&lt;blockquote&gt;
-  &lt;p&gt;You can also track the other metrics and experiment with various load capacities&lt;/p&gt;
-&lt;/blockquote&gt;
-&lt;p&gt;Alright, now that you&amp;rsquo;ve actually seen &lt;strong&gt;what&lt;/strong&gt; the application does and examined the basic scalability characteristics of the stack, let&amp;rsquo;s move on to the &lt;strong&gt;how&lt;/strong&gt;.&lt;/p&gt;
-&lt;p&gt;But, before that&amp;hellip;.&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;Don&amp;rsquo;t forget to delete resources&lt;/strong&gt;&lt;/p&gt;
-&lt;p&gt;Once you&amp;rsquo;re done, to delete all the services, simply use:&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;cdk destroy&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;h2&gt;AWS CDK code walk through&amp;hellip;&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;aws-cdk-code-walk-through&#34;&gt;&lt;/span&gt;
-    &lt;a href=&#34;#aws-cdk-code-walk-through&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;We will go through the keys parts of the &lt;code&gt;NewDynamoDBAppRunnerStack&lt;/code&gt; function which defines the entire stack required by the URL shortener application (&lt;em&gt;I&amp;rsquo;ve omitted some code for brevity&lt;/em&gt;).&lt;/p&gt;
-&lt;blockquote&gt;
-  &lt;p&gt;You can refer to the complete code on &lt;a href=&#34;https://github.com/abhirockzz/apprunner-dynamodb-golang/tree/master/cdk&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;GitHub&lt;/a&gt;&lt;/p&gt;
-&lt;/blockquote&gt;
-&lt;p&gt;We start by defining a &lt;code&gt;DynamoDB&lt;/code&gt; table with &lt;code&gt;shorturl&lt;/code&gt; as the Partition key (Range/Sort key is not required for our case). Note that the &lt;code&gt;BillingMode&lt;/code&gt; attribute decides the table capacity mode, which is &lt;strong&gt;Provisioned&lt;/strong&gt; in this case (with 5 &lt;code&gt;RCU&lt;/code&gt; and &lt;code&gt;WCU&lt;/code&gt;). As demonstrated in the previous section, this was chosen on purpose.&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;kd&#34;&gt;func&lt;/span&gt; &lt;span class=&#34;nf&#34;&gt;NewDynamoDBAppRunnerStack&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;scope&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;constructs&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;Construct&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;id&lt;/span&gt; &lt;span class=&#34;kt&#34;&gt;string&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;props&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;*&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;DynamoDBAppRunnerStackProps&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;awscdk&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;Stack&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;c1&#34;&gt;//....&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;dynamoDBTable&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;:=&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;awsdynamodb&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;NewTable&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;stack&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;dynamodb-short-urls-table&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;awsdynamodb&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;TableProps&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;PartitionKey&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;awsdynamodb&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;Attribute&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;				&lt;span class=&#34;nx&#34;&gt;Name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;shortCodeDynamoDBAttributeName&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;				&lt;span class=&#34;nx&#34;&gt;Type&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;awsdynamodb&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;AttributeType_STRING&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;p&#34;&gt;},&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;BillingMode&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;   &lt;span class=&#34;nx&#34;&gt;awsdynamodb&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;BillingMode_PROVISIONED&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;ReadCapacity&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;  &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Number&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;mi&#34;&gt;5&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;WriteCapacity&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Number&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;mi&#34;&gt;5&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;RemovalPolicy&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;awscdk&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;RemovalPolicy_DESTROY&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;p&#34;&gt;})&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;c1&#34;&gt;//...&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;Then, we use &lt;a href=&#34;https://pkg.go.dev/github.com/aws/aws-cdk-go/awscdk/v2/awsiam#NewRole&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;awsiam.NewRole&lt;/a&gt; to define a new IAM role and also add a policy that allows App Runner to execute actions in &lt;code&gt;DynamoDB&lt;/code&gt;. In this case we provide granular permissions - &lt;a href=&#34;https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_GetItem.html&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;GetItem&lt;/a&gt; and &lt;a href=&#34;https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_PutItem.html&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;PutItem&lt;/a&gt;.&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;//...&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nx&#34;&gt;apprunnerDynamoDBIAMrole&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;:=&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;awsiam&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;NewRole&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;stack&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;role-apprunner-dynamodb&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;awsiam&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;RoleProps&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;AssumedBy&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;awsiam&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;NewServicePrincipal&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;tasks.apprunner.amazonaws.com&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt; &lt;span class=&#34;kc&#34;&gt;nil&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;p&#34;&gt;})&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nx&#34;&gt;apprunnerDynamoDBIAMrole&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;AddToPolicy&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;awsiam&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;NewPolicyStatement&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;awsiam&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;PolicyStatementProps&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;nx&#34;&gt;Effect&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;    &lt;span class=&#34;nx&#34;&gt;awsiam&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;Effect_ALLOW&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;nx&#34;&gt;Actions&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;   &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Strings&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;dynamodb:GetItem&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;s&#34;&gt;&amp;#34;dynamodb:PutItem&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;nx&#34;&gt;Resources&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Strings&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;*&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;dynamoDBTable&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;TableArn&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;())}))&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;&lt;a href=&#34;https://pkg.go.dev/github.com/aws/aws-cdk-go/awscdk/v2/awsecrassets#NewDockerImageAsset&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;awsecrassets.NewDockerImageAsset&lt;/a&gt; allows to create and push our application Docker image to ECR - with a single line of code.&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;//...&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nx&#34;&gt;appDockerImage&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;:=&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;awsecrassets&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;NewDockerImageAsset&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;stack&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;app-image&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;awsecrassets&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;DockerImageAssetProps&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;Directory&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;appDirectory&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)})&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;Once all the pieces ready, we define the App Runner Service. Notice how it references the information required by the application:&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;The name of the &lt;code&gt;DynamoDB&lt;/code&gt; table (defined previously) is seeded as &lt;code&gt;TABLE_NAME&lt;/code&gt; env var (required by the application)&lt;/li&gt;
-&lt;li&gt;The Docker image that we defined is directly used by the &lt;code&gt;Asset&lt;/code&gt; attribute&lt;/li&gt;
-&lt;li&gt;The IAM role that we defined is attached to the &lt;a href=&#34;https://docs.aws.amazon.com/apprunner/latest/dg/security_iam_service-with-iam.html&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;App Runner service as Instance Role&lt;/a&gt;&lt;/li&gt;
-&lt;/ul&gt;
-&lt;blockquote&gt;
-  &lt;p&gt;The instance role is an optional role that App Runner uses to provide permissions to AWS service actions that your service&amp;rsquo;s compute instances need.&lt;/p&gt;
-&lt;/blockquote&gt;
-&lt;p&gt;Note that that an &lt;strong&gt;alpha&lt;/strong&gt; version (at the time of writing) of the &lt;a href=&#34;https://pkg.go.dev/github.com/aws/aws-cdk-go/awscdkapprunneralpha/v2&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;L2 App Runner CDK construct&lt;/a&gt; has been used and this is much simple compared to the &lt;a href=&#34;https://pkg.go.dev/github.com/aws/aws-cdk-go/awscdk/v2/awsapprunner&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;CloudFormation based L1 construct&lt;/a&gt;. It offers a convenient &lt;a href=&#34;https://pkg.go.dev/github.com/aws/aws-cdk-go/awscdkapprunneralpha/v2#NewService&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;NewService&lt;/a&gt; function with which you can define the App Runner Service including the source (locally available in this case), the IAM roles (Instance and Access) etc.&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;//...&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nx&#34;&gt;app&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;:=&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;awscdkapprunneralpha&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;NewService&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;stack&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;apprunner-url-shortener&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;awscdkapprunneralpha&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;ServiceProps&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;Source&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;awscdkapprunneralpha&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;NewAssetSource&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;				&lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;awscdkapprunneralpha&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;AssetProps&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;					&lt;span class=&#34;nx&#34;&gt;ImageConfiguration&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;awscdkapprunneralpha&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;ImageConfiguration&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;Environment&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;kd&#34;&gt;map&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;[&lt;/span&gt;&lt;span class=&#34;kt&#34;&gt;string&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;]&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;*&lt;/span&gt;&lt;span class=&#34;kt&#34;&gt;string&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;						&lt;span class=&#34;s&#34;&gt;&amp;#34;TABLE_NAME&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;dynamoDBTable&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;TableName&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;						&lt;span class=&#34;s&#34;&gt;&amp;#34;AWS_REGION&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;dynamoDBTable&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Env&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;().&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;Region&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;},&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;						&lt;span class=&#34;nx&#34;&gt;Port&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Number&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;appPort&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)},&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;					&lt;span class=&#34;nx&#34;&gt;Asset&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;appDockerImage&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;}),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;InstanceRole&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;apprunnerDynamoDBIAMrole&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;Memory&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;       &lt;span class=&#34;nx&#34;&gt;awscdkapprunneralpha&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Memory_TWO_GB&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;Cpu&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;          &lt;span class=&#34;nx&#34;&gt;awscdkapprunneralpha&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Cpu_ONE_VCPU&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;p&#34;&gt;})&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;app&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;ApplyRemovalPolicy&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;awscdk&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;RemovalPolicy_DESTROY&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;h2&gt;Wrap up&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;wrap-up&#34;&gt;&lt;/span&gt;
-    &lt;a href=&#34;#wrap-up&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;This brings us to the end of this blog post! You explored a URL shortener application that exposed REST APIs, used &lt;code&gt;DynamoDB&lt;/code&gt; as its persistent store and deployed it to AWS App Runner. Then we looked at how the individual services scaled elastically in response to the workload. Finally, we also explored the AWS CDK code that made is possible to define the application and its infrastructure as (Go) code.&lt;/p&gt;
-&lt;p&gt;Happy building!&lt;/p&gt;
 
       </description>
     </item>
