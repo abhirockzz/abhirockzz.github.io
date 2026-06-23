@@ -6,7 +6,7 @@
     <generator>Hugo -- gohugo.io</generator>
     <language>en</language>
     <copyright>© Abhishek Gupta, 2025</copyright>
-    <lastBuildDate>Wed, 14 Jan 2026 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Tue, 02 Jun 2026 00:00:00 +0000</lastBuildDate>
     
 	  <atom:link href="https://abhirockzz.github.io/tags/python/index.xml" rel="self" type="application/rss+xml" />
     
@@ -15,6 +15,383 @@
         
       
     
+    
+    <item>
+      <title>Announcing the Public Preview of Integrated Embeddings in Azure Cosmos DB: Build AI Apps With Embeddings That Stay in Sync</title>
+      <link>https://abhirockzz.github.io/blog/integrated-embeddings-azure-cosmos-db/</link>
+      <pubDate>Tue, 02 Jun 2026 00:00:00 +0000</pubDate>
+      
+      <guid>https://abhirockzz.github.io/blog/integrated-embeddings-azure-cosmos-db/</guid>
+      <description>
+        
+        
+        &lt;p&gt;&lt;em&gt;Originally posted on &lt;a href=&#34;https://devblogs.microsoft.com/cosmosdb/announcing-the-public-preview-of-integrated-embeddings-in-azure-cosmos-db-build-ai-apps-with-embeddings-that-stay-in-sync/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;https://devblogs.microsoft.com/cosmosdb/announcing-the-public-preview-of-integrated-embeddings-in-azure-cosmos-db-build-ai-apps-with-embeddings-that-stay-in-sync/&lt;/a&gt;&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;AI applications built on Azure Cosmos DB depend on embeddings for grounded results. Keeping them in sync with your data is the hard part: it means building and operating a separate data pipeline to track changes, call an embedding model, and write the results back to Azure Cosmos DB. In practice, that pipeline also has to handle failures and retries, throttling, scaling, and monitoring as your data and traffic grow.&lt;/p&gt;
+&lt;p&gt;Integrated Embeddings in Azure Cosmos DB, now in Public Preview, removes that heavy lifting. Azure Cosmos DB automatically generates and maintains the embeddings for you as items are written and updated, so the vectors stored alongside your items always reflect the current state of your data. You configure it by specifying the source properties to embed, the Microsoft Foundry embedding model to use, and the path where the generated embeddings are stored, and then focus on building AI applications, such as Retrieval-Augmented Generation (RAG), on top of your data.&lt;/p&gt;
+&lt;div style=&#34;position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden;&#34;&gt;
+      &lt;iframe allow=&#34;accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen&#34; loading=&#34;eager&#34; referrerpolicy=&#34;strict-origin-when-cross-origin&#34; src=&#34;https://www.youtube.com/embed/obYZG0hulHw?autoplay=0&amp;amp;controls=1&amp;amp;end=0&amp;amp;loop=0&amp;amp;mute=0&amp;amp;start=0&#34; style=&#34;position: absolute; top: 0; left: 0; width: 100%; height: 100%; border:0;&#34; title=&#34;YouTube video&#34;&gt;&lt;/iframe&gt;
+    &lt;/div&gt;
+
+&lt;h2&gt;How Integrated Embeddings works&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;how-integrated-embeddings-works&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#how-integrated-embeddings-works&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Integrated Embeddings is configured through a new &lt;code&gt;embeddingSource&lt;/code&gt; block in the &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/vector-search#container-vector-policies&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;container vector policy&lt;/a&gt;. The rest of the policy (vector path, dimensions, distance function) stays the same. This block tells Azure Cosmos DB three things:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;What to embed:&lt;/strong&gt; one or more item properties listed in &lt;code&gt;sourcePaths&lt;/code&gt;. When you list multiple paths, the values are combined into a single input for the embedding model. An item is re-embedded only when one of these properties changes.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;What to embed with:&lt;/strong&gt; a Microsoft Foundry embedding model deployment, identified by &lt;code&gt;deploymentName&lt;/code&gt;, &lt;code&gt;modelName&lt;/code&gt;, and &lt;code&gt;endpoint&lt;/code&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;How to authenticate:&lt;/strong&gt; &lt;code&gt;authType&lt;/code&gt;: &lt;code&gt;&amp;quot;Entra&amp;quot;&lt;/code&gt; — currently the only supported value.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;For example, here is a vector policy that embeds the &lt;code&gt;/text&lt;/code&gt; property of each item using &lt;code&gt;text-embedding-3-small&lt;/code&gt; and writes the resulting vector to &lt;code&gt;/embedding&lt;/code&gt;:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-json&#34; data-lang=&#34;json&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;nt&#34;&gt;&amp;#34;vectorEmbeddings&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;[&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      &lt;span class=&#34;nt&#34;&gt;&amp;#34;path&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;/embedding&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      &lt;span class=&#34;nt&#34;&gt;&amp;#34;dataType&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;float32&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      &lt;span class=&#34;nt&#34;&gt;&amp;#34;dimensions&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;mi&#34;&gt;1536&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      &lt;span class=&#34;nt&#34;&gt;&amp;#34;distanceFunction&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;cosine&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      &lt;span class=&#34;nt&#34;&gt;&amp;#34;embeddingSource&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;nt&#34;&gt;&amp;#34;sourcePaths&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;[&lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;/text&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;],&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;nt&#34;&gt;&amp;#34;deploymentName&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;text-embedding-3-small&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;nt&#34;&gt;&amp;#34;modelName&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;text-embedding-3-small&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;nt&#34;&gt;&amp;#34;endpoint&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;https://&amp;lt;foundry-resource-name&amp;gt;.openai.azure.com/&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;nt&#34;&gt;&amp;#34;authType&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;Entra&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      &lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;p&#34;&gt;]&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;At the time of Public Preview, the following Azure OpenAI embedding models are supported through Microsoft Foundry: &lt;code&gt;text-embedding-3-small&lt;/code&gt;, &lt;code&gt;text-embedding-3-large&lt;/code&gt;, and &lt;code&gt;text-embedding-ada-002&lt;/code&gt;.&lt;/p&gt;
+&lt;h2&gt;Integrated Embeddings in action&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;integrated-embeddings-in-action&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#integrated-embeddings-in-action&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;To get started with a simple example, try the &lt;a href=&#34;https://learn.microsoft.com/en-us/azure/cosmos-db/integrated-embeddings?tabs=python#get-started-with-integrated-embeddings&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;quickstart in the docs&lt;/a&gt;. It walks through creating a container with an &lt;code&gt;embeddingSource&lt;/code&gt; policy, inserting a few sample items, and verifying that Azure Cosmos DB writes an embedding to each item.&lt;/p&gt;
+&lt;p&gt;The walkthrough below is a longer, end-to-end example. You&amp;rsquo;ll load a dataset of outdoor products into Azure Cosmos DB, let Integrated Embeddings generate the vectors, and then run a vector search against the container.&lt;/p&gt;
+&lt;p&gt;Before you start, complete the &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/integrated-embeddings#prerequisites&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Integrated Embeddings prerequisites&lt;/a&gt; from the documentation: vector search, change feed mode enabled, and a Microsoft Foundry model deployment. The Azure Cosmos DB account&amp;rsquo;s managed identity also needs the &lt;code&gt;Cognitive Services OpenAI User&lt;/code&gt; role on the Microsoft Foundry resource so it can call the model.&lt;/p&gt;
+&lt;p&gt;In addition, the principal you sign in as needs two role assignments on the Azure Cosmos DB account so the sample app can act on your behalf:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;Cosmos DB Operator&lt;/code&gt; (Azure RBAC) to create the database and container through Azure Resource Manager.&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;Cosmos DB Built-in Data Contributor&lt;/code&gt; (Azure Cosmos DB RBAC) to upsert and read items. See &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/integrated-embeddings?tabs=python#use-the-azure-management-sdk-with-microsoft-entra-id&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;how to assign these roles&lt;/a&gt; in the getting started section.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;In step 4 the sample app calls the Microsoft Foundry embedding deployment directly to embed the query string. For simplicity, the sample uses an API key for this call (Integrated Embeddings itself uses Entra ID, as configured in the vector policy). &lt;a href=&#34;https://learn.microsoft.com/azure/foundry/openai/tutorials/embeddings?tabs=command-line#retrieve-key-and-endpoint&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Make sure you have the API key&lt;/a&gt; for your Foundry resource ahead of time and have it ready to drop into &lt;code&gt;.env&lt;/code&gt; file.&lt;/p&gt;
+&lt;h3&gt;Set up the sample application&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;set-up-the-sample-application&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#set-up-the-sample-application&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;The sample app is written in Python; you&amp;rsquo;ll need Python 3.x installed locally. Clone the GitHub repository and install dependencies:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;git clone https://github.com/abhirockzz/integrated-embeddings-sample
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;cd&lt;/span&gt; integrated-embeddings-sample
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# create a virtual environment and install dependencies&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;python -m venv .venv &lt;span class=&#34;o&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span class=&#34;nb&#34;&gt;source&lt;/span&gt; .venv/bin/activate
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;pip install -r requirements.txt&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;Copy &lt;code&gt;.env.example&lt;/code&gt; to &lt;code&gt;.env&lt;/code&gt; and fill in your Azure Cosmos DB account endpoint and Microsoft Foundry deployment details:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;cp .env.example .env
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# edit .env&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;Sign in to the Azure CLI so the sample app can authenticate to Azure Cosmos DB and Microsoft Foundry using your identity:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;az login&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;h3&gt;Step 1: Create the database and container&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;step-1-create-the-database-and-container&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#step-1-create-the-database-and-container&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;This script creates the database and a container along with a vector embedding policy that has an &lt;code&gt;embeddingSource&lt;/code&gt; block with source path &lt;code&gt;/description&lt;/code&gt;, model &lt;code&gt;text-embedding-3-small&lt;/code&gt;, and output stored at &lt;code&gt;/embedding&lt;/code&gt;. It adds a &lt;code&gt;quantizedFlat&lt;/code&gt; vector index on &lt;code&gt;/embedding&lt;/code&gt; so you can query the embeddings in step 4.&lt;/p&gt;
+&lt;p&gt;Run the script:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;python create_db_and_container.py&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;The container is provisioned with autoscale 1,000 RU/s.&lt;/p&gt;
+&lt;h3&gt;Step 2: Insert sample data&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;step-2-insert-sample-data&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#step-2-insert-sample-data&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;This script upserts 100 outdoor-product items from items.json into the container. Each item has an &lt;code&gt;id&lt;/code&gt;, a &lt;code&gt;name&lt;/code&gt;, a &lt;code&gt;description&lt;/code&gt;, a &lt;code&gt;category&lt;/code&gt;, &lt;code&gt;tags&lt;/code&gt;, and a few other fields — but only &lt;code&gt;/description&lt;/code&gt; is sent to the embedding model, per the policy you set in step 1.&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;python insert_sample_data.py&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;You&amp;rsquo;ll see one line per item as it&amp;rsquo;s inserted. None of the items have an embedding field yet; Azure Cosmos DB picks up the changes and generates embeddings asynchronously.&lt;/p&gt;
+&lt;h3&gt;Step 3: Verify embeddings in the Azure portal&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;step-3-verify-embeddings-in-the-azure-portal&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#step-3-verify-embeddings-in-the-azure-portal&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;Open the &lt;a href=&#34;https://portal.azure.com/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Azure portal&lt;/a&gt;, navigate to your Azure Cosmos DB account → Data Explorer, open the container you created in step 1, and run the query below.&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-sql&#34; data-lang=&#34;sql&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;k&#34;&gt;SELECT&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;VALUE&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;COUNT&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;mi&#34;&gt;1&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;FROM&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;c&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;WHERE&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;IS_DEFINED&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;c&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;embedding&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;When the count reaches 100, all embeddings have been generated.&lt;/p&gt;
+&lt;h3&gt;Step 4: Run a vector search&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;step-4-run-a-vector-search&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#step-4-run-a-vector-search&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;Now that every item has an embedding, you can run a vector search against the container. The script embeds your query string by calling the same Microsoft Foundry embedding model deployment that Azure Cosmos DB used for the items (using the &lt;code&gt;FOUNDRY_API_KEY&lt;/code&gt; you set in &lt;code&gt;.env&lt;/code&gt; file), then runs a &lt;code&gt;VectorDistance()&lt;/code&gt; query to find the closest items by cosine similarity.&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;python vector_search.py &lt;span class=&#34;s2&#34;&gt;&amp;#34;I need to stay warm on a cold ski trip&amp;#34;&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;Running this returns something similar to the following results. You should see a mix of ski-related gloves and jackets along with some cold-weather sleeping bags — all relevant to the concept of &amp;ldquo;staying warm on a cold ski trip,&amp;rdquo; even though none of the item descriptions contain those exact words.&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;pre&gt;&lt;code&gt;Query: &amp;#39;I need to stay warm on a cold ski trip&amp;#39;
+Top 5 results:
+
+1. Studio Talon Insulated Storm Glove
+category=Winter Sports, Gloves, Insulated Gloves score=0.4974
+2. Prairie Nomad Waterproof Resort Shell Jacket
+category=Skiing, Outerwear, Shell Jackets score=0.4923
+3. Ridge Drift Touchscreen Insulated Ski Glove
+category=Winter Sports, Gloves, Insulated Gloves score=0.4855
+4. Everest All-Weather Short 850 Fill Trail Sack
+category=Camping, Sleeping Bags, Down Bags score=0.4756
+5. Brook Shift 850-Fill Trail Sack Sleeping Bag
+category=Camping, Sleeping Bags, Down Bags score=0.4570&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;A couple more queries to give you a feel for what&amp;rsquo;s possible.&lt;/p&gt;
+&lt;p&gt;Try a planning-style query. Instead of gear, you&amp;rsquo;ll get trip-planning books and trail guides:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;python vector_search.py &lt;span class=&#34;s2&#34;&gt;&amp;#34;plan a long hike in unfamiliar terrain&amp;#34;&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;Or try a more specific query. The top result is a one-person shelter, with closely related tents below it:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;python vector_search.py &lt;span class=&#34;s2&#34;&gt;&amp;#34;easy to set up shelter for one person&amp;#34;&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;You can use &lt;code&gt;--top-k&lt;/code&gt; to control how many results are returned (defaults to 5):&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;python vector_search.py &lt;span class=&#34;s2&#34;&gt;&amp;#34;lightweight cookware for backpacking&amp;#34;&lt;/span&gt; --top-k &lt;span class=&#34;m&#34;&gt;3&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;Pure vector search returns the most semantically similar items but doesn&amp;rsquo;t account for exact keyword matches. For queries where both semantic intent and specific terms matter, &lt;a href=&#34;https://learn.microsoft.com/en-us/azure/cosmos-db/gen-ai/hybrid-search&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Azure Cosmos DB for NoSQL supports hybrid search&lt;/a&gt;, which combines vector similarity and full-text (BM25) ranking using Reciprocal Rank Fusion. You can also add a &lt;code&gt;WHERE&lt;/code&gt; clause to narrow results to a specific category or tag. All of these queries run against the same embeddings that Integrated Embeddings generates and keeps in sync.&lt;/p&gt;
+&lt;h2&gt;Build a simple RAG agent on top of the data&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;build-a-simple-rag-agent-on-top-of-the-data&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#build-a-simple-rag-agent-on-top-of-the-data&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Retrieval-Augmented Generation (RAG) is a pattern where a language model answers user questions by first retrieving relevant content from a knowledge base, then using that content as grounding for its response. For RAG over your Azure Cosmos DB data, the retrieval step is vector search and the knowledge base is your container.&lt;/p&gt;
+&lt;p&gt;To turn the vector search into a Retrieval-Augmented Generation (RAG) application, we wrap it as a tool that a language model can call. We use a simple &lt;a href=&#34;https://docs.langchain.com/oss/python/langchain/rag&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;LangChain&lt;/a&gt; agent with a &lt;code&gt;retrieve_context&lt;/code&gt; tool that embeds the user&amp;rsquo;s query and runs the same &lt;code&gt;VectorDistance()&lt;/code&gt; search you saw in step 4. The agent decides when to call the tool, reads the results, and answers in natural language. To keep the agent grounded in your data, the system prompt instructs the model to recommend only products that appear in the retrieved results and to ignore any instructions contained in the retrieved text.&lt;/p&gt;
+&lt;p&gt;The agent needs a large language model (LLM). &lt;a href=&#34;https://learn.microsoft.com/azure/foundry/foundry-models/how-to/deploy-foundry-models#deploy-a-model&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Deploy the model&lt;/a&gt; (for example &lt;code&gt;gpt-5.4&lt;/code&gt;) in your Microsoft Foundry resource and set &lt;code&gt;FOUNDRY_CHAT_DEPLOYMENT&lt;/code&gt; in &lt;code&gt;.env&lt;/code&gt; to the deployment name. The agent uses the same &lt;code&gt;FOUNDRY_API_KEY&lt;/code&gt; for both chat and query-time embedding calls.&lt;/p&gt;
+&lt;p&gt;Once you start the agent, it opens a simple interactive prompt where you can ask catalog-style questions:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;python rag_agent.py&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;Try out a few queries. For example, ask about a product category and the agent surfaces every relevant item:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;pre&gt;&lt;code&gt;You: What sleeping bags do you have for cold nights?&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;The agent calls the retrieval tool, gets back the three cold-weather down bags in the catalog, and lists them with their shared 850-fill warmth and use cases.&lt;/p&gt;
+&lt;p&gt;Ask about a specific product feature and the agent filters the results for you:&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;pre&gt;&lt;code&gt;You: What ski goggles do you have with a magnetic lens?&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;Vector search returns all three ski goggles in the catalog, but the agent recommends only the two that actually have a magnetic lens system. This is the agent + RAG advantage on top of pure vector search: broad retrieval, narrow reasoning.&lt;/p&gt;
+&lt;p&gt;Integrated Embeddings keeps the item embeddings in sync with the source data automatically, so the agent&amp;rsquo;s retrieval stays accurate as products are added, updated, or removed. You don&amp;rsquo;t have to build or run a separate embedding pipeline to keep the index fresh.&lt;/p&gt;
+&lt;h2&gt;Other ways to configure Integrated Embeddings&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;other-ways-to-configure-integrated-embeddings&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#other-ways-to-configure-integrated-embeddings&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;You can embed more than one property at a time by listing multiple paths in &lt;code&gt;sourcePaths&lt;/code&gt;. Azure Cosmos DB concatenates the values into a single input for the embedding model. This is useful when no single field carries enough information. For example, a product title is usually too short on its own, but combining &lt;code&gt;/title&lt;/code&gt; and &lt;code&gt;/description&lt;/code&gt; produces a richer vector.&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-json&#34; data-lang=&#34;json&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;nt&#34;&gt;&amp;#34;vectorEmbeddings&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;[&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      &lt;span class=&#34;nt&#34;&gt;&amp;#34;path&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;/embedding&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      &lt;span class=&#34;nt&#34;&gt;&amp;#34;dataType&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;float32&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      &lt;span class=&#34;nt&#34;&gt;&amp;#34;dimensions&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;mi&#34;&gt;1536&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      &lt;span class=&#34;nt&#34;&gt;&amp;#34;distanceFunction&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;cosine&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      &lt;span class=&#34;nt&#34;&gt;&amp;#34;embeddingSource&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;nt&#34;&gt;&amp;#34;sourcePaths&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;[&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;          &lt;span class=&#34;s2&#34;&gt;&amp;#34;/title&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;          &lt;span class=&#34;s2&#34;&gt;&amp;#34;/description&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;p&#34;&gt;],&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;nt&#34;&gt;&amp;#34;deploymentName&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;text-embedding-3-small&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;nt&#34;&gt;&amp;#34;modelName&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;text-embedding-3-small&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;nt&#34;&gt;&amp;#34;endpoint&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;https://&amp;lt;foundry-resource-name&amp;gt;.openai.azure.com/&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;nt&#34;&gt;&amp;#34;authType&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;Entra&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      &lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;p&#34;&gt;]&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;You can also generate multiple embeddings by adding more entries to &lt;code&gt;vectorEmbeddings&lt;/code&gt;. Each entry has its own path, model, and source properties, and Azure Cosmos DB maintains all of the vectors in parallel.&lt;/p&gt;
+&lt;p&gt;The example below generates &lt;code&gt;/desc_embedding&lt;/code&gt; from &lt;code&gt;/description&lt;/code&gt; using &lt;code&gt;text-embedding-3-large&lt;/code&gt;, and &lt;code&gt;/title_embedding&lt;/code&gt; from &lt;code&gt;/title&lt;/code&gt; using &lt;code&gt;text-embedding-3-small&lt;/code&gt;.&lt;/p&gt;
+&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
+
+&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-json&#34; data-lang=&#34;json&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;nt&#34;&gt;&amp;#34;vectorEmbeddings&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;[&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      &lt;span class=&#34;nt&#34;&gt;&amp;#34;path&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;/desc_embedding&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      &lt;span class=&#34;nt&#34;&gt;&amp;#34;dataType&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;float32&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      &lt;span class=&#34;nt&#34;&gt;&amp;#34;dimensions&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;mi&#34;&gt;3072&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      &lt;span class=&#34;nt&#34;&gt;&amp;#34;distanceFunction&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;cosine&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      &lt;span class=&#34;nt&#34;&gt;&amp;#34;embeddingSource&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;nt&#34;&gt;&amp;#34;sourcePaths&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;[&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;          &lt;span class=&#34;s2&#34;&gt;&amp;#34;/description&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;p&#34;&gt;],&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;nt&#34;&gt;&amp;#34;deploymentName&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;text-embedding-3-large&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;nt&#34;&gt;&amp;#34;modelName&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;text-embedding-3-large&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;nt&#34;&gt;&amp;#34;endpoint&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;https://&amp;lt;foundry-resource-name&amp;gt;.openai.azure.com/&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;nt&#34;&gt;&amp;#34;authType&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;Entra&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      &lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;p&#34;&gt;},&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      &lt;span class=&#34;nt&#34;&gt;&amp;#34;path&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;/title_embedding&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      &lt;span class=&#34;nt&#34;&gt;&amp;#34;dataType&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;float32&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      &lt;span class=&#34;nt&#34;&gt;&amp;#34;dimensions&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;mi&#34;&gt;1536&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      &lt;span class=&#34;nt&#34;&gt;&amp;#34;distanceFunction&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;cosine&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      &lt;span class=&#34;nt&#34;&gt;&amp;#34;embeddingSource&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;nt&#34;&gt;&amp;#34;sourcePaths&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;[&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;          &lt;span class=&#34;s2&#34;&gt;&amp;#34;/title&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;p&#34;&gt;],&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;nt&#34;&gt;&amp;#34;deploymentName&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;text-embedding-3-small&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;nt&#34;&gt;&amp;#34;modelName&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;text-embedding-3-small&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;nt&#34;&gt;&amp;#34;endpoint&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;https://&amp;lt;foundry-resource-name&amp;gt;.openai.azure.com/&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;nt&#34;&gt;&amp;#34;authType&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;Entra&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      &lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;p&#34;&gt;]&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
+  &lt;button
+    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
+    title=&#34;Copy code&#34;
+  &gt;
+    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;h2&gt;What&amp;rsquo;s supported in Public Preview&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;whats-supported-in-public-preview&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#whats-supported-in-public-preview&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;You can configure Integrated Embeddings today through the Azure Cosmos DB SDK (for Python) with key-based authentication, or through the Azure Cosmos DB management SDK (Python and JavaScript) with Microsoft Entra ID. Both options are demonstrated in the &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/integrated-embeddings?tabs=python#get-started-with-integrated-embeddings&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;documentation&lt;/a&gt;. Support across the Azure CLI, ARM, Bicep, and other SDKs will be added in subsequent releases.&lt;/p&gt;
+&lt;p&gt;Azure Portal support for configuring and managing Integrated Embeddings (in Data Explorer) is not available yet. As we work on adding this, you can configure Integrated Embeddings through one of the SDK options.&lt;/p&gt;
+&lt;h2&gt;Get started&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;get-started&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#get-started&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;With Integrated Embeddings, Azure Cosmos DB keeps vector embeddings in sync with your data automatically, so you no longer need to build and operate separate pipelines to do it. Integrated Embeddings uses your existing Microsoft Foundry and Azure Cosmos DB resources, so the only costs are the Foundry inference calls and the request units used to read the change feed and write embeddings back to your items.&lt;/p&gt;
+&lt;p&gt;To start building:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Follow the &lt;a href=&#34;https://learn.microsoft.com/en-us/azure/cosmos-db/integrated-embeddings?tabs=python#get-started-with-integrated-embeddings&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;quickstart&lt;/a&gt; to create a container with an &lt;code&gt;embeddingSource&lt;/code&gt; policy and insert your first items.&lt;/li&gt;
+&lt;li&gt;Clone the &lt;a href=&#34;https://github.com/abhirockzz/integrated-embeddings-sample&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;sample app&lt;/a&gt; to run the full walkthrough above on your own data.&lt;/li&gt;
+&lt;li&gt;Read the &lt;a href=&#34;https://aka.ms/integrated-embeddings-doc&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Integrated Embeddings documentation&lt;/a&gt; for the complete reference.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;We&amp;rsquo;d love your feedback during preview! Reach out to us at &lt;a href=&#34;mailto:CosmosSearch@Microsoft.com&#34; &gt;CosmosSearch@Microsoft.com&lt;/a&gt;.&lt;/p&gt;
+
+      </description>
+    </item>
     
     <item>
       <title>Azure Cosmos DB Playground: Learn and experiment with queries in your browser</title>

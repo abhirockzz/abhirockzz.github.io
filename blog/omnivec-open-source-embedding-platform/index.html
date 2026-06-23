@@ -1,0 +1,1833 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="index, follow" />
+  <link rel="icon shortcut" href="/favicon.ico" sizes="32x32" />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="/favicon-dark.svg" type="image/svg+xml" media="(prefers-color-scheme: dark)" />
+<link rel="icon" href="/favicon-16x16.png" type="image/png" sizes="16x16" />
+<link rel="icon" href="/favicon-32x32.png" type="image/png" sizes="32x32" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
+<link fetchpriority="low" href="/site.webmanifest" rel="manifest" />
+<title>Introducing OmniVec: An Open-Source Embedding Platform for AI Apps on Azure – Abhishek Gupta</title>
+  <meta name="description" content="Originally posted on https://devblogs.microsoft.com/cosmosdb/introducing-omnivec-an-open-source-embedding-platform-for-ai-apps-on-azure/
+Today we are open-sourcing OmniVec, a platform for building and operating the embedding pipelines that keep the vector representation of your operational data in sync as it changes. You register data sources, embedding model(s), vector stores (destination), and OmniVec does the rest: initial backfill, change tracking, model invocation to generate, and writing them back to your vector store. We are shipping this with support for Azure Cosmos DB, PostgreSQL, SQL Server (source and destination), and Azure Blob Storage (destination). You deploy OmniVec in your own Azure subscription, and use the web UI, CLI, or the REST API to manage it." /><link rel="canonical" href="https://abhirockzz.github.io/blog/omnivec-open-source-embedding-platform/" itemprop="url" />
+
+<meta property="og:title" content="Introducing OmniVec: An Open-Source Embedding Platform for AI Apps on Azure" />
+<meta property="og:description" content="Originally posted on https://devblogs.microsoft.com/cosmosdb/introducing-omnivec-an-open-source-embedding-platform-for-ai-apps-on-azure/
+Today we are open-sourcing OmniVec, a platform for building and operating the embedding pipelines that keep the vector representation of your operational data in sync as it changes. You register data sources, embedding model(s), vector stores (destination), and OmniVec does the rest: initial backfill, change tracking, model invocation to generate, and writing them back to your vector store. We are shipping this with support for Azure Cosmos DB, PostgreSQL, SQL Server (source and destination), and Azure Blob Storage (destination). You deploy OmniVec in your own Azure subscription, and use the web UI, CLI, or the REST API to manage it." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://abhirockzz.github.io/blog/omnivec-open-source-embedding-platform/" /><meta property="og:image" content="https://abhirockzz.github.io/logo.png" /><meta property="article:section" content="blog" />
+<meta property="article:published_time" content="2026-06-02T00:00:00+00:00" />
+<meta property="article:modified_time" content="2026-06-02T00:00:00+00:00" />
+
+  <meta itemprop="name" content="Introducing OmniVec: An Open-Source Embedding Platform for AI Apps on Azure">
+  <meta itemprop="description" content="Originally posted on https://devblogs.microsoft.com/cosmosdb/introducing-omnivec-an-open-source-embedding-platform-for-ai-apps-on-azure/
+Today we are open-sourcing OmniVec, a platform for building and operating the embedding pipelines that keep the vector representation of your operational data in sync as it changes. You register data sources, embedding model(s), vector stores (destination), and OmniVec does the rest: initial backfill, change tracking, model invocation to generate, and writing them back to your vector store. We are shipping this with support for Azure Cosmos DB, PostgreSQL, SQL Server (source and destination), and Azure Blob Storage (destination). You deploy OmniVec in your own Azure subscription, and use the web UI, CLI, or the REST API to manage it.">
+  <meta itemprop="datePublished" content="2026-06-02T00:00:00+00:00">
+  <meta itemprop="dateModified" content="2026-06-02T00:00:00+00:00">
+  <meta itemprop="wordCount" content="2239">
+  <meta itemprop="image" content="https://abhirockzz.github.io/blog/omnivec-open-source-embedding-platform/logo.png">
+  <meta itemprop="keywords" content="Cosmosdb,Azure,Embeddings,Vector-Search,Ai,Open-Source,Kubernetes">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://abhirockzz.github.io/blog/omnivec-open-source-embedding-platform/logo.png">
+  <meta name="twitter:title" content="Introducing OmniVec: An Open-Source Embedding Platform for AI Apps on Azure">
+  <meta name="twitter:description" content="Originally posted on https://devblogs.microsoft.com/cosmosdb/introducing-omnivec-an-open-source-embedding-platform-for-ai-apps-on-azure/
+Today we are open-sourcing OmniVec, a platform for building and operating the embedding pipelines that keep the vector representation of your operational data in sync as it changes. You register data sources, embedding model(s), vector stores (destination), and OmniVec does the rest: initial backfill, change tracking, model invocation to generate, and writing them back to your vector store. We are shipping this with support for Azure Cosmos DB, PostgreSQL, SQL Server (source and destination), and Azure Blob Storage (destination). You deploy OmniVec in your own Azure subscription, and use the web UI, CLI, or the REST API to manage it.">
+
+    <link rel="preload" href="/css/compiled/main.min.e0bb0f28123bf084d555fc9253c6d2aa1443b2dfcde6044741a207eabdc3ddb8.css" as="style" integrity="sha256-4LsPKBI78ITVVfySU8bSqhRDst/N5gRHQaIH6r3D3bg=" />
+    <link href="/css/compiled/main.min.e0bb0f28123bf084d555fc9253c6d2aa1443b2dfcde6044741a207eabdc3ddb8.css" rel="stylesheet" integrity="sha256-4LsPKBI78ITVVfySU8bSqhRDst/N5gRHQaIH6r3D3bg=" />
+
+
+
+  <link href="/css/custom.min.e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855.css" rel="stylesheet" integrity="sha256-47DEQpj8HBSa&#43;/TImW&#43;5JCeuQeRkm5NMpJWZG3hSuFU=" />
+
+
+  <script>
+     
+    const defaultTheme = 'system';
+
+    const setDarkTheme = () => {
+      document.documentElement.classList.add("dark");
+      document.documentElement.style.colorScheme = "dark";
+    }
+    const setLightTheme = () => {
+      document.documentElement.classList.remove("dark");
+      document.documentElement.style.colorScheme = "light";
+    }
+
+    if ("color-theme" in localStorage) {
+      localStorage.getItem("color-theme") === "dark" ? setDarkTheme() : setLightTheme();
+    } else {
+      defaultTheme === "dark" ? setDarkTheme() : setLightTheme();
+      if (defaultTheme === "system") {
+        window.matchMedia("(prefers-color-scheme: dark)").matches ? setDarkTheme() : setLightTheme();
+      }
+    }
+  </script>
+
+  
+</head>
+<body dir="ltr"><div class="nav-container hx-sticky hx-top-0 hx-z-20 hx-w-full hx-bg-transparent print:hx-hidden">
+  <div class="nav-container-blur hx-pointer-events-none hx-absolute hx-z-[-1] hx-h-full hx-w-full hx-bg-white dark:hx-bg-dark hx-shadow-[0_2px_4px_rgba(0,0,0,.02),0_1px_0_rgba(0,0,0,.06)] contrast-more:hx-shadow-[0_0_0_1px_#000] dark:hx-shadow-[0_-1px_0_rgba(255,255,255,.1)_inset] contrast-more:dark:hx-shadow-[0_0_0_1px_#fff]"></div>
+
+  <nav class="hx-mx-auto hx-flex hx-items-center hx-justify-end hx-gap-2 hx-h-16 hx-px-6 hx-max-w-[90rem]">
+    <a class="hx-flex hx-items-center hover:hx-opacity-75 ltr:hx-mr-auto rtl:hx-ml-auto" href="/">
+        <img class="hx-mr-2 hx-block dark:hx-hidden" src="/images/logo.svg" alt="Abhishek Gupta" height="20" width="20" />
+        <img class="hx-mr-2 hx-hidden dark:hx-block" src="/images/logo.svg" alt="Abhishek Gupta" height="20" width="20" />
+        <span class="hx-mr-2 hx-font-extrabold hx-inline hx-select-none" title="Abhishek Gupta">Abhishek Gupta</span>
+    </a><a
+            title="Blog"
+            href="/blog"
+            
+            class="hx-text-sm contrast-more:hx-text-gray-700 contrast-more:dark:hx-text-gray-100 hx-relative -hx-ml-2 hx-hidden hx-whitespace-nowrap hx-p-2 md:hx-inline-block hx-font-medium"
+          >
+            <span class="hx-text-center">Blog</span>
+          </a><a
+            title="About"
+            href="/about"
+            
+            class="hx-text-sm contrast-more:hx-text-gray-700 contrast-more:dark:hx-text-gray-100 hx-relative -hx-ml-2 hx-hidden hx-whitespace-nowrap hx-p-2 md:hx-inline-block hx-text-gray-600 hover:hx-text-gray-800 dark:hx-text-gray-400 dark:hover:hx-text-gray-200"
+          >
+            <span class="hx-text-center">About</span>
+          </a><a
+            title="Projects"
+            href="/projects"
+            
+            class="hx-text-sm contrast-more:hx-text-gray-700 contrast-more:dark:hx-text-gray-100 hx-relative -hx-ml-2 hx-hidden hx-whitespace-nowrap hx-p-2 md:hx-inline-block hx-text-gray-600 hover:hx-text-gray-800 dark:hx-text-gray-400 dark:hover:hx-text-gray-200"
+          >
+            <span class="hx-text-center">Projects</span>
+          </a><a
+            title="Presentations"
+            href="/presentations"
+            
+            class="hx-text-sm contrast-more:hx-text-gray-700 contrast-more:dark:hx-text-gray-100 hx-relative -hx-ml-2 hx-hidden hx-whitespace-nowrap hx-p-2 md:hx-inline-block hx-text-gray-600 hover:hx-text-gray-800 dark:hx-text-gray-400 dark:hover:hx-text-gray-200"
+          >
+            <span class="hx-text-center">Presentations</span>
+          </a><a
+            title="Publications"
+            href="/publications"
+            
+            class="hx-text-sm contrast-more:hx-text-gray-700 contrast-more:dark:hx-text-gray-100 hx-relative -hx-ml-2 hx-hidden hx-whitespace-nowrap hx-p-2 md:hx-inline-block hx-text-gray-600 hover:hx-text-gray-800 dark:hx-text-gray-400 dark:hover:hx-text-gray-200"
+          >
+            <span class="hx-text-center">Publications</span>
+          </a><div class="search-wrapper hx-relative md:hx-w-64">
+  <div class="hx-relative hx-flex hx-items-center hx-text-gray-900 contrast-more:hx-text-gray-800 dark:hx-text-gray-300 contrast-more:dark:hx-text-gray-300">
+    <input
+      placeholder="Search..."
+      class="search-input hx-block hx-w-full hx-appearance-none hx-rounded-lg hx-px-3 hx-py-2 hx-transition-colors hx-text-base hx-leading-tight md:hx-text-sm hx-bg-black/[.05] dark:hx-bg-gray-50/10 focus:hx-bg-white dark:focus:hx-bg-dark placeholder:hx-text-gray-500 dark:placeholder:hx-text-gray-400 contrast-more:hx-border contrast-more:hx-border-current"
+      type="search"
+      value=""
+      spellcheck="false"
+    />
+    <kbd
+      class="hx-absolute hx-my-1.5 hx-select-none ltr:hx-right-1.5 rtl:hx-left-1.5 hx-h-5 hx-rounded hx-bg-white hx-px-1.5 hx-font-mono hx-text-[10px] hx-font-medium hx-text-gray-500 hx-border dark:hx-border-gray-100/20 dark:hx-bg-dark/50 contrast-more:hx-border-current contrast-more:hx-text-current contrast-more:dark:hx-border-current hx-items-center hx-gap-1 hx-transition-opacity hx-pointer-events-none hx-hidden sm:hx-flex"
+    >
+      CTRL K
+    </kbd>
+  </div>
+
+  <div>
+    <ul
+      class="search-results hextra-scrollbar hx-hidden hx-border hx-border-gray-200 hx-bg-white hx-text-gray-100 dark:hx-border-neutral-800 dark:hx-bg-neutral-900 hx-absolute hx-top-full hx-z-20 hx-mt-2 hx-overflow-auto hx-overscroll-contain hx-rounded-xl hx-py-2.5 hx-shadow-xl hx-max-h-[min(calc(50vh-11rem-env(safe-area-inset-bottom)),400px)] md:hx-max-h-[min(calc(100vh-5rem-env(safe-area-inset-bottom)),400px)] hx-inset-x-0 ltr:md:hx-left-auto rtl:md:hx-right-auto contrast-more:hx-border contrast-more:hx-border-gray-900 contrast-more:dark:hx-border-gray-50 hx-w-screen hx-min-h-[100px] hx-max-w-[min(calc(100vw-2rem),calc(100%+20rem))]"
+      style="transition: max-height 0.2s ease 0s;"
+    ></ul>
+  </div>
+</div>
+
+          <a class="hx-p-2 hx-text-current" target="_blank" rel="noreferrer" href="https://github.com/abhirockzz/" title="GitHub"><svg height=24 fill="currentColor" viewBox="3 3 18 18">
+  <path d="M12 3C7.0275 3 3 7.12937 3 12.2276C3 16.3109 5.57625 19.7597 9.15374 20.9824C9.60374 21.0631 9.77249 20.7863 9.77249 20.5441C9.77249 20.3249 9.76125 19.5982 9.76125 18.8254C7.5 19.2522 6.915 18.2602 6.735 17.7412C6.63375 17.4759 6.19499 16.6569 5.8125 16.4378C5.4975 16.2647 5.0475 15.838 5.80124 15.8264C6.51 15.8149 7.01625 16.4954 7.18499 16.7723C7.99499 18.1679 9.28875 17.7758 9.80625 17.5335C9.885 16.9337 10.1212 16.53 10.38 16.2993C8.3775 16.0687 6.285 15.2728 6.285 11.7432C6.285 10.7397 6.63375 9.9092 7.20749 9.26326C7.1175 9.03257 6.8025 8.08674 7.2975 6.81794C7.2975 6.81794 8.05125 6.57571 9.77249 7.76377C10.4925 7.55615 11.2575 7.45234 12.0225 7.45234C12.7875 7.45234 13.5525 7.55615 14.2725 7.76377C15.9937 6.56418 16.7475 6.81794 16.7475 6.81794C17.2424 8.08674 16.9275 9.03257 16.8375 9.26326C17.4113 9.9092 17.76 10.7281 17.76 11.7432C17.76 15.2843 15.6563 16.0687 13.6537 16.2993C13.98 16.5877 14.2613 17.1414 14.2613 18.0065C14.2613 19.2407 14.25 20.2326 14.25 20.5441C14.25 20.7863 14.4188 21.0746 14.8688 20.9824C16.6554 20.364 18.2079 19.1866 19.3078 17.6162C20.4077 16.0457 20.9995 14.1611 21 12.2276C21 7.12937 16.9725 3 12 3Z"></path>
+</svg>
+<span class="hx-sr-only">GitHub</span>
+          </a>
+          <a class="hx-p-2 hx-text-current" target="_blank" rel="noreferrer" href="https://www.linkedin.com/in/abhirockzz/" title="LinkedIn"><svg height=24 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="currentColor" d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037c-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85c3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065a2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg><span class="hx-sr-only">LinkedIn</span>
+          </a>
+          <a class="hx-p-2 hx-text-current" target="_blank" rel="noreferrer" href="https://twitter.com/abhi_tweeter/" title="Twitter"><svg height=24 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="currentColor" d="M389.2 48h70.6L305.6 224.2 487 464H345L233.7 318.6 106.5 464H35.8L200.7 275.5 26.8 48H172.4L272.9 180.9 389.2 48zM364.4 421.8h39.1L151.1 88h-42L364.4 421.8z"/></svg><span class="hx-sr-only">Twitter</span>
+          </a><a
+            title="dev.to"
+            href="https://dev.to/abhirockzz"
+            target="_blank" rel="noreferrer"
+            class="hx-text-sm contrast-more:hx-text-gray-700 contrast-more:dark:hx-text-gray-100 hx-relative -hx-ml-2 hx-hidden hx-whitespace-nowrap hx-p-2 md:hx-inline-block hx-text-gray-600 hover:hx-text-gray-800 dark:hx-text-gray-400 dark:hover:hx-text-gray-200"
+          >
+            <span class="hx-text-center">dev.to</span>
+          </a><a
+            title="medium"
+            href="https://medium.com/@abhishek1987"
+            target="_blank" rel="noreferrer"
+            class="hx-text-sm contrast-more:hx-text-gray-700 contrast-more:dark:hx-text-gray-100 hx-relative -hx-ml-2 hx-hidden hx-whitespace-nowrap hx-p-2 md:hx-inline-block hx-text-gray-600 hover:hx-text-gray-800 dark:hx-text-gray-400 dark:hover:hx-text-gray-200"
+          >
+            <span class="hx-text-center">medium</span>
+          </a><button type="button" aria-label="Menu" class="hamburger-menu -hx-mr-2 hx-rounded hx-p-2 active:hx-bg-gray-400/20 md:hx-hidden"><svg height=24 fill="none" viewBox="0 0 24 24" stroke="currentColor"><g><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8H20"></path></g><g><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16H20"></path></g></svg></button>
+  </nav>
+</div>
+
+  <div class="hx-mx-auto hx-flex hx-max-w-screen-xl">
+    <div class="mobile-menu-overlay [transition:background-color_1.5s_ease] hx-fixed hx-inset-0 hx-z-10 hx-bg-black/80 dark:hx-bg-black/60 hx-hidden"></div>
+<aside class="sidebar-container hx-flex hx-flex-col print:hx-hidden md:hx-top-16 md:hx-shrink-0 md:hx-w-64 md:hx-self-start max-md:[transform:translate3d(0,-100%,0)] md:hx-hidden xl:hx-block">
+  
+  <div class="hx-px-4 hx-pt-4 md:hx-hidden">
+    <div class="search-wrapper hx-relative md:hx-w-64">
+  <div class="hx-relative hx-flex hx-items-center hx-text-gray-900 contrast-more:hx-text-gray-800 dark:hx-text-gray-300 contrast-more:dark:hx-text-gray-300">
+    <input
+      placeholder="Search..."
+      class="search-input hx-block hx-w-full hx-appearance-none hx-rounded-lg hx-px-3 hx-py-2 hx-transition-colors hx-text-base hx-leading-tight md:hx-text-sm hx-bg-black/[.05] dark:hx-bg-gray-50/10 focus:hx-bg-white dark:focus:hx-bg-dark placeholder:hx-text-gray-500 dark:placeholder:hx-text-gray-400 contrast-more:hx-border contrast-more:hx-border-current"
+      type="search"
+      value=""
+      spellcheck="false"
+    />
+    <kbd
+      class="hx-absolute hx-my-1.5 hx-select-none ltr:hx-right-1.5 rtl:hx-left-1.5 hx-h-5 hx-rounded hx-bg-white hx-px-1.5 hx-font-mono hx-text-[10px] hx-font-medium hx-text-gray-500 hx-border dark:hx-border-gray-100/20 dark:hx-bg-dark/50 contrast-more:hx-border-current contrast-more:hx-text-current contrast-more:dark:hx-border-current hx-items-center hx-gap-1 hx-transition-opacity hx-pointer-events-none hx-hidden sm:hx-flex"
+    >
+      CTRL K
+    </kbd>
+  </div>
+
+  <div>
+    <ul
+      class="search-results hextra-scrollbar hx-hidden hx-border hx-border-gray-200 hx-bg-white hx-text-gray-100 dark:hx-border-neutral-800 dark:hx-bg-neutral-900 hx-absolute hx-top-full hx-z-20 hx-mt-2 hx-overflow-auto hx-overscroll-contain hx-rounded-xl hx-py-2.5 hx-shadow-xl hx-max-h-[min(calc(50vh-11rem-env(safe-area-inset-bottom)),400px)] md:hx-max-h-[min(calc(100vh-5rem-env(safe-area-inset-bottom)),400px)] hx-inset-x-0 ltr:md:hx-left-auto rtl:md:hx-right-auto contrast-more:hx-border contrast-more:hx-border-gray-900 contrast-more:dark:hx-border-gray-50 hx-w-screen hx-min-h-[100px] hx-max-w-[min(calc(100vw-2rem),calc(100%+20rem))]"
+      style="transition: max-height 0.2s ease 0s;"
+    ></ul>
+  </div>
+</div>
+
+  </div>
+  <div class="hextra-scrollbar hx-overflow-y-auto hx-overflow-x-hidden hx-p-4 hx-grow md:hx-h-[calc(100vh-var(--navbar-height)-var(--menu-height))]">
+    <ul class="hx-flex hx-flex-col hx-gap-1 md:hx-hidden">
+      
+      
+          <li class="open"><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/"
+    
+  >Blog posts
+        <span class="hextra-sidebar-collapsible-button"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" class="hx-h-[18px] hx-min-w-[18px] hx-rounded-sm hx-p-0.5 hover:hx-bg-gray-800/5 dark:hover:hx-bg-gray-100/5"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" class="hx-origin-center hx-transition-transform rtl:-hx-rotate-180"></path></svg></span>
+    </a><div class="ltr:hx-pr-0 hx-overflow-hidden">
+        <ul class='hx-relative hx-flex hx-flex-col hx-gap-1 before:hx-absolute before:hx-inset-y-1 before:hx-w-px before:hx-bg-gray-200 before:hx-content-[""] ltr:hx-ml-3 ltr:hx-pl-3 ltr:before:hx-left-0 rtl:hx-mr-3 rtl:hx-pr-3 rtl:before:hx-right-0 dark:before:hx-bg-neutral-800'><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/azure-cosmos-db-vnext-emulator-ga/"
+    
+  >Announcing General availability of the Azure Cosmos DB vNext emulator
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/integrated-embeddings-azure-cosmos-db/"
+    
+  >Announcing the Public Preview of Integrated Embeddings in Azure Cosmos DB: Build AI Apps With Embeddings That Stay in Sync
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col open"><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      sidebar-active-item hx-bg-primary-100 hx-font-semibold hx-text-primary-800 contrast-more:hx-border contrast-more:hx-border-primary-500 dark:hx-bg-primary-400/10 dark:hx-text-primary-600 contrast-more:dark:hx-border-primary-500"
+    href="/blog/omnivec-open-source-embedding-platform/"
+    
+  >Introducing OmniVec: An Open-Source Embedding Platform for AI Apps on Azure
+    </a>
+  
+    <ul class='hx-flex hx-flex-col hx-gap-1 hx-relative before:hx-absolute before:hx-inset-y-1 before:hx-w-px before:hx-bg-gray-200 before:hx-content-[""] dark:before:hx-bg-neutral-800 ltr:hx-pl-3 ltr:before:hx-left-0 rtl:hx-pr-3 rtl:before:hx-right-0 ltr:hx-ml-3 rtl:hx-mr-3'><li>
+              <a
+                href="#deep-dive"
+                class="hx-flex hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [word-break:break-word] hx-cursor-pointer [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] contrast-more:hx-border hx-gap-2 before:hx-opacity-25 before:hx-content-['#'] hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:hx-text-gray-900 contrast-more:dark:hx-text-gray-50 contrast-more:hx-border-transparent contrast-more:hover:hx-border-gray-900 contrast-more:dark:hover:hx-border-gray-50"
+              >Deep Dive</a>
+            </li>
+          <li>
+              <a
+                href="#omnivec-in-action"
+                class="hx-flex hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [word-break:break-word] hx-cursor-pointer [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] contrast-more:hx-border hx-gap-2 before:hx-opacity-25 before:hx-content-['#'] hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:hx-text-gray-900 contrast-more:dark:hx-text-gray-50 contrast-more:hx-border-transparent contrast-more:hover:hx-border-gray-900 contrast-more:dark:hover:hx-border-gray-50"
+              >OmniVec in action</a>
+            </li>
+          <li>
+              <a
+                href="#wrapping-up"
+                class="hx-flex hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [word-break:break-word] hx-cursor-pointer [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] contrast-more:hx-border hx-gap-2 before:hx-opacity-25 before:hx-content-['#'] hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:hx-text-gray-900 contrast-more:dark:hx-text-gray-50 contrast-more:hx-border-transparent contrast-more:hover:hx-border-gray-900 contrast-more:dark:hover:hx-border-gray-50"
+              >Wrapping up</a>
+            </li>
+          </ul>
+  
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/linkedin/2026-05-01-ghc-cli-chronicle/"
+    
+  >Put your GitHub Copilot CLI session history to work with Chronicle
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/linkedin/2026-04-29-ghc-cli-rubber-duck/"
+    
+  >Brainstorm with the Rubber Duck agent in GitHub Copilot CLI
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/linkedin/2026-04-01-ghc-sdk-embed-cli/"
+    
+  >Bundle GitHub Copilot CLI with your app using the Copilot SDK
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/linkedin/2026-03-24-youtube-ghc-cli/"
+    
+  >Make YouTube learning more efficient with this simple workflow
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/cosmosdb-sidekick/"
+    
+  >A Chrome Extension That Talks to Your Database
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/linkedin/2026-03-21-autopilot-vs-allowall-in-ghc-cli/"
+    
+  >Autopilot vs --allow-all in GitHub Copilot CLI
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/linkedin/2026-03-19-easily-connect-ai-agents-to-chrome/"
+    
+  >Easily Connect AI Agents to Chrome
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/linkedin/2026-03-18-use-ai-agents-with-cosmosdb-emulator/"
+    
+  >Use AI Agents with Cosmos DB Emulator
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/linkedin/2026-03-17-chat-with-cosmosdb-using-phone/"
+    
+  >Chat with Cosmos DB using your phone
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/linkedin/2026-03-16-ghc-cli-headless-mode-ghc-sdk/"
+    
+  >Run GitHub Copilot CLI in headless mode with the Copilot SDK
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/linkedin/2026-03-11-cosmosdb-emulator-testcontainers/"
+    
+  >Using the Cosmos DB Emulator with Testcontainers
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/documentdb-on-kubernetes-local-ha/"
+    
+  >DocumentDB on Kubernetes: Resilient, Highly Available Databases with Automatic Failover
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/time-tracker-with-copilot-sdk/"
+    
+  >Build a Time Tracking App with GitHub Copilot SDK
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/flight-log-app-with-copilot-sdk/"
+    
+  >Agentic Apps with GitHub Copilot SDK
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/gh-cli-cosmosdb-mcp/"
+    
+  >GitHub Copilot CLI &#43; MCP: Talk to Your Database in Plain English
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/cosmosdb-playground/"
+    
+  >Azure Cosmos DB Playground: Learn and experiment with queries in your browser
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/azure-cosmos-db-vnext-emulator-query-and-observability-enhancements/"
+    
+  >Azure Cosmos DB vNext Emulator: Query and Observability Enhancements
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/introducing-the-documentdb-kubernetes-operator/"
+    
+  >DocumentDB goes cloud-native: Introducing the DocumentDB Kubernetes Operator
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/build-a-rag-application-with-langchain-and-local-llms-powered-by-ollama/"
+    
+  >Build a RAG application with LangChain and Local LLMs powered by Ollama
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/integration-testing-for-go-applications-using-testcontainers-and-containerized-databases/"
+    
+  >Integration testing for Go applications using Testcontainers and containerized databases
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/building-resilient-go-applications-simple-tip-for-mocking-and-testing-database-error-responses/"
+    
+  >Building resilient Go applications: Simple tip for mocking and testing database error responses
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/scaling-multi-tenant-go-applications-choosing-the-right-database-partitioning-approach/"
+    
+  >Scaling multi-tenant Go applications: Choosing the right database partitioning approach
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/a-simple-convenience-package-for-the-azure-cosmos-db-go-sdk/"
+    
+  >A simple, convenience package for the Azure Cosmos DB Go SDK
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/how-to-configure-and-customize-the-go-sdk-for-azure-cosmos-db/"
+    
+  >Build reliable Go applications: Configuring Azure Cosmos DB Go SDK for real-world scenarios
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/building-event-driven-go-applications-with-azure-cosmos-db-and-azure-functions/"
+    
+  >Building Event-Driven Go applications with Azure Cosmos DB and Azure Functions
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/vector-embeddings-made-easy-with-go-azure-cosmos-db-and-openai/"
+    
+  >Vector embeddings made easy with Go, Azure Cosmos DB, and OpenAI
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/build-a-mcp-server-using-go-to-interact-with-database/"
+    
+  >Build a MCP server using Go to connect AI agents with databases
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/implementing-chat-history-for-ai-applications-using-azure-cosmos-db-go-sdk/"
+    
+  >Implementing Chat History for AI Applications Using Azure Cosmos DB Go SDK
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/migrating-data-from-dynamodb-to-azure-cosmos-db/"
+    
+  >Migrating data from DynamoDB to Azure Cosmos DB
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/use-azure-cosmos-db-as-a-docker-container-in-cicd-pipelines/"
+    
+  >Use Azure Cosmos DB as a Docker container in CI/CD pipelines
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/get-started-with-vector-search-in-azure-cosmos-db/"
+    
+  >Getting started with Vector Search in Azure Cosmos DB
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/conf42-go-redis-better-together/"
+    
+  >Go and Redis, Better Together 🤝
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/aiml-lambda-polly-texttospeech-go/"
+    
+  >Step-by-Step Guide to Building a Serverless Text to Speech Solution using Golang on AWS
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/ack-sqs-lambda-dynamodb/"
+    
+  >Use AWS Controllers for Kubernetes to deploy a Serverless data processing solution with SQS, Lambda and DynamoDB
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/lambda-events-kinesis-go/"
+    
+  >Use Golang for data processing with Amazon Kinesis and AWS Lambda
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/deploy-go-apps-apprunner/"
+    
+  >Deploying Go Applications to AWS App Runner: A Step-by-Step Guide
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/cdk-apprunner-kafka-dynamodb-eks/"
+    
+  >Use CDK to deploy a complete solution with Kafka, App Runner, EKS and DynamoDB
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/cdk-msk-apprunner-eks-dynamodb/"
+    
+  >Use CDK to deploy a complete solution with Kafka, App Runner, EKS and DynamoDB
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/getting-started-msk-serverless-lamda-go/"
+    
+  >Getting started with MSK Serverless and AWS Lambda using Go
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/msk-serverless-lambda-go-getting-started/"
+    
+  >Getting started with MSK Serverless and AWS Lambda using Go
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/dynamodb-go-sdk-scan-batch-ops/"
+    
+  >DynamoDB Go SDK: How to use the Scan and Batch operations efficiently
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/dynamodb-go-sdk-type-conversions/"
+    
+  >How to handle type conversions with the DynamoDB Go SDK
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/cdk8s-k8s-go-6/"
+    
+  >Write your Kubernetes Infrastructure as Go code - Combine cdk8s with AWS CDK
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/cdk8s-k8s-go-5/"
+    
+  >Write your Kubernetes Infrastructure as Go code - Manage AWS services
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/using-redis-on-cloud-ten-things/"
+    
+  >Using Redis on Cloud? Here are ten things you should know
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/manage-redis-on-aws-kubernetes/"
+    
+  >Manage Redis on AWS from Kubernetes
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/url-shortener-dynamodb-apprunner/"
+    
+  >Use AWS App Runner, DynamoDB and CDK to deploy and run a Cloud native Go app
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/cdk8s-k8s-go-4/"
+    
+  >Write your Kubernetes Infrastructure as Go code - Extend cdk8s with custom Constructs
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/url-shortener-dynamodb-lambda-go/"
+    
+  >Build a Serverless URL shortener with Go
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/cdk8s-k8s-go-3/"
+    
+  >Write your Kubernetes Infrastructure as Go code - Using Custom Resource Definitions with cdk8s
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/dynamodb-streams-lambda-go/"
+    
+  >Learn how to use DynamoDB Streams with AWS Lambda and Go
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/cdk8s-k8s-go-2/"
+    
+  >Write your Kubernetes Infrastructure as Go code - cdk8s-plus in action!
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/cdk8s-k8s-go-1/"
+    
+  >Write your Kubernetes Infrastructure as Go code - Getting started with cdk8s
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/msk-to-dynamodb-with-kafka/"
+    
+  >MySQL to DynamoDB: Build a streaming data pipeline on AWS using Kafka
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/msk-dynamodb-data-pipeline-1/"
+    
+  >Build a data pipeline on AWS with Kafka, Kafka connect and DynamoDB
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/twitter-leaderboard-app-redis-lambda-part2/"
+    
+  >Build a Twitter Leaderboard app with Redis and AWS Lambda (part 2)
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/memorydb-apprunner-cdk/"
+    
+  >Build Cloud-Native apps with AWS App Runner, Redis and AWS CDK
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/twitter-leaderboard-app-redis-lambda-part1/"
+    
+  >Build a Twitter Leaderboard app with Redis and AWS Lambda (part 1)
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/redis-on-aws-getting-started-easy-way/"
+    
+  >Getting started with Redis on AWS - the easy way!
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/lambda-function-url-dynamodb-sam/"
+    
+  >Use Lambda Function URL to write a Serverless app backed by DynamoDB
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/lambda-function-url-slack-backend-cdk/"
+    
+  >Package and deploy a Lambda function as a Docker container with AWS CDK
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/lambda-function-url-awsome-slack-backend/"
+    
+  >Using AWS Lambda Function URL to build a Serverless backend for Slack
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/cosmosdb-partial-doc-update/"
+    
+  >Now Generally Available – Partial Document Update in Azure Cosmos DB
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/iot-cosmosdb-confluent/"
+    
+  >Extracting Value from IoT Using Azure Cosmos DB, Azure Synapse Analytics, and Confluent Cloud
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/cosmosdb-emulator-devcontainer/"
+    
+  >Enhance local development experience using the Azure Cosmos DB Linux emulator and VS Code
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/kubexpose-operator/"
+    
+  >Kubexpose: A Kubernetes Operator, for fun and profit!
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/adx-synapse-integration/"
+    
+  >Getting started with Azure Data Explorer and Azure Synapse Analytics for Big Data processing
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/access-sqldb-keyvault/"
+    
+  >Securely access Azure SQL Database from Azure Synapse
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/cosmos-kafka-docker/"
+    
+  >Getting started with Kafka Connector for Azure Cosmos DB using Docker
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/redis-streams-in-action-part4/"
+    
+  >Redis Streams in Action - Part 4 (Serverless Go app to monitor tweets processor)
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/redis-timeseries-kafka/"
+    
+  >Processing Time-Series Data with Redis and Apache Kafka
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/redis-streams-in-action-part3/"
+    
+  >Redis Streams in Action - Part 3 (Java app to process tweets with Redis Streams)
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/redis-streams-in-action-part2/"
+    
+  >Redis Streams in Action — Part 2 (Tweets consumer app)
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/redis-streams-in-action-part1/"
+    
+  >Redis Streams in Action: Part 1 (Intro and overview)
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/rust-kafka-getting-started-2/"
+    
+  >Getting started with Kafka and Rust: Part 2
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/rust-kafka-getting-started-1/"
+    
+  >Getting started with Kafka and Rust: Part 1
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/real-time-search-redisearch-kafka/"
+    
+  >RediSearch in Action
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/redisearch-in-action/"
+    
+  >Real-Time Search and Analytics with Confluent, Azure, Redis, and Spring Cloud
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/autoscale-redis-apps-kubernetes/"
+    
+  >Autoscaling Redis applications on Kubernetes 🚀🚀
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/azure-cosmosdb-use-cases-tradeoffs/"
+    
+  >Azure Cosmos DB: Use Cases and Trade-Offs
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/redis-grafana/"
+    
+  >An easy to use monitoring solution for Redis
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/rust-redis-getting-started/"
+    
+  >Getting started with Rust and Redis
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/postgres-kafka-cassandra/"
+    
+  >Learn how to setup data pipeline from PostgreSQL to Cassandra using Kafka Connect
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/kafka-cassandra-ingestion/"
+    
+  >Integrate Kafka and Cassandra using Kafka Connect
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/golang-serverless-backend/"
+    
+  >Build a Serverless app using Go and Azure Functions
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/create-data/"
+    
+  >Picking the Right Distributed Database
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/postgres-azure-data-explorer-cdc/"
+    
+  >Change Data Capture from PostgreSQL to Azure Data Explorer using Kafka Connect
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/kafka-azure-data-explorer-kubernetes/"
+    
+  >Data Ingestion into Azure Data Explorer using Kafka Connect on Kubernetes
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/cosmosdb-fault-tolerant-apps/"
+    
+  >Build fault tolerant applications with Cassandra API for Azure Cosmos DB
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/azure-stream-analytics-tutorial/"
+    
+  >Build a pipeline to join streams of real time data
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/kafka-azure-data-explorer/"
+    
+  >How to Ingest data from Kafka into Azure Data Explorer
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/postgres-debezium-pgoutput/"
+    
+  >PostgreSQL pgoutput plugin for change data capture
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/golang-azure-data-explorer-manage/"
+    
+  >How to use Azure Go SDK to manage Azure Data Explorer clusters
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/kafka-kubernetes-strimzi-4/"
+    
+  >Kafka on Kubernetes, the Strimzi way! (Part 4)
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/golang-azure-data-explorer-getting-started/"
+    
+  >Tutorial: Getting started with Azure Data Explorer using the Go SDK
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/manage-eventhubs-kubernetes/"
+    
+  >Orchestrate Azure Event Hubs via Kubernetes
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/kafka-kubernetes-strimzi-3/"
+    
+  >Kafka on Kubernetes, the Strimzi way! (Part 3)
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/postgres-kafka-debezium-azure-cdc/"
+    
+  >Change Data Capture architecture using Debezium, Postgres and Kafka
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/eventhubs-rbac/"
+    
+  >Azure Event Hubs &#39;Role Based Access Control&#39; in action
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/kafka-kubernetes-strimzi-2/"
+    
+  >Kafka on Kubernetes, the Strimzi way! (Part 2)
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/kafka-kubernetes-strimzi-1/"
+    
+  >Kafka on Kubernetes, the Strimzi way! (Part 1)
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/azure-redis-tls-tip/"
+    
+  >Tip: Using the latest TLS version with Azure Cache for Redis
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/mongodb-kafka-kubernetes/"
+    
+  >Data pipeline using MongoDB and Kafka Connect on Kubernetes
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/joined-microsoft/"
+    
+  >Joined the Microsoft Developer Advocacy team 🎉🎊 🍻
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/kubernetes-services-ngrok/"
+    
+  >Expose Kubernetes services with ngrok
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/serverless-talk-oracle-code/"
+    
+  >Serverless Architectures and Patterns
+    </a>
+              
+            </li><li class="hx-flex hx-flex-col "><a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50"
+    href="/blog/serverless-tensorflow-image-classification/"
+    
+  >Serverless Image Classification with TensorFlow
+    </a>
+              
+            </li></ul>
+      </div></li>
+    </ul>
+
+    <div class="max-xl:hx-hidden hx-h-0 hx-w-64 hx-shrink-0"></div></div>
+  
+  </aside>
+    
+<nav class="hextra-toc hx-order-last hx-hidden hx-w-64 hx-shrink-0 xl:hx-block print:hx-hidden hx-px-4" aria-label="table of contents">
+    <div class="hextra-scrollbar hx-sticky hx-top-16 hx-overflow-y-auto hx-pr-4 hx-pt-6 hx-text-sm [hyphens:auto] hx-max-h-[calc(100vh-var(--navbar-height)-env(safe-area-inset-bottom))] ltr:hx--mr-4 rtl:hx--ml-4"><p class="hx-mb-4 hx-font-semibold hx-tracking-tight">On this page</p><ul>
+      <li class="hx-my-2 hx-scroll-my-6 hx-scroll-py-6">
+        <a class="hx-font-semibold hx-inline-block hx-text-gray-500 hover:hx-text-gray-900 dark:hx-text-gray-400 dark:hover:hx-text-gray-300 contrast-more:hx-text-gray-900 contrast-more:hx-underline contrast-more:dark:hx-text-gray-50 hx-w-full hx-break-words" href="#deep-dive">Deep Dive
+        </a>
+      </li>
+      <li class="hx-my-2 hx-scroll-my-6 hx-scroll-py-6">
+        <a class="ltr:hx-pl-4 rtl:hx-pr-4 hx-inline-block hx-text-gray-500 hover:hx-text-gray-900 dark:hx-text-gray-400 dark:hover:hx-text-gray-300 contrast-more:hx-text-gray-900 contrast-more:hx-underline contrast-more:dark:hx-text-gray-50 hx-w-full hx-break-words" href="#key-concepts">Key concepts
+        </a>
+      </li>
+      <li class="hx-my-2 hx-scroll-my-6 hx-scroll-py-6">
+        <a class="ltr:hx-pl-4 rtl:hx-pr-4 hx-inline-block hx-text-gray-500 hover:hx-text-gray-900 dark:hx-text-gray-400 dark:hover:hx-text-gray-300 contrast-more:hx-text-gray-900 contrast-more:hx-underline contrast-more:dark:hx-text-gray-50 hx-w-full hx-break-words" href="#architecture-at-a-glance">Architecture at a glance
+        </a>
+      </li>
+      <li class="hx-my-2 hx-scroll-my-6 hx-scroll-py-6">
+        <a class="hx-font-semibold hx-inline-block hx-text-gray-500 hover:hx-text-gray-900 dark:hx-text-gray-400 dark:hover:hx-text-gray-300 contrast-more:hx-text-gray-900 contrast-more:hx-underline contrast-more:dark:hx-text-gray-50 hx-w-full hx-break-words" href="#omnivec-in-action">OmniVec in action
+        </a>
+      </li>
+      <li class="hx-my-2 hx-scroll-my-6 hx-scroll-py-6">
+        <a class="ltr:hx-pl-4 rtl:hx-pr-4 hx-inline-block hx-text-gray-500 hover:hx-text-gray-900 dark:hx-text-gray-400 dark:hover:hx-text-gray-300 contrast-more:hx-text-gray-900 contrast-more:hx-underline contrast-more:dark:hx-text-gray-50 hx-w-full hx-break-words" href="#prerequisites">Prerequisites
+        </a>
+      </li>
+      <li class="hx-my-2 hx-scroll-my-6 hx-scroll-py-6">
+        <a class="ltr:hx-pl-4 rtl:hx-pr-4 hx-inline-block hx-text-gray-500 hover:hx-text-gray-900 dark:hx-text-gray-400 dark:hover:hx-text-gray-300 contrast-more:hx-text-gray-900 contrast-more:hx-underline contrast-more:dark:hx-text-gray-50 hx-w-full hx-break-words" href="#deploy-and-configure-omnivec">Deploy and configure OmniVec
+        </a>
+      </li>
+      <li class="hx-my-2 hx-scroll-my-6 hx-scroll-py-6">
+        <a class="ltr:hx-pl-4 rtl:hx-pr-4 hx-inline-block hx-text-gray-500 hover:hx-text-gray-900 dark:hx-text-gray-400 dark:hover:hx-text-gray-300 contrast-more:hx-text-gray-900 contrast-more:hx-underline contrast-more:dark:hx-text-gray-50 hx-w-full hx-break-words" href="#set-up-azure-cosmos-db">Set up Azure Cosmos DB
+        </a>
+      </li>
+      <li class="hx-my-2 hx-scroll-my-6 hx-scroll-py-6">
+        <a class="ltr:hx-pl-4 rtl:hx-pr-4 hx-inline-block hx-text-gray-500 hover:hx-text-gray-900 dark:hx-text-gray-400 dark:hover:hx-text-gray-300 contrast-more:hx-text-gray-900 contrast-more:hx-underline contrast-more:dark:hx-text-gray-50 hx-w-full hx-break-words" href="#grant-omnivec-access-to-azure-cosmos-db">Grant OmniVec access to Azure Cosmos DB
+        </a>
+      </li>
+      <li class="hx-my-2 hx-scroll-my-6 hx-scroll-py-6">
+        <a class="ltr:hx-pl-4 rtl:hx-pr-4 hx-inline-block hx-text-gray-500 hover:hx-text-gray-900 dark:hx-text-gray-400 dark:hover:hx-text-gray-300 contrast-more:hx-text-gray-900 contrast-more:hx-underline contrast-more:dark:hx-text-gray-50 hx-w-full hx-break-words" href="#wire-up-the-pipeline">Wire up the pipeline
+        </a>
+      </li>
+      <li class="hx-my-2 hx-scroll-my-6 hx-scroll-py-6">
+        <a class="ltr:hx-pl-4 rtl:hx-pr-4 hx-inline-block hx-text-gray-500 hover:hx-text-gray-900 dark:hx-text-gray-400 dark:hover:hx-text-gray-300 contrast-more:hx-text-gray-900 contrast-more:hx-underline contrast-more:dark:hx-text-gray-50 hx-w-full hx-break-words" href="#run-vector-search">Run vector search
+        </a>
+      </li>
+      <li class="hx-my-2 hx-scroll-my-6 hx-scroll-py-6">
+        <a class="hx-font-semibold hx-inline-block hx-text-gray-500 hover:hx-text-gray-900 dark:hx-text-gray-400 dark:hover:hx-text-gray-300 contrast-more:hx-text-gray-900 contrast-more:hx-underline contrast-more:dark:hx-text-gray-50 hx-w-full hx-break-words" href="#wrapping-up">Wrapping up
+        </a>
+      </li></ul>
+      <div class="hx-mt-8 hx-border-t hx-bg-white hx-pt-8 hx-shadow-[0_-12px_16px_white] dark:hx-bg-dark dark:hx-shadow-[0_-12px_16px_#111] hx-sticky hx-bottom-0 hx-flex hx-flex-col hx-items-start hx-gap-2 hx-pb-8 dark:hx-border-neutral-800 contrast-more:hx-border-t contrast-more:hx-border-neutral-400 contrast-more:hx-shadow-none contrast-more:dark:hx-border-neutral-400">
+        <button aria-hidden="true" id="backToTop" onClick="scrollUp();" class="hx-transition-all hx-duration-75 hx-opacity-0 hx-text-xs hx-font-medium hx-text-gray-500 hover:hx-text-gray-900 dark:hx-text-gray-400 dark:hover:hx-text-gray-100 contrast-more:hx-text-gray-800 contrast-more:dark:hx-text-gray-50">
+          <span>Scroll to top</span>
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="hx-inline ltr:hx-ml-1 rtl:hx-mr-1 hx-h-3.5 hx-w-3.5 hx-border hx-rounded-full hx-border-gray-500 hover:hx-border-gray-900 dark:hx-border-gray-400 dark:hover:hx-border-gray-100 contrast-more:hx-border-gray-800 contrast-more:dark:hx-border-gray-50">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+
+    <article class="hx-w-full hx-break-words hx-flex hx-min-h-[calc(100vh-var(--navbar-height))] hx-min-w-0 hx-justify-center hx-pb-8 hx-pr-[calc(env(safe-area-inset-right)-1.5rem)]">
+      <main class="hx-w-full hx-min-w-0 hx-max-w-6xl hx-px-6 hx-pt-4 md:hx-px-12">
+        
+  <div class="hx-mt-1.5 hx-flex hx-items-center hx-gap-1 hx-overflow-hidden hx-text-sm hx-text-gray-500 dark:hx-text-gray-400 contrast-more:hx-text-current">
+        <div class="hx-whitespace-nowrap hx-transition-colors hx-min-w-[24px] hx-overflow-hidden hx-text-ellipsis hover:hx-text-gray-900 dark:hover:hx-text-gray-100">
+          <a href="/blog/">Blog posts</a>
+        </div><svg class="hx-w-3.5 hx-shrink-0 rtl:-hx-rotate-180" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg><div class="hx-whitespace-nowrap hx-transition-colors hx-font-medium hx-text-gray-700 contrast-more:hx-font-bold contrast-more:hx-text-current dark:hx-text-gray-100 contrast-more:dark:hx-text-current">Introducing OmniVec: An Open-Source Embedding Platform for AI Apps on Azure</div>
+  </div>
+
+        <h1 class="hx-mt-2 hx-text-4xl hx-font-bold hx-tracking-tight hx-text-slate-900 dark:hx-text-slate-100">Introducing OmniVec: An Open-Source Embedding Platform for AI Apps on Azure</h1>
+        <div class="hx-mt-4 hx-mb-16 hx-text-gray-500 hx-text-sm hx-flex hx-items-center hx-flex-wrap hx-gap-y-2"><span class="hx-mr-1">June 2, 2026</span></div>
+        <div class="content">
+          <p><em>Originally posted on <a href="https://devblogs.microsoft.com/cosmosdb/introducing-omnivec-an-open-source-embedding-platform-for-ai-apps-on-azure/" target="_blank" rel="noopener">https://devblogs.microsoft.com/cosmosdb/introducing-omnivec-an-open-source-embedding-platform-for-ai-apps-on-azure/</a></em></p>
+<p>Today we are open-sourcing <a href="https://github.com/AzureCosmosDB/OmniVec" target="_blank" rel="noopener">OmniVec</a>, a platform for building and operating the embedding pipelines that keep the vector representation of your operational data in sync as it changes. You register data sources, embedding model(s), vector stores (destination), and OmniVec does the rest: initial backfill, change tracking, model invocation to generate, and writing them back to your vector store. We are shipping this with support for <a href="https://learn.microsoft.com/azure/cosmos-db/" target="_blank" rel="noopener">Azure Cosmos DB</a>, PostgreSQL, SQL Server (source and destination), and <a href="https://learn.microsoft.com/azure/storage/blobs/" target="_blank" rel="noopener">Azure Blob Storage</a> (destination). You deploy OmniVec in your own Azure subscription, and use the web UI, CLI, or the REST API to manage it.</p>
+<p>Most AI applications end up building the same plumbing to keep that vector representation in sync: a change-capture process on the source, a consumer pool that generates embeddings, retry and backfill logic, dead-letter handling, and the operational work to keep it all running. OmniVec collapses that stack into four configurable components: a source, a model, a destination, and a pipeline that wires the first three together.</p>
+<div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden;">
+      <iframe allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen" loading="eager" referrerpolicy="strict-origin-when-cross-origin" src="https://www.youtube.com/embed/GnAI60YO75Q?autoplay=0&amp;controls=1&amp;end=0&amp;loop=0&amp;mute=0&amp;start=0" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border:0;" title="YouTube video"></iframe>
+    </div>
+
+<h2>Deep Dive<span class="hx-absolute -hx-mt-20" id="deep-dive"></span>
+    <a href="#deep-dive" class="subheading-anchor" aria-label="Permalink for this section"></a></h2><p>Deploying OmniVec into your Azure subscription provisions multiple Azure resources, including an <a href="https://learn.microsoft.com/azure/aks/" target="_blank" rel="noopener">Azure Kubernetes Service</a> (AKS) cluster that hosts the OmniVec services (API, controller, and workers), an Azure Cosmos DB account for pipeline metadata, job state, and progress metrics, and an <a href="https://learn.microsoft.com/azure/container-registry/" target="_blank" rel="noopener">Azure Container Registry</a> that stores the service images AKS pulls from, and more. You control the choices that affect cost and capacity, such as the embedding model (hosted Azure OpenAI or a self-hosted GPU model), the AKS node size and count, and whether to provision a GPU pool, etc.</p>
+<h3>Key concepts<span class="hx-absolute -hx-mt-20" id="key-concepts"></span>
+    <a href="#key-concepts" class="subheading-anchor" aria-label="Permalink for this section"></a></h3><p><img src="components.png" alt="OmniVec components" loading="lazy" /></p>
+<p>OmniVec exposes the following core primitives:</p>
+<ul>
+<li><strong>Source:</strong> A system OmniVec reads records from. The source definition tells OmniVec how to connect to it and how to track changes on it.</li>
+<li><strong>Model:</strong> The embedding model OmniVec calls to turn record content into a vector. A model registration captures the provider, model name, endpoint, and credentials, and the runtime calls it with batching and retries.</li>
+<li><strong>Destination:</strong> A vector store where the generated embeddings are written, alongside (or as an update to) the originating record.</li>
+<li><strong>Pipeline:</strong> The binding that ties a source, a model, and a destination together. It also declares which source fields to embed and which destination field receives the vector.</li>
+</ul>
+<h3>Architecture at a glance<span class="hx-absolute -hx-mt-20" id="architecture-at-a-glance"></span>
+    <a href="#architecture-at-a-glance" class="subheading-anchor" aria-label="Permalink for this section"></a></h3><p>OmniVec runs as a set of services on Azure Kubernetes Service:</p>
+<ul>
+<li><strong>REST API:</strong> A FastAPI control plane that holds the configuration of sources, models, destinations, and pipelines, and exposes it over REST. The CLI and the web UI use this API behind the scenes.</li>
+<li><strong>Ingestion:</strong> Watches each source for changes and queues up the records that need embedding. How it tracks changes depends on the source: the change feed for Azure Cosmos DB, blob events for Azure Blob Storage, and CDC for SQL Server and PostgreSQL.</li>
+<li><strong>Workers:</strong> A horizontally scalable pool on compute that pulls records off the queue, calls the embedding model, and writes the resulting embedding to the destination.</li>
+<li><strong>Model routing layer:</strong> A unified entry point in front of the embedding models. It lets a pipeline call either an external provider like <a href="https://learn.microsoft.com/azure/ai-services/openai/" target="_blank" rel="noopener">Azure OpenAI</a> or a self-hosted GPU model.</li>
+<li><strong>Metadata store:</strong> An Azure Cosmos DB account that the deployment provisions for you. It holds pipeline definitions, job state, progress metrics, etc.</li>
+</ul>
+<h2>OmniVec in action<span class="hx-absolute -hx-mt-20" id="omnivec-in-action"></span>
+    <a href="#omnivec-in-action" class="subheading-anchor" aria-label="Permalink for this section"></a></h2><p>Let&rsquo;s put OmniVec to work end to end. In this walkthrough, you will:</p>
+<ul>
+<li>deploy it into your subscription</li>
+<li>point it at an Azure Cosmos DB container</li>
+<li>wire up a pipeline to automatically generate vector embeddings</li>
+<li>then run vector search over this data</li>
+</ul>
+<p>We use Azure Cosmos DB as both the source and the destination here as an example, but this applies to any supported combination of sources, models, and destinations.</p>
+<h3>Prerequisites<span class="hx-absolute -hx-mt-20" id="prerequisites"></span>
+    <a href="#prerequisites" class="subheading-anchor" aria-label="Permalink for this section"></a></h3><p>Before you start, make sure you have:</p>
+<ul>
+<li>An Azure subscription with permissions to create resource groups, an AKS cluster, an ACR, and an Azure Cosmos DB account.</li>
+<li>An embedding model. This walkthrough uses an <a href="https://learn.microsoft.com/azure/foundry-classic/foundry-models/concepts/models-sold-directly-by-azure?tabs=americas%2Caz-global-standard%2Cglobal-standard&amp;pivots=azure-openai#embeddings" target="_blank" rel="noopener">Azure OpenAI embedding model deployed in Microsoft Foundry</a>. <a href="https://learn.microsoft.com/azure/foundry-classic/openai/how-to/create-resource?pivots=cli#deploy-a-model" target="_blank" rel="noopener">Deploy one in your subscription</a> and note the endpoint, model name, and API key. You&rsquo;ll configure them in OmniVec later.</li>
+<li>CLI tools:
+<ul>
+<li><a href="https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd" target="_blank" rel="noopener">Azure Developer CLI (azd)</a> for deployment.</li>
+<li><a href="https://learn.microsoft.com/cli/azure/install-azure-cli" target="_blank" rel="noopener">Azure CLI (az)</a> to setup Azure Cosmos DB (but you can also do it directly via the Azure portal).</li>
+<li><a href="https://kubernetes.io/docs/tasks/tools/" target="_blank" rel="noopener">kubectl</a> and <a href="https://helm.sh/docs/intro/install/" target="_blank" rel="noopener">Helm</a></li>
+<li>OmniVec CLI from the <a href="https://github.com/AzureCosmosDB/OmniVec/releases" target="_blank" rel="noopener">OmniVec releases page</a> to manage sources, destinations, pipeline, and config.</li>
+</ul>
+</li>
+</ul>
+<p>Then clone the quickstart repo, which has the sample data and seed script used later:</p>
+<div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+
+<div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">git clone https://github.com/AzureCosmosDB/omnivec-cosmosdb-quickstart
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="nb">cd</span> omnivec-cosmosdb-quickstart</span></span></code></pre></div></div><div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+  <button
+    class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+    title="Copy code"
+  >
+    <div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4"></div>
+    <div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4"></div>
+  </button>
+</div>
+</div>
+<h3>Deploy and configure OmniVec<span class="hx-absolute -hx-mt-20" id="deploy-and-configure-omnivec"></span>
+    <a href="#deploy-and-configure-omnivec" class="subheading-anchor" aria-label="Permalink for this section"></a></h3><p>Create a new <code>azd</code> environment for the deployment. Pick an <code>ENV_NAME</code> (it becomes part of resource names), and choose a <code>LOCATION</code> that supports AKS and Azure Cosmos DB in your subscription:</p>
+<div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+
+<div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">ENV_NAME</span><span class="o">=</span><span class="s2">&#34;my-omnivec&#34;</span>
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">LOCATION</span><span class="o">=</span><span class="s2">&#34;westus2&#34;</span>
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">SUBSCRIPTION_ID</span><span class="o">=</span><span class="s2">&#34;&lt;your-subscription-id&gt;&#34;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">azd env new <span class="s2">&#34;</span><span class="nv">$ENV_NAME</span><span class="s2">&#34;</span> --location <span class="s2">&#34;</span><span class="nv">$LOCATION</span><span class="s2">&#34;</span> --subscription <span class="s2">&#34;</span><span class="nv">$SUBSCRIPTION_ID</span><span class="s2">&#34;</span></span></span></code></pre></div></div><div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+  <button
+    class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+    title="Copy code"
+  >
+    <div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4"></div>
+    <div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4"></div>
+  </button>
+</div>
+</div>
+<p>Configure the deployment:</p>
+<div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+
+<div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">azd env <span class="nb">set</span> OMNIVEC_METADATA_STORE <span class="s2">&#34;cosmosdb-provisioned&#34;</span>
+</span></span><span class="line"><span class="cl">azd env <span class="nb">set</span> OMNIVEC_ENABLE_BLOB_SOURCE <span class="s2">&#34;false&#34;</span>
+</span></span><span class="line"><span class="cl">azd env <span class="nb">set</span> OMNIVEC_SYSTEM_NODE_VM_SIZE <span class="s2">&#34;Standard_D2ds_v5&#34;</span>
+</span></span><span class="line"><span class="cl">azd env <span class="nb">set</span> OMNIVEC_SYSTEM_NODE_COUNT <span class="m">2</span>
+</span></span><span class="line"><span class="cl">azd env <span class="nb">set</span> OMNIVEC_GPU_NODE_VM_SIZE <span class="s2">&#34;&#34;</span>
+</span></span><span class="line"><span class="cl">azd env <span class="nb">set</span> OMNIVEC_GPU_NODE_COUNT <span class="m">0</span>
+</span></span><span class="line"><span class="cl">azd env <span class="nb">set</span> OMNIVEC_BUILD_MODE <span class="s2">&#34;acr&#34;</span>
+</span></span><span class="line"><span class="cl">azd env <span class="nb">set</span> OMNIVEC_BUILD true</span></span></code></pre></div></div><div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+  <button
+    class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+    title="Copy code"
+  >
+    <div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4"></div>
+    <div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4"></div>
+  </button>
+</div>
+</div>
+<ul>
+<li><code>OMNIVEC_METADATA_STORE</code> provisions a dedicated Azure Cosmos DB account for OmniVec&rsquo;s own pipeline metadata, job state, and progress metrics.</li>
+<li><code>OMNIVEC_ENABLE_BLOB_SOURCE</code> is off because this walkthrough only uses Azure Cosmos DB as a source; turn it on if you need Azure Blob Storage.</li>
+<li>Size the AKS system pool with <code>OMNIVEC_SYSTEM_NODE_VM_SIZE</code> and <code>OMNIVEC_SYSTEM_NODE_COUNT</code> based on your expected workload.</li>
+<li>The GPU pool (<code>OMNIVEC_GPU_NODE_VM_SIZE</code>, <code>OMNIVEC_GPU_NODE_COUNT</code>) is empty here because we&rsquo;re calling a hosted Azure OpenAI model; set them if you want to run self-hosted embedding models inside the cluster.</li>
+<li><code>OMNIVEC_BUILD_MODE=acr</code> builds the service images in the provisioned ACR, and <code>OMNIVEC_BUILD=true</code> triggers that build as part of this deployment.</li>
+</ul>
+<p>You only need one command for deployment:</p>
+<div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+
+<div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">azd up</span></span></code></pre></div></div><div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+  <button
+    class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+    title="Copy code"
+  >
+    <div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4"></div>
+    <div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4"></div>
+  </button>
+</div>
+</div>
+<p>This takes a few minutes. It provisions the AKS cluster, Azure Cosmos DB account, and ACR, builds the OmniVec service images in ACR, and installs the Helm chart onto the cluster. When it finishes, you&rsquo;ll see a summary similar to the following (your values will differ):</p>
+<div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+
+<div><pre><code>//..... redacted
+Instance ID: my-omnivec-dhmzlhlv4lk7s
+Environment: my-omnivec
+AKS Cluster: omnivec-aks-dhmzlhlv4lk7s
+ACR Registry: omnivecacrdhmzlhlv4lk7s.azurecr.io
+CosmosDB: https://omnivec-cosmos-dhmzlhlv4lk7s.documents.azure.com:443/
+Admin Token: &lt;admin-token&gt;
+
+OmniVec FQDN: http://my-omnivec-dhmzlhlv4lk7s.westus2.cloudapp.azure.com/ui
+OmniVec IP: http://&lt;public-ip&gt;/ui
+
+Health Check: http://my-omnivec-dhmzlhlv4lk7s.westus2.cloudapp.azure.com/health</code></pre></div><div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+  <button
+    class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+    title="Copy code"
+  >
+    <div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4"></div>
+    <div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4"></div>
+  </button>
+</div>
+</div>
+<p>Save the admin token and the OmniVec FQDN. You&rsquo;ll use both in the next step to point the CLI at this deployment. You can also open the FQDN in a browser to confirm the web UI is up.</p>
+<p>The rest of this walkthrough uses the CLI (the web UI exposes the same operations if you prefer to click through it). Point it at your deployment and authenticate:</p>
+<div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+
+<div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">SERVER_URL</span><span class="o">=</span>&lt;e.g. http://my-omnivec-dhmzlhlv4lk7s.westus2.cloudapp.azure.com/&gt;
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">ADMIN_TOKEN</span><span class="o">=</span>&lt;admin-token&gt;
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">omnivec config <span class="nb">set</span> server <span class="nv">$SERVER_URL</span>
+</span></span><span class="line"><span class="cl">omnivec auth login --token <span class="nv">$ADMIN_TOKEN</span></span></span></code></pre></div></div><div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+  <button
+    class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+    title="Copy code"
+  >
+    <div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4"></div>
+    <div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4"></div>
+  </button>
+</div>
+</div>
+<p>Use the bare FQDN, without the <code>/ui</code> suffix.</p>
+<p>Confirm the CLI is wired up:</p>
+<div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+
+<div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">omnivec config view</span></span></code></pre></div></div><div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+  <button
+    class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+    title="Copy code"
+  >
+    <div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4"></div>
+    <div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4"></div>
+  </button>
+</div>
+</div>
+<p>Finally, register your Azure OpenAI embedding model with OmniVec. Pipelines reference models by the name you give them here:</p>
+<div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+
+<div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">FOUNDRY_ENDPOINT</span><span class="o">=</span>&lt;your-foundry-endpoint&gt;
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">FOUNDRY_MODEL_NAME</span><span class="o">=</span>&lt;e.g. text-embedding-3-small&gt;
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">FOUNDRY_API_KEY</span><span class="o">=</span>&lt;your-foundry-api-key&gt;
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">omnivec model add <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--name demo-foundry-oai-model <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--type azure-openai <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--model <span class="nv">$FOUNDRY_MODEL_NAME</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--endpoint <span class="nv">$FOUNDRY_ENDPOINT</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--api-key <span class="nv">$FOUNDRY_API_KEY</span></span></span></code></pre></div></div><div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+  <button
+    class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+    title="Copy code"
+  >
+    <div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4"></div>
+    <div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4"></div>
+  </button>
+</div>
+</div>
+<h3>Set up Azure Cosmos DB<span class="hx-absolute -hx-mt-20" id="set-up-azure-cosmos-db"></span>
+    <a href="#set-up-azure-cosmos-db" class="subheading-anchor" aria-label="Permalink for this section"></a></h3><p>You need an Azure Cosmos DB account, database, and container that OmniVec will read from and write embeddings to. This walkthrough uses the same container as both source and destination. If you don&rsquo;t already have an Azure Cosmos DB account, <a href="https://learn.microsoft.com/azure/cosmos-db/nosql/quickstart-portal#create-account" target="_blank" rel="noopener">create one</a> before continuing.</p>
+<p>Sign in to the Azure CLI and select the subscription that holds the account:</p>
+<div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+
+<div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">az login
+</span></span><span class="line"><span class="cl">az account <span class="nb">set</span> --subscription <span class="s2">&#34;</span><span class="nv">$SUBSCRIPTION_ID</span><span class="s2">&#34;</span></span></span></code></pre></div></div><div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+  <button
+    class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+    title="Copy code"
+  >
+    <div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4"></div>
+    <div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4"></div>
+  </button>
+</div>
+</div>
+<p>Your signed-in user needs permission to create a database and container on the account. The built-in <code>Cosmos DB Operator</code> role (or any role granting <code>Microsoft.DocumentDB/databaseAccounts/sqlDatabases/*</code> and <code>.../containers/*</code> write actions) is sufficient. Account <code>Contributor</code> or <code>Owner</code> also works.</p>
+<p>Set the names you&rsquo;ll use throughout the rest of the walkthrough:</p>
+<div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+
+<div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">RG</span><span class="o">=</span>&lt;your-resource-group&gt;
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">COSMOS_ACCOUNT</span><span class="o">=</span>&lt;your-cosmos-account&gt;
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">COSMOS_DB</span><span class="o">=</span>omnivec-demodb
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">COSMOS_CONTAINER</span><span class="o">=</span>demo-container</span></span></code></pre></div></div><div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+  <button
+    class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+    title="Copy code"
+  >
+    <div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4"></div>
+    <div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4"></div>
+  </button>
+</div>
+</div>
+<p>Create the database:</p>
+<div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+
+<div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">az cosmosdb sql database create <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--account-name <span class="nv">$COSMOS_ACCOUNT</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--resource-group <span class="nv">$RG</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--name <span class="nv">$COSMOS_DB</span></span></span></code></pre></div></div><div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+  <button
+    class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+    title="Copy code"
+  >
+    <div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4"></div>
+    <div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4"></div>
+  </button>
+</div>
+</div>
+<p>Create the container with a vector embedding policy and a DiskANN vector index on <code>/embedding</code>. The <code>1536</code> dimension matches <code>text-embedding-3-small</code>; change it if you registered a different model:</p>
+<div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+
+<div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">az cosmosdb sql container create <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--account-name <span class="nv">$COSMOS_ACCOUNT</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--resource-group <span class="nv">$RG</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--database-name <span class="nv">$COSMOS_DB</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--name <span class="nv">$COSMOS_CONTAINER</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--partition-key-path /id <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--vector-embeddings <span class="s1">&#39;{&#34;vectorEmbeddings&#34;:[{&#34;path&#34;:&#34;/embedding&#34;,&#34;dataType&#34;:&#34;float32&#34;,&#34;dimensions&#34;:1536,&#34;distanceFunction&#34;:&#34;cosine&#34;}]}&#39;</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--idx <span class="s1">&#39;{&#34;indexingMode&#34;:&#34;consistent&#34;,&#34;automatic&#34;:true,&#34;includedPaths&#34;:[{&#34;path&#34;:&#34;/*&#34;}],&#34;excludedPaths&#34;:[{&#34;path&#34;:&#34;/\&#34;_etag\&#34;/?&#34;},{&#34;path&#34;:&#34;/embedding/*&#34;}],&#34;vectorIndexes&#34;:[{&#34;path&#34;:&#34;/embedding&#34;,&#34;type&#34;:&#34;diskANN&#34;}]}&#39;</span></span></span></code></pre></div></div><div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+  <button
+    class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+    title="Copy code"
+  >
+    <div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4"></div>
+    <div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4"></div>
+  </button>
+</div>
+</div>
+<p>Now seed it with sample data. The seed script uses <code>DefaultAzureCredential</code>, so first grant your signed-in user the <code>Cosmos DB Built-in Data Contributor</code> role on the Azure Cosmos DB account:</p>
+<div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+
+<div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">USER_PRINCIPAL_ID</span><span class="o">=</span><span class="k">$(</span>az ad signed-in-user show --query id -o tsv<span class="k">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">az cosmosdb sql role assignment create <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--account-name <span class="s2">&#34;</span><span class="nv">$COSMOS_ACCOUNT</span><span class="s2">&#34;</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--resource-group <span class="s2">&#34;</span><span class="nv">$RG</span><span class="s2">&#34;</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--role-definition-id <span class="s2">&#34;00000000-0000-0000-0000-000000000002&#34;</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--principal-id <span class="s2">&#34;</span><span class="nv">$USER_PRINCIPAL_ID</span><span class="s2">&#34;</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--scope <span class="s2">&#34;/&#34;</span></span></span></code></pre></div></div><div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+  <button
+    class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+    title="Copy code"
+  >
+    <div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4"></div>
+    <div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4"></div>
+  </button>
+</div>
+</div>
+<p>Then install the sample app&rsquo;s dependencies and run the seed script (it reads <code>COSMOS_ACCOUNT</code>, <code>COSMOS_DB</code>, and <code>COSMOS_CONTAINER</code> from the environment):</p>
+<div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+
+<div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="nb">cd</span> sample-app
+</span></span><span class="line"><span class="cl">python3 -m venv .venv <span class="o">&amp;&amp;</span> <span class="nb">source</span> .venv/bin/activate
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">pip install -r requirements.txt
+</span></span><span class="line"><span class="cl">python insert_sample_data.py</span></span></code></pre></div></div><div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+  <button
+    class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+    title="Copy code"
+  >
+    <div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4"></div>
+    <div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4"></div>
+  </button>
+</div>
+</div>
+<p>You should now have 100 product documents in the container, each with name and description fields.</p>
+<h3>Grant OmniVec access to Azure Cosmos DB<span class="hx-absolute -hx-mt-20" id="grant-omnivec-access-to-azure-cosmos-db"></span>
+    <a href="#grant-omnivec-access-to-azure-cosmos-db" class="subheading-anchor" aria-label="Permalink for this section"></a></h3><p>OmniVec pods authenticate to Azure Cosmos DB using a managed identity, not a connection string. Before you create a source or destination, grant that identity two roles on the Azure Cosmos DB account:</p>
+<ul>
+<li><strong>Data plane (<code>Cosmos DB Built-in Data Contributor</code>):</strong> read source documents and write embeddings.</li>
+<li><strong>Control plane (<code>Cosmos DB Account Reader Role</code>):</strong> read the account-level metadata and vector policies that the change-feed processor inspects at startup. Skipping it causes pipeline failures with a <code>readMetadata</code> error.</li>
+</ul>
+<p>First, find the principal ID of the OmniVec workload identity. It lives in the OmniVec deployment&rsquo;s resource group (not the Azure Cosmos DB account&rsquo;s <code>$RG</code>). That resource group has several managed identities, so filter by the client ID that <code>azd</code> exported rather than picking the first one:</p>
+<div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+
+<div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">OMNIVEC_RG</span><span class="o">=</span><span class="k">$(</span>azd env get-value AZURE_RESOURCE_GROUP<span class="k">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">OMNIVEC_PRINCIPAL_ID</span><span class="o">=</span><span class="k">$(</span>az identity list -g <span class="s2">&#34;</span><span class="nv">$OMNIVEC_RG</span><span class="s2">&#34;</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--query <span class="s2">&#34;[?clientId==&#39;</span><span class="k">$(</span>azd env get-value AZURE_IDENTITY_CLIENT_ID<span class="k">)</span><span class="s2">&#39;].principalId&#34;</span> -o tsv<span class="k">)</span></span></span></code></pre></div></div><div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+  <button
+    class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+    title="Copy code"
+  >
+    <div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4"></div>
+    <div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4"></div>
+  </button>
+</div>
+</div>
+<p>Grant the data-plane role:</p>
+<div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+
+<div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">az cosmosdb sql role assignment create <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--account-name <span class="s2">&#34;</span><span class="nv">$COSMOS_ACCOUNT</span><span class="s2">&#34;</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--resource-group <span class="s2">&#34;</span><span class="nv">$RG</span><span class="s2">&#34;</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--role-definition-id <span class="s2">&#34;00000000-0000-0000-0000-000000000002&#34;</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--principal-id <span class="s2">&#34;</span><span class="nv">$OMNIVEC_PRINCIPAL_ID</span><span class="s2">&#34;</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--scope <span class="s2">&#34;/&#34;</span></span></span></code></pre></div></div><div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+  <button
+    class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+    title="Copy code"
+  >
+    <div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4"></div>
+    <div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4"></div>
+  </button>
+</div>
+</div>
+<p>Grant the control-plane role:</p>
+<div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+
+<div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">az role assignment create <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--assignee <span class="s2">&#34;</span><span class="nv">$OMNIVEC_PRINCIPAL_ID</span><span class="s2">&#34;</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--role <span class="s2">&#34;Cosmos DB Account Reader Role&#34;</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--scope <span class="s2">&#34;</span><span class="k">$(</span>az cosmosdb show -n <span class="s2">&#34;</span><span class="nv">$COSMOS_ACCOUNT</span><span class="s2">&#34;</span> -g <span class="s2">&#34;</span><span class="nv">$RG</span><span class="s2">&#34;</span> --query id -o tsv<span class="k">)</span><span class="s2">&#34;</span></span></span></code></pre></div></div><div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+  <button
+    class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+    title="Copy code"
+  >
+    <div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4"></div>
+    <div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4"></div>
+  </button>
+</div>
+</div>
+<p>Wait 1–2 minutes for the assignments to propagate before moving on.</p>
+<h3>Wire up the pipeline<span class="hx-absolute -hx-mt-20" id="wire-up-the-pipeline"></span>
+    <a href="#wire-up-the-pipeline" class="subheading-anchor" aria-label="Permalink for this section"></a></h3><p>With Azure Cosmos DB ready and OmniVec authorized, the rest of the setup is three OmniVec resources: a source, a destination, and a pipeline that binds them to the model you registered earlier.</p>
+<p>Register the Azure Cosmos DB container as a source. OmniVec will watch its change feed:</p>
+<div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+
+<div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">omnivec <span class="nb">source</span> create --name demo-cosmosdb-source <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--type cosmosdb <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--config <span class="s2">&#34;{\&#34;endpoint\&#34;:\&#34;https://</span><span class="nv">$COSMOS_ACCOUNT</span><span class="s2">.documents.azure.com:443/\&#34;,\&#34;database\&#34;:\&#34;</span><span class="nv">$COSMOS_DB</span><span class="s2">\&#34;,\&#34;container\&#34;:\&#34;</span><span class="nv">$COSMOS_CONTAINER</span><span class="s2">\&#34;,\&#34;auth_type\&#34;:\&#34;managed-identity\&#34;}&#34;</span></span></span></code></pre></div></div><div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+  <button
+    class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+    title="Copy code"
+  >
+    <div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4"></div>
+    <div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4"></div>
+  </button>
+</div>
+</div>
+<p>Register the same Azure Cosmos DB container as a destination. OmniVec will write embeddings back into it:</p>
+<div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+
+<div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">omnivec destination create --name demo-cosmosdb-destination <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--type cosmosdb-vector <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--config <span class="s2">&#34;{\&#34;endpoint\&#34;:\&#34;https://</span><span class="nv">$COSMOS_ACCOUNT</span><span class="s2">.documents.azure.com:443/\&#34;,\&#34;database\&#34;:\&#34;</span><span class="nv">$COSMOS_DB</span><span class="s2">\&#34;,\&#34;container\&#34;:\&#34;</span><span class="nv">$COSMOS_CONTAINER</span><span class="s2">\&#34;,\&#34;auth_type\&#34;:\&#34;managed-identity\&#34;}&#34;</span></span></span></code></pre></div></div><div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+  <button
+    class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+    title="Copy code"
+  >
+    <div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4"></div>
+    <div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4"></div>
+  </button>
+</div>
+</div>
+<p>The pipeline needs three IDs: source, destination, and model. Grab the source and destination IDs from <code>omnivec source list</code> and <code>omnivec destination list</code> (they look like <code>src-…</code> and <code>dst-…</code>). For the model, the registered name (demo-foundry-oai-model) isn&rsquo;t the ID; the internal <code>mdl-ext-*</code> ID is what the pipeline expects:</p>
+<div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+
+<div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">SOURCE_ID</span><span class="o">=</span>&lt;src-id-from-source-list&gt;
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">DESTINATION_ID</span><span class="o">=</span>&lt;dst-id-from-destination-list&gt;
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">MODEL_ID</span><span class="o">=</span><span class="k">$(</span>omnivec model <span class="nb">test</span> demo-foundry-oai-model <span class="p">|</span> sed <span class="s1">&#39;s/^OK: Model test returned: //&#39;</span> <span class="p">|</span> jq -r <span class="s1">&#39;.id&#39;</span><span class="k">)</span></span></span></code></pre></div></div><div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+  <button
+    class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+    title="Copy code"
+  >
+    <div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4"></div>
+    <div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4"></div>
+  </button>
+</div>
+</div>
+<p>Create the pipeline. <code>--content-fields</code> tells OmniVec which fields on each source document to embed (concatenated), <code>--embedding-field</code> is where the resulting vector lands on the destination document, and <code>--vector-index-path</code> is the path the destination container&rsquo;s vector index looks at (it should match the path you set in the <code>az cosmosdb sql container create</code> step):</p>
+<div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+
+<div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">omnivec pipeline create --name demo-cosmosdb-pipeline <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--source <span class="nv">$SOURCE_ID</span> --destination <span class="nv">$DESTINATION_ID</span> --model <span class="nv">$MODEL_ID</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--content-fields name,description --embedding-field embedding <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>--vector-index-path /embedding --processing-mode inline</span></span></code></pre></div></div><div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+  <button
+    class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+    title="Copy code"
+  >
+    <div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4"></div>
+    <div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4"></div>
+  </button>
+</div>
+</div>
+<p>You should see something like:</p>
+<div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+
+<div><pre><code>OK: Pipeline created: pip-94348d5e (status: paused)</code></pre></div><div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+  <button
+    class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+    title="Copy code"
+  >
+    <div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4"></div>
+    <div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4"></div>
+  </button>
+</div>
+</div>
+<p>New pipelines start paused. Grab the pipeline ID from the output (or from <code>omnivec pipeline list</code>) and resume it:</p>
+<div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+
+<div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">PIPELINE_ID</span><span class="o">=</span>&lt;pip-id-from-create-output&gt;
+</span></span><span class="line"><span class="cl">omnivec pipeline resume <span class="nv">$PIPELINE_ID</span></span></span></code></pre></div></div><div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+  <button
+    class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+    title="Copy code"
+  >
+    <div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4"></div>
+    <div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4"></div>
+  </button>
+</div>
+</div>
+<p>Check the pipeline&rsquo;s progress:</p>
+<div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+
+<div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">omnivec pipeline show <span class="nv">$PIPELINE_ID</span></span></span></code></pre></div></div><div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+  <button
+    class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+    title="Copy code"
+  >
+    <div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4"></div>
+    <div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4"></div>
+  </button>
+</div>
+</div>
+<p>Once the workers have processed the seed data, you&rsquo;ll see output similar to the following (truncated for brevity):</p>
+<div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+
+<div><pre><code>Pipeline
+ID: pip-94348d5e
+Name: demo-cosmosdb-pipeline
+Status: active
+...
+
+Stats
+Documents Embedded: 100
+Source Docs: 100
+Completion: 100.0%
+Failed: 0
+Pending: 0
+...</code></pre></div><div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+  <button
+    class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+    title="Copy code"
+  >
+    <div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4"></div>
+    <div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4"></div>
+  </button>
+</div>
+</div>
+<p>Completion: 100.0% means every seed document now has an embedding written back to its embedding field. From this point on, any insert or update to the source container flows through the change feed and gets re-embedded automatically.</p>
+<h3>Run vector search<span class="hx-absolute -hx-mt-20" id="run-vector-search"></span>
+    <a href="#run-vector-search" class="subheading-anchor" aria-label="Permalink for this section"></a></h3><p>The embeddings are in place, so you can run vector search against the destination. Use the OmniVec CLI&rsquo;s search command with a natural-language query:</p>
+<div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+
+<div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">omnivec search <span class="s2">&#34;warm waterproof hiking pants&#34;</span> --index <span class="nv">$DESTINATION_ID</span> --top-k <span class="m">3</span></span></span></code></pre></div></div><div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+  <button
+    class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+    title="Copy code"
+  >
+    <div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4"></div>
+    <div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4"></div>
+  </button>
+</div>
+</div>
+<p>Try another query to confirm it generalizes beyond the obvious matches:</p>
+<div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+
+<div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">omnivec search <span class="s2">&#34;lightweight running shoes&#34;</span> --index <span class="nv">$DESTINATION_ID</span> --top-k <span class="m">3</span></span></span></code></pre></div></div><div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+  <button
+    class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+    title="Copy code"
+  >
+    <div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4"></div>
+    <div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4"></div>
+  </button>
+</div>
+</div>
+<p>The web UI ships with a vector search playground that calls the same API.</p>
+<p><img src="vector-search-playground.png" alt="Screenshot of the OmniVec vector search playground showing a natural-language query, vector search controls, and a results panel with matched documents and similarity scores." loading="lazy" /></p>
+<h2>Wrapping up<span class="hx-absolute -hx-mt-20" id="wrapping-up"></span>
+    <a href="#wrapping-up" class="subheading-anchor" aria-label="Permalink for this section"></a></h2><p>The walkthrough above used Azure Cosmos DB as both source and destination, with a hosted Azure OpenAI embedding model, but you can mix and match sources, destinations, and models. It supports a wide range of scenarios – a common use case is pointing OmniVec at an Azure Blob Storage container full of PDFs and other documents and writing the embeddings into Azure Cosmos DB.</p>
+<p>OmniVec is on GitHub at <a href="https://github.com/AzureCosmosDB/OmniVec" target="_blank" rel="noopener">AzureCosmosDB/OmniVec</a>. It is a public preview, so expect changes as it matures. Clone it, deploy it into your own subscription, and try it on one of your own datasets. Bug reports, feedback, and requests are all welcome through GitHub issues. And if you build something interesting on top of it, we&rsquo;d love to hear about that too!</p>
+
+        </div>
+    <div class="hx-mt-12 hx-mb-8 hx-block hx-text-xs hx-text-gray-500 ltr:hx-text-right rtl:hx-text-left dark:hx-text-gray-400">Last updated on <time datetime="2026-06-02T00:00:00.000Z">June 2, 2026</time></div><div class="hx-mb-8 hx-flex hx-items-center hx-border-t hx-pt-8 dark:hx-border-neutral-800 contrast-more:hx-border-neutral-400 dark:contrast-more:hx-border-neutral-400 print:hx-hidden"><a
+        href="/blog/linkedin/2026-05-01-ghc-cli-chronicle/"
+        title="Put your GitHub Copilot CLI session history to work with Chronicle"
+        class="hx-flex hx-max-w-[50%] hx-items-center hx-gap-1 hx-py-4 hx-text-base hx-font-medium hx-text-gray-600 hx-transition-colors [word-break:break-word] hover:hx-text-primary-600 dark:hx-text-gray-300 md:hx-text-lg ltr:hx-pr-4 rtl:hx-pl-4"
+      ><svg class="hx-inline hx-h-5 hx-shrink-0 ltr:hx-rotate-180" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>Put your GitHub Copilot CLI session history to work with Chronicle</a><a
+        href="/blog/integrated-embeddings-azure-cosmos-db/"
+        title="Announcing the Public Preview of Integrated Embeddings in Azure Cosmos DB: Build AI Apps With Embeddings That Stay in Sync"
+        class="hx-flex hx-max-w-[50%] hx-items-center hx-gap-1 hx-py-4 hx-text-base hx-font-medium hx-text-gray-600 hx-transition-colors [word-break:break-word] hover:hx-text-primary-600 dark:hx-text-gray-300 md:hx-text-lg ltr:hx-ml-auto ltr:hx-pl-4 ltr:hx-text-right rtl:hx-mr-auto rtl:hx-pr-4 rtl:hx-text-left"
+      >Announcing the Public Preview of Integrated Embeddings in Azure Cosmos DB: Build AI Apps With Embeddings That Stay in Sync<svg class="hx-inline hx-h-5 hx-shrink-0 rtl:-hx-rotate-180" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg></a></div></main>
+    </article>
+  </div>
+
+      
+<footer style="background-color: #000; color: #fff; padding: 3rem 0 2rem 0; margin-top: 4rem;">
+    <div style="max-width: 80rem; margin: 0 auto; padding: 0 2rem;">
+
+        
+        <div style="display: flex; justify-content: center; margin-bottom: 2rem;">
+            <ul style="list-style: none; margin: 0; padding: 0; display: flex; gap: 2rem; flex-wrap: wrap;">
+                <li><a href="/about" style="color: #e5e7eb; text-decoration: none; transition: color 0.2s;"
+                        onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#e5e7eb'">About</a></li>
+                <li><a href="/projects" style="color: #e5e7eb; text-decoration: none; transition: color 0.2s;"
+                        onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#e5e7eb'">Projects</a></li>
+                <li><a href="/presentations" style="color: #e5e7eb; text-decoration: none; transition: color 0.2s;"
+                        onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#e5e7eb'">Presentations</a>
+                </li>
+                <li><a href="/publications" style="color: #e5e7eb; text-decoration: none; transition: color 0.2s;"
+                        onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#e5e7eb'">Publications</a>
+                </li>
+                <li><a href="/blog" style="color: #e5e7eb; text-decoration: none; transition: color 0.2s;"
+                        onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#e5e7eb'">Blog</a></li>
+            </ul>
+        </div>
+
+        
+        <div style="display: flex; justify-content: center; margin-bottom: 2rem;">
+            <ul style="list-style: none; margin: 0; padding: 0; display: flex; gap: 1.5rem; flex-wrap: wrap;">
+
+                
+                <li>
+                    <a href="https://twitter.com/abhi_tweeter/" title="Twitter"
+                        style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; background-color: #1f2937; border-radius: 8px; transition: all 0.2s; text-decoration: none;"
+                        onmouseover="this.style.backgroundColor='#374151'; this.style.transform='translateY(-2px)'"
+                        onmouseout="this.style.backgroundColor='#1f2937'; this.style.transform='translateY(0)'">
+                        <svg width="20" height="20" fill="#e5e7eb" viewBox="0 0 24 24">
+                            <path
+                                d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                        </svg>
+                    </a>
+                </li>
+
+                
+                <li>
+                    <a href="https://www.linkedin.com/in/abhirockzz/" title="LinkedIn"
+                        style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; background-color: #1f2937; border-radius: 8px; transition: all 0.2s; text-decoration: none;"
+                        onmouseover="this.style.backgroundColor='#374151'; this.style.transform='translateY(-2px)'"
+                        onmouseout="this.style.backgroundColor='#1f2937'; this.style.transform='translateY(0)'">
+                        <svg width="20" height="20" fill="#e5e7eb" viewBox="0 0 24 24">
+                            <path
+                                d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+                        </svg>
+                    </a>
+                </li>
+
+                
+                <li>
+                    <a href="https://github.com/abhirockzz/" title="GitHub"
+                        style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; background-color: #1f2937; border-radius: 8px; transition: all 0.2s; text-decoration: none;"
+                        onmouseover="this.style.backgroundColor='#374151'; this.style.transform='translateY(-2px)'"
+                        onmouseout="this.style.backgroundColor='#1f2937'; this.style.transform='translateY(0)'">
+                        <svg width="20" height="20" fill="#e5e7eb" viewBox="0 0 24 24">
+                            <path
+                                d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+                        </svg>
+                    </a>
+                </li>
+
+                
+                <li>
+                    <a href="https://dev.to/abhirockzz" title="dev.to"
+                        style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; background-color: #1f2937; border-radius: 8px; transition: all 0.2s; text-decoration: none;"
+                        onmouseover="this.style.backgroundColor='#374151'; this.style.transform='translateY(-2px)'"
+                        onmouseout="this.style.backgroundColor='#1f2937'; this.style.transform='translateY(0)'">
+                        <svg width="20" height="20" fill="#e5e7eb" viewBox="0 0 24 24">
+                            <path
+                                d="M7.826 10.083a.784.784 0 0 0-.468-.175h-.701v4.198h.701a.786.786 0 0 0 .468-.175c.155-.117.233-.292.233-.525v-2.798c.001-.233-.078-.408-.233-.525zM19.236 3H4.764C3.791 3 3.002 3.787 3.002 4.760v14.480c0 .973.789 1.760 1.762 1.760h14.472c.973 0 1.762-.787 1.762-1.760V4.760C21.998 3.787 21.209 3 20.236 3zm-7.138 12.171c0 .967-.84 1.748-1.879 1.748H6.425V7.083h3.794c1.039 0 1.879.781 1.879 1.748v6.34zm4.132-2.952c0 .492-.172.94-.484 1.286-.311.346-.739.518-1.283.518s-.971-.172-1.283-.518c-.311-.346-.484-.794-.484-1.286v-2.467c0-.492.172-.94.484-1.286.311-.346.739-.518 1.283-.518s.971.172 1.283.518c.311.346.484.794.484 1.286v2.467z" />
+                        </svg>
+                    </a>
+                </li>
+
+                
+                <li>
+                    <a href="https://medium.com/@abhishek1987" title="Medium"
+                        style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; background-color: #1f2937; border-radius: 8px; transition: all 0.2s; text-decoration: none;"
+                        onmouseover="this.style.backgroundColor='#374151'; this.style.transform='translateY(-2px)'"
+                        onmouseout="this.style.backgroundColor='#1f2937'; this.style.transform='translateY(0)'">
+                        <svg width="20" height="20" fill="#e5e7eb" viewBox="0 0 24 24">
+                            <path
+                                d="M13.54 12a6.8 6.8 0 01-6.77 6.82A6.8 6.8 0 010 12a6.8 6.8 0 016.77-6.82A6.8 6.8 0 0113.54 12zM20.96 12c0 3.54-1.51 6.42-3.38 6.42-1.87 0-3.39-2.88-3.39-6.42s1.52-6.42 3.39-6.42 3.38 2.88 3.38 6.42M24 12c0 3.17-.53 5.75-1.19 5.75-.66 0-1.19-2.58-1.19-5.75s.53-5.75 1.19-5.75C23.47 6.25 24 8.83 24 12z" />
+                        </svg>
+                    </a>
+                </li>
+
+            </ul>
+        </div>
+
+        
+        <div style="text-align: center; padding-top: 2rem; border-top: 1px solid #374151;">
+            <p style="margin: 0; color: #9ca3af; font-size: 0.875rem;">
+                © Abhishek Gupta, 2025
+            </p>
+        </div>
+    </div>
+</footer>
+    
+    <script defer src="/js/main.min.0942239592f0795dc7213dd1057fd229d7edc19c0ef1a285396eb292d9ca9842.js" integrity="sha256-CUIjlZLweV3HIT3RBX/SKdftwZwO8aKFOW6yktnKmEI="></script>
+<script defer src="/lib/flexsearch/flexsearch.bundle.min.0425860527cc9968f9f049421c7a56b39327d475e2e3a8f550416be3a9134327.js" integrity="sha256-BCWGBSfMmWj58ElCHHpWs5Mn1HXi46j1UEFr46kTQyc="></script>
+    <script defer src="/en.search.min.7918d81999396a56d9ff1b7a986d6474e66bd5acdbbe01e8bac129f5ef345a88.js" integrity="sha256-eRjYGZk5albZ/xt6mG1kdOZr1azbvgHousEp9e80Wog="></script>
+  </body>
+</html>
