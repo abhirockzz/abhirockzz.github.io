@@ -6,7 +6,7 @@
     <generator>Hugo -- gohugo.io</generator>
     <language>en</language>
     <copyright>© Abhishek Gupta, 2025</copyright>
-    <lastBuildDate>Fri, 03 Jul 2026 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Mon, 06 Jul 2026 00:00:00 +0000</lastBuildDate>
     
 	  <atom:link href="https://abhirockzz.github.io/index.xml" rel="self" type="application/rss+xml" />
     
@@ -14,6 +14,114 @@
       
       
     
+    
+    <item>
+      <title>Need a different partition key in Azure Cosmos DB? Pick the right approach</title>
+      <link>https://abhirockzz.github.io/blog/change-partition-key-cosmos-db/</link>
+      <pubDate>Mon, 06 Jul 2026 00:00:00 +0000</pubDate>
+      
+      <guid>https://abhirockzz.github.io/blog/change-partition-key-cosmos-db/</guid>
+      <description>
+        
+        
+        &lt;p&gt;&lt;em&gt;Originally posted on &lt;a href=&#34;https://devblogs.microsoft.com/cosmosdb/need-a-different-partition-key-in-azure-cosmos-db-pick-the-right-approach/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;https://devblogs.microsoft.com/cosmosdb/need-a-different-partition-key-in-azure-cosmos-db-pick-the-right-approach/&lt;/a&gt;&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;Once you create a container, its &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/partitioning&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;partition key&lt;/a&gt; is fixed at creation, and you can&amp;rsquo;t change it in place. However, if your original key starts causing problems like &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/how-to-query-container#avoid-cross-partition-queries&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;cross-partition queries&lt;/a&gt; or &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/troubleshoot-request-rate-too-large#how-to-identify-the-hot-partition&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;hot partitions&lt;/a&gt;, you need to consider your options for changing it. This post explains the mechanics of changing a partition key, and the tradeoffs between the options.&lt;/p&gt;
+&lt;p&gt;First, think about the &lt;strong&gt;intent&lt;/strong&gt; of your change:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Re-partition the data.&lt;/strong&gt; You want your items (and future &lt;em&gt;writes&lt;/em&gt;) to live under a different key. This means moving to a new container and there are three ways, from least to most effort: &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/change-partition-key&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Change partition key&lt;/a&gt; feature, &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/container-copy&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;container copy jobs&lt;/a&gt;, or a do-it-yourself migration.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Query by a different key without moving.&lt;/strong&gt; Your writes are fine where they are, and you only have &lt;em&gt;read&lt;/em&gt; patterns that fan out across partitions. A Global Secondary Index adds a separate, read-only, automatically-synchronized container with a different partition key and its own data model, a projection of your items (all properties, or just a subset). The source container stays unchanged.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Note that every &amp;ldquo;change the partition key&amp;rdquo; option is actually a &lt;strong&gt;move&lt;/strong&gt;: get your data into a &lt;em&gt;new&lt;/em&gt; container that has the new key, then point your app at it. The exception is a &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/global-secondary-indexes&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Global Secondary Index&lt;/a&gt;, which adds a different key for read patterns while the source container stays unchanged.&lt;/p&gt;
+&lt;p&gt;Let&amp;rsquo;s walk through each path and its tradeoffs.&lt;/p&gt;
+&lt;h2&gt;Re-partition the data&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;re-partition-the-data&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#re-partition-the-data&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;The three options below all land your data in a &lt;em&gt;new&lt;/em&gt; container with the new key. But, they differ in how much Azure Cosmos DB does for you, whether you can keep writing to the source while the copy runs, and how much control you have over the cutover.&lt;/p&gt;
+&lt;h3&gt;Option 1: the portal Change partition key feature (least effort)&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;option-1-the-portal-change-partition-key-feature-least-effort&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#option-1-the-portal-change-partition-key-feature-least-effort&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;The portal feature is the managed path. In the Azure portal, open &lt;strong&gt;Data Explorer&lt;/strong&gt;, pick your container, go to &lt;strong&gt;Scale &amp;amp; Settings → Partition Keys&lt;/strong&gt;, and select &lt;strong&gt;Change&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;The portal creates or selects a destination container in the same database, then copies your data into it using &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/container-copy&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;container copy jobs&lt;/a&gt; (Option 2 covers those, since they&amp;rsquo;re the same engine). If you let the portal create the destination container for you, all configurations except the partition key and unique keys are replicated to the destination, so you only restate those two. You can run the copy &lt;strong&gt;online&lt;/strong&gt; or &lt;strong&gt;offline&lt;/strong&gt; (the next section explains what that means). In online mode you finish the job by selecting &lt;strong&gt;Complete&lt;/strong&gt;, and once the copy is done you start using the new container with the new key and optionally delete the old one.&lt;/p&gt;
+&lt;div class=&#34;hx-overflow-x-auto hx-mt-6 hx-flex hx-rounded-lg hx-border hx-py-2 ltr:hx-pr-4 rtl:hx-pl-4 contrast-more:hx-border-current contrast-more:dark:hx-border-current hx-border-blue-200 hx-bg-blue-100 hx-text-blue-900 dark:hx-border-blue-200/30 dark:hx-bg-blue-900/30 dark:hx-text-blue-200&#34;&gt;
+  &lt;div class=&#34;ltr:hx-pl-3 ltr:hx-pr-2 rtl:hx-pr-3 rtl:hx-pl-2&#34;&gt;&lt;div class=&#34;hx-select-none hx-text-xl&#34; style=&#34;font-family: &#39;Apple Color Emoji&#39;, &#39;Segoe UI Emoji&#39;, &#39;Segoe UI Symbol&#39;;&#34;&gt;ℹ️&lt;/div&gt;&lt;/div&gt;
+
+  &lt;div class=&#34;hx-w-full hx-min-w-0 hx-leading-7&#34;&gt;
+    &lt;div class=&#34;hx-mt-6 hx-leading-7 first:hx-mt-0&#34;&gt;Read more in the Change partition key &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/change-partition-key#limitations&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;limitations&lt;/a&gt;.&lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+
+&lt;h3&gt;Option 2: container copy jobs directly (same engine, scriptable)&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;option-2-container-copy-jobs-directly-same-engine-scriptable&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#option-2-container-copy-jobs-directly-same-engine-scriptable&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;&lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/container-copy&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Container copy jobs&lt;/a&gt; are the engine behind the portal capability. You can also create and manage them yourself with &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/how-to-container-copy&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Azure CLI&lt;/a&gt; (via the &lt;code&gt;cosmosdb-preview&lt;/code&gt; extension), which is what you want for scripting, automation, or finer control. The workflow is: create the target container with the partition key (and throughput, unique keys, etc.) you want, create the copy job, monitor it, and cut over. When the source and destination are in &lt;em&gt;different&lt;/em&gt; accounts, you first give the destination account&amp;rsquo;s identity read access to the source container. Same-account copies don&amp;rsquo;t need this step.&lt;/p&gt;
+&lt;p&gt;Container copy has two modes: online, where writes continue during the copy, and offline, where you stop writes before the job starts.&lt;/p&gt;
+&lt;p&gt;Online mode keeps writes flowing during the copy and ends with a short Complete-then-cutover, but every source write is charged double RUs while online copy is enabled, and it needs continuous backup, &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/change-feed-modes?tabs=latest-version#all-versions-and-deletes-change-feed-mode&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;all-versions-and-deletes change feed&lt;/a&gt;, and the account-level capability switched on first. Offline skips those prerequisites at the cost of a write freeze on the source until you cut over. The &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/container-copy&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Container copy jobs&lt;/a&gt; documentation walks through the prerequisites and cutover for both modes.&lt;/p&gt;
+&lt;p&gt;Both modes run on a best-effort basis (there&amp;rsquo;s no guaranteed completion time), and jobs run one at a time in the write region. Two things are worth planning for: a copy doesn&amp;rsquo;t carry TTL across, so an item that hasn&amp;rsquo;t expired restarts its countdown in the destination, and you&amp;rsquo;ll want the target provisioned at roughly twice the source throughput to keep up.&lt;/p&gt;
+&lt;div class=&#34;hx-overflow-x-auto hx-mt-6 hx-flex hx-rounded-lg hx-border hx-py-2 ltr:hx-pr-4 rtl:hx-pl-4 contrast-more:hx-border-current contrast-more:dark:hx-border-current hx-border-yellow-100 hx-bg-yellow-50 hx-text-yellow-900 dark:hx-border-yellow-200/30 dark:hx-bg-yellow-700/30 dark:hx-text-yellow-200&#34;&gt;
+  &lt;div class=&#34;ltr:hx-pl-3 ltr:hx-pr-2 rtl:hx-pr-3 rtl:hx-pl-2&#34;&gt;&lt;div class=&#34;hx-select-none hx-text-xl&#34; style=&#34;font-family: &#39;Apple Color Emoji&#39;, &#39;Segoe UI Emoji&#39;, &#39;Segoe UI Symbol&#39;;&#34;&gt;⚠️&lt;/div&gt;&lt;/div&gt;
+
+  &lt;div class=&#34;hx-w-full hx-min-w-0 hx-leading-7&#34;&gt;
+    &lt;div class=&#34;hx-mt-6 hx-leading-7 first:hx-mt-0&#34;&gt;&lt;strong&gt;Before you cut over:&lt;/strong&gt; A new container is also your one window to turn on features that can only be set at creation, the clearest being hierarchical partition keys, so weigh them now if they fit your workload. And since you&amp;rsquo;re re-keying everything, confirm the new partition key value plus id is unique across the destination, or two formerly distinct items can collide.&lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+
+&lt;h3&gt;Option 3: roll your own migration (most control, most work)&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;option-3-roll-your-own-migration-most-control-most-work&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#option-3-roll-your-own-migration-most-control-most-work&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;If you need transforms during the move, your container exceeds the container-copy limits, or you just want full ownership of the process, create the new container yourself and move the data with your own pipeline. The &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/migrate&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;large-scale migration guidance&lt;/a&gt; covers the building blocks:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Bulk ingestion&lt;/strong&gt; to load the new container fast: the .NET v3 SDK has it built in, and the &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/bulk-executor-overview&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;bulk executor library&lt;/a&gt; covers apps still on .NET SDK 2.x.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Azure Data Factory&lt;/strong&gt; for smaller datasets (configure source and sink, no code), or the &lt;strong&gt;Spark connector&lt;/strong&gt; if you already work in Spark.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/change-feed&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Change feed&lt;/a&gt;&lt;/strong&gt; to catch writes that land on the source after your bulk load and replay them into the new container until you cut over. Its default &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/change-feed-modes&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;latest-version mode&lt;/a&gt; skips deletes and TTL expirations, so use all-versions-and-deletes (which needs continuous backup) to handle delete operations.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Pre-create the destination with enough RU/s and turn off indexing during the load to hold down write cost. You own incremental sync, error handling, cutover, and any reshaping along the way.&lt;/p&gt;
+&lt;h2&gt;Query by a different key, without moving (global secondary index)&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;query-by-a-different-key-without-moving-global-secondary-index&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#query-by-a-different-key-without-moving-global-secondary-index&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;If your only pain is cross-partition queries (reads that fan out because your filter property isn&amp;rsquo;t the partition key), you may not need to move at all. For that case, use &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/global-secondary-indexes&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;global secondary indexes&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;A global secondary index (GSI) is a separate, read-only container keyed by a &lt;em&gt;different&lt;/em&gt; partition key, with its own data model. That model is a projection query over your items (&lt;code&gt;SELECT *&lt;/code&gt; for all properties, or just the subset you query), and it stays automatically synchronized with the source container. You keep writing to your existing container with its existing key, and queries whose filter matches the GSI&amp;rsquo;s partition key (the specific patterns you built the GSI for) can become single-partition queries against the GSI instead of cross-partition queries on the source. A GSI helps the patterns it&amp;rsquo;s keyed for, not every cross-partition query.&lt;/p&gt;
+&lt;p&gt;GSIs fit when changing your existing partition key would be disruptive, and you have multiple query patterns that no single key can satisfy. A GSI needs continuous backups on the account, stays eventually consistent regardless of your consistency level, and runs on autoscale with its own storage and RU costs. Once one exists, replace and delete on the source cost 50–100% more RU (creates aren&amp;rsquo;t affected), and &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/global-secondary-indexes&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;global secondary indexes&lt;/a&gt; cover the rest.&lt;/p&gt;
+&lt;p&gt;A GSI fixes reads. It doesn&amp;rsquo;t change where your &lt;em&gt;writes&lt;/em&gt; land, so it won&amp;rsquo;t relieve a write-side hot partition on the source. If your problem is write distribution, or you need a different primary key for the data, you&amp;rsquo;re back to the data re-partitioning option above and you have to move.&lt;/p&gt;
+&lt;h2&gt;To wrap up&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;to-wrap-up&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#to-wrap-up&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;If your writes need a different key, you end up moving the data, and the only question left is how much of the copy you hand to Azure Cosmos DB. If only your reads fan out, a GSI fixes that without changing where your writes land. The table below puts all four side by side.&lt;/p&gt;
+&lt;h3&gt;Decision table&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;decision-table&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#decision-table&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;table&gt;
+  &lt;thead&gt;
+      &lt;tr&gt;
+          &lt;th&gt;Option&lt;/th&gt;
+          &lt;th&gt;Keep writing to the source during the move?&lt;/th&gt;
+          &lt;th&gt;Effort&lt;/th&gt;
+          &lt;th&gt;Use it when&lt;/th&gt;
+      &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;tbody&gt;
+      &lt;tr&gt;
+          &lt;td&gt;&lt;strong&gt;Portal &amp;ldquo;Change partition key&amp;rdquo;&lt;/strong&gt;&lt;/td&gt;
+          &lt;td&gt;Yes (online mode) or no (offline)&lt;/td&gt;
+          &lt;td&gt;Lowest&lt;/td&gt;
+          &lt;td&gt;You want point-and-click, container &amp;lt; 1,000,000 RU/s, &amp;lt; 4 TB, supported region&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+          &lt;td&gt;&lt;strong&gt;Container copy jobs (CLI)&lt;/strong&gt;&lt;/td&gt;
+          &lt;td&gt;Yes (online) or no (offline)&lt;/td&gt;
+          &lt;td&gt;Low–medium&lt;/td&gt;
+          &lt;td&gt;You want the managed engine but scripted, with explicit online/offline control&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+          &lt;td&gt;&lt;strong&gt;Roll your own (bulk / ADF / Spark + change feed)&lt;/strong&gt;&lt;/td&gt;
+          &lt;td&gt;Yes, if you build incremental sync yourself&lt;/td&gt;
+          &lt;td&gt;Highest&lt;/td&gt;
+          &lt;td&gt;You need transforms, are above the copy limits, or want full control of cutover&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+          &lt;td&gt;&lt;strong&gt;Global secondary index&lt;/strong&gt;&lt;/td&gt;
+          &lt;td&gt;N/A, source stays as-is, GSI auto-synced&lt;/td&gt;
+          &lt;td&gt;Medium&lt;/td&gt;
+          &lt;td&gt;The pain is cross-partition &lt;em&gt;reads&lt;/em&gt;, not write hot partitions, and you can keep the source key&lt;/td&gt;
+      &lt;/tr&gt;
+  &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;h2&gt;Learn more&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;learn-more&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#learn-more&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/partitioning&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Partitioning in Azure Cosmos DB&lt;/a&gt;, &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/change-partition-key&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Change the partition key (portal feature)&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/container-copy&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Container copy jobs&lt;/a&gt;, &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/how-to-container-copy&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Create and manage container copy jobs (CLI)&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/global-secondary-indexes&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Global secondary indexes&lt;/a&gt;, &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/hierarchical-partition-keys&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Hierarchical partition keys&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/migrate&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Migrate large amounts of data&lt;/a&gt;, &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/bulk-executor-overview&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Bulk executor library overview&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/change-feed-modes&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Change feed modes&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+      </description>
+    </item>
     
     <item>
       <title>How to Use Deep Agents with Azure Cosmos DB – Plan, act, and verify against operational data</title>
@@ -12940,774 +13048,6 @@ Our table is ready, now we can deploy our URL shortener application.&lt;/p&gt;
 &lt;li&gt;&lt;a href=&#34;https://aws.amazon.com/blogs/database/measuring-database-performance-of-amazon-memorydb-for-redis/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Measuring database performance of Amazon MemoryDB for Redis&lt;/a&gt;&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;Feel free to share your Redis tips, tricks and suggestions. Until then, Happy Building!&lt;/p&gt;
-
-      </description>
-    </item>
-    
-    <item>
-      <title>Manage Redis on AWS from Kubernetes</title>
-      <link>https://abhirockzz.github.io/blog/manage-redis-on-aws-kubernetes/</link>
-      <pubDate>Wed, 21 Sep 2022 00:00:00 +0000</pubDate>
-      
-      <guid>https://abhirockzz.github.io/blog/manage-redis-on-aws-kubernetes/</guid>
-      <description>
-        
-        
-        &lt;p&gt;&lt;em&gt;&lt;strong&gt;Using AWS Controller for Kubernetes and CDK for Kubernetes&lt;/strong&gt;&lt;/em&gt;&lt;/p&gt;
-&lt;p&gt;In this blog post, you will learn how to use &lt;code&gt;ACK&lt;/code&gt; with &lt;a href=&#34;https://docs.aws.amazon.com/eks/latest/userguide/what-is-eks.html&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Amazon EKS&lt;/a&gt; for creating a Redis cluster on AWS (with &lt;a href=&#34;https://docs.aws.amazon.com/memorydb/latest/devguide/what-is-memorydb-for-redis.html&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Amazon MemoryDB&lt;/a&gt;).&lt;/p&gt;
-&lt;p&gt;&lt;a href=&#34;https://aws-controllers-k8s.github.io/community/docs/community/overview/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;AWS Controllers for Kubernetes&lt;/a&gt; (also known as &lt;strong&gt;ACK&lt;/strong&gt;) leverage &lt;a href=&#34;https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/#custom-resources&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Kubernetes Custom Resource and Custom Resource Definitions&lt;/a&gt; and give you the ability to manage and use AWS services directly from Kubernetes without needing to define resources outside of the cluster. It &lt;a href=&#34;https://aws-controllers-k8s.github.io/community/docs/community/services/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;supports many AWS services&lt;/a&gt; including &lt;code&gt;S3&lt;/code&gt;, &lt;code&gt;DynamoDB&lt;/code&gt;, &lt;code&gt;MemoryDB&lt;/code&gt; etc.&lt;/p&gt;
-&lt;p&gt;Normally you would define custom resources in ACK using YAML. But, in this case we will leverage &lt;a href=&#34;https://cdk8s.io/docs/latest/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;cdk8s&lt;/a&gt; (Cloud Development Kit for Kubernetes), an open-source framework (part of CNCF) that allows you to define your Kubernetes applications using regular programming languages (instead of &lt;code&gt;yaml&lt;/code&gt;). Thanks to &lt;code&gt;cdk8s&lt;/code&gt; support for &lt;a href=&#34;cdk8s-k8s-go-3.md&#34; &gt;Kubernetes Custom Resource definitions&lt;/a&gt;, we will import &lt;code&gt;MemoryDB&lt;/code&gt; &lt;code&gt;ACK&lt;/code&gt; CRDs as APIs and then define a cluster using code (I will be using &lt;code&gt;Go&lt;/code&gt; for this).&lt;/p&gt;
-&lt;p&gt;That&amp;rsquo;s not all! In addition to the infrastructure, we will take care of the application that will represent the application which will connect with the MemoryDB cluster. To do this, we will use the &lt;a href=&#34;https://cdk8s.io/docs/latest/plus/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;cdk8s-plus library&lt;/a&gt; to define a Kubernetes &lt;code&gt;Deployment&lt;/code&gt; (and &lt;code&gt;Service&lt;/code&gt; to expose it), thereby building an end to end solution. In the process, you will learn about some of other nuances of &lt;code&gt;ACK&lt;/code&gt; such as &lt;code&gt;FieldExport&lt;/code&gt; etc.&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;https://miro.medium.com/max/1400/1*2plcuR0yNCkRbBNcLNpxoA.png&#34; alt=&#34;&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
-&lt;h2&gt;Pre-requisites&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;pre-requisites&#34;&gt;&lt;/span&gt;
-    &lt;a href=&#34;#pre-requisites&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;To follow along step-by-step, in addition to an AWS account, you will need to have &lt;a href=&#34;https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;AWS CLI&lt;/a&gt;, &lt;a href=&#34;https://cdk8s.io/docs/latest/getting-started/#install-the-cli&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;cdk8s CLI&lt;/a&gt;, &lt;a href=&#34;https://kubernetes.io/docs/tasks/tools/#kubectl&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;kubectl&lt;/a&gt;, &lt;a href=&#34;https://helm.sh/docs/intro/install/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;helm&lt;/a&gt; and the &lt;a href=&#34;https://go.dev/dl/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Go programming language&lt;/a&gt; installed.&lt;/p&gt;
-&lt;p&gt;There are a variety of ways in which you can create an &lt;a href=&#34;https://docs.aws.amazon.com/eks/latest/userguide/create-cluster.html&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Amazon EKS cluster&lt;/a&gt;. I prefer using &lt;a href=&#34;https://eksctl.io/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;eksctl&lt;/a&gt; CLI because of the convenience it offers!&lt;/p&gt;
-&lt;h2&gt;First, set up the MemoryDB controller&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;first-set-up-the-memorydb-controller&#34;&gt;&lt;/span&gt;
-    &lt;a href=&#34;#first-set-up-the-memorydb-controller&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;blockquote&gt;
-  &lt;p&gt;Most of the below steps are adapted from the &lt;code&gt;ACK&lt;/code&gt; documentation - &lt;a href=&#34;https://aws-controllers-k8s.github.io/community/docs/user-docs/install/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Install an ACK Controller&lt;/a&gt;&lt;/p&gt;
-&lt;/blockquote&gt;
-&lt;p&gt;&lt;strong&gt;Install it using &lt;code&gt;Helm&lt;/code&gt;:&lt;/strong&gt;&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;export&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;SERVICE&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;memorydb
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;export&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;RELEASE_VERSION&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;sb&#34;&gt;`&lt;/span&gt;curl -sL https://api.github.com/repos/aws-controllers-k8s/&lt;span class=&#34;nv&#34;&gt;$SERVICE&lt;/span&gt;-controller/releases/latest &lt;span class=&#34;p&#34;&gt;|&lt;/span&gt; grep &lt;span class=&#34;s1&#34;&gt;&amp;#39;&amp;#34;tag_name&amp;#34;:&amp;#39;&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;|&lt;/span&gt; cut -d&lt;span class=&#34;s1&#34;&gt;&amp;#39;&amp;#34;&amp;#39;&lt;/span&gt; -f4&lt;span class=&#34;sb&#34;&gt;`&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;export&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;ACK_SYSTEM_NAMESPACE&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;ack-system
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# you can change the region as required&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;export&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;AWS_REGION&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;us-east-1
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;aws ecr-public get-login-password --region us-east-1 &lt;span class=&#34;p&#34;&gt;|&lt;/span&gt; helm registry login --username AWS --password-stdin public.ecr.aws
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;helm install --create-namespace -n &lt;span class=&#34;nv&#34;&gt;$ACK_SYSTEM_NAMESPACE&lt;/span&gt; ack-&lt;span class=&#34;nv&#34;&gt;$SERVICE&lt;/span&gt;-controller &lt;span class=&#34;se&#34;&gt;\
-&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;se&#34;&gt;&lt;/span&gt;  oci://public.ecr.aws/aws-controllers-k8s/&lt;span class=&#34;nv&#34;&gt;$SERVICE&lt;/span&gt;-chart --version&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;nv&#34;&gt;$RELEASE_VERSION&lt;/span&gt; --set&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;aws.region&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;nv&#34;&gt;$AWS_REGION&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;To confirm, run:&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl get crd
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# output (multiple CRDs)&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;NAME                                         CREATED AT
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;acls.memorydb.services.k8s.aws               2022-08-13T19:15:46Z
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;adoptedresources.services.k8s.aws            2022-08-13T19:15:53Z
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;clusters.memorydb.services.k8s.aws           2022-08-13T19:15:47Z
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;eniconfigs.crd.k8s.amazonaws.com             2022-08-13T19:02:10Z
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;fieldexports.services.k8s.aws                2022-08-13T19:15:56Z
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;parametergroups.memorydb.services.k8s.aws    2022-08-13T19:15:48Z
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;securitygrouppolicies.vpcresources.k8s.aws   2022-08-13T19:02:12Z
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;snapshots.memorydb.services.k8s.aws          2022-08-13T19:15:51Z
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;subnetgroups.memorydb.services.k8s.aws       2022-08-13T19:15:52Z
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;users.memorydb.services.k8s.aws              2022-08-13T19:15:53Z&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;Since the controller has to interact with AWS Services (make API calls), we need to configure &lt;a href=&#34;https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;IAM Roles for Service Accounts&lt;/a&gt; (also known as &lt;strong&gt;IRSA&lt;/strong&gt;).&lt;/p&gt;
-&lt;blockquote&gt;
-  &lt;p&gt;Refer to &lt;a href=&#34;https://aws-controllers-k8s.github.io/community/docs/user-docs/irsa/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Configure IAM Permissions&lt;/a&gt; for details&lt;/p&gt;
-&lt;/blockquote&gt;
-&lt;p&gt;&lt;strong&gt;IRSA configuration&lt;/strong&gt;&lt;/p&gt;
-&lt;p&gt;First, create an OIDC identity provider for your cluster.&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;export&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;EKS_CLUSTER_NAME&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&amp;lt;name of your EKS cluster&amp;gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;export&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;AWS_REGION&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&amp;lt;cluster region&amp;gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;eksctl utils associate-iam-oidc-provider --cluster &lt;span class=&#34;nv&#34;&gt;$EKS_CLUSTER_NAME&lt;/span&gt; --region &lt;span class=&#34;nv&#34;&gt;$AWS_REGION&lt;/span&gt; --approve&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;The goal is to create an IAM role and attach appropriate permissions via policies. We can then create a &lt;a href=&#34;https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Kubernetes Service Account&lt;/a&gt; and attach the IAM role to it. Thus, the controller &lt;code&gt;Pod&lt;/code&gt; will be able to make AWS API calls. Note that we are using providing all &lt;code&gt;MemoryDB&lt;/code&gt; permissions to our control via the &lt;code&gt;arn:aws:iam::aws:policy/AmazonMemoryDBFullAccess&lt;/code&gt; policy.&lt;/p&gt;
-&lt;p&gt;Thanks to &lt;code&gt;eksctl&lt;/code&gt;, this can be done with a single line!&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;export&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;SERVICE&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;memorydb
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;export&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;ACK_K8S_SERVICE_ACCOUNT_NAME&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;ack-&lt;span class=&#34;nv&#34;&gt;$SERVICE&lt;/span&gt;-controller
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# recommend using the same name&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;export&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;ACK_SYSTEM_NAMESPACE&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;ack-system
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;export&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;EKS_CLUSTER_NAME&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&amp;lt;enter EKS cluster name&amp;gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;export&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;POLICY_ARN&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;arn:aws:iam::aws:policy/AmazonMemoryDBFullAccess
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# IAM role has a format - do not change it. you can&amp;#39;t use any arbitrary name&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;export&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;IAM_ROLE_NAME&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;ack-&lt;span class=&#34;nv&#34;&gt;$SERVICE&lt;/span&gt;-controller-role
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;eksctl create iamserviceaccount &lt;span class=&#34;se&#34;&gt;\
-&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;se&#34;&gt;&lt;/span&gt;    --name &lt;span class=&#34;nv&#34;&gt;$ACK_K8S_SERVICE_ACCOUNT_NAME&lt;/span&gt; &lt;span class=&#34;se&#34;&gt;\
-&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;se&#34;&gt;&lt;/span&gt;    --namespace &lt;span class=&#34;nv&#34;&gt;$ACK_SYSTEM_NAMESPACE&lt;/span&gt; &lt;span class=&#34;se&#34;&gt;\
-&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;se&#34;&gt;&lt;/span&gt;    --cluster &lt;span class=&#34;nv&#34;&gt;$EKS_CLUSTER_NAME&lt;/span&gt; &lt;span class=&#34;se&#34;&gt;\
-&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;se&#34;&gt;&lt;/span&gt;    --role-name &lt;span class=&#34;nv&#34;&gt;$IAM_ROLE_NAME&lt;/span&gt; &lt;span class=&#34;se&#34;&gt;\
-&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;se&#34;&gt;&lt;/span&gt;    --attach-policy-arn &lt;span class=&#34;nv&#34;&gt;$POLICY_ARN&lt;/span&gt; &lt;span class=&#34;se&#34;&gt;\
-&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;se&#34;&gt;&lt;/span&gt;    --approve &lt;span class=&#34;se&#34;&gt;\
-&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;se&#34;&gt;&lt;/span&gt;    --override-existing-serviceaccounts&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;blockquote&gt;
-  &lt;p&gt;The policy (&lt;code&gt;AmazonMemoryDBFullAccess&lt;/code&gt;) is chosen as per &lt;a href=&#34;https://github.com/aws-controllers-k8s/memorydb-controller/blob/main/config/iam/recommended-policy-arn&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;https://github.com/aws-controllers-k8s/memorydb-controller/blob/main/config/iam/recommended-policy-arn&lt;/a&gt;&lt;/p&gt;
-&lt;/blockquote&gt;
-&lt;p&gt;To confirm, you can check whether the IAM role was created and also introspect the Kubernetes service account&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;aws iam get-role --role-name&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;nv&#34;&gt;$IAM_ROLE_NAME&lt;/span&gt; --query Role.Arn --output text
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl describe serviceaccount/&lt;span class=&#34;nv&#34;&gt;$ACK_K8S_SERVICE_ACCOUNT_NAME&lt;/span&gt; -n &lt;span class=&#34;nv&#34;&gt;$ACK_SYSTEM_NAMESPACE&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# you will see similar output&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Name:                ack-memorydb-controller
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Namespace:           ack-system
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Labels:              app.kubernetes.io/instance&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;ack-memorydb-controller
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;                     app.kubernetes.io/managed-by&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;eksctl
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;                     app.kubernetes.io/name&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;memorydb-chart
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;                     app.kubernetes.io/version&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;v0.0.2
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;                     helm.sh/chart&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;memorydb-chart-v0.0.2
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;                     k8s-app&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;memorydb-chart
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Annotations:         eks.amazonaws.com/role-arn: arn:aws:iam::568863012249:role/ack-memorydb-controller-role
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;                     meta.helm.sh/release-name: ack-memorydb-controller
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;                     meta.helm.sh/release-namespace: ack-system
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Image pull secrets:  &amp;lt;none&amp;gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Mountable secrets:   ack-memorydb-controller-token-2cmmx
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Tokens:              ack-memorydb-controller-token-2cmmx
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Events:              &amp;lt;none&amp;gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;For &lt;code&gt;IRSA&lt;/code&gt; to take effect, you need to restart the ACK &lt;code&gt;Deployment&lt;/code&gt;:&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# Note the deployment name for ACK service controller from following command&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl get deployments -n &lt;span class=&#34;nv&#34;&gt;$ACK_SYSTEM_NAMESPACE&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl -n &lt;span class=&#34;nv&#34;&gt;$ACK_SYSTEM_NAMESPACE&lt;/span&gt; rollout restart deployment ack-memorydb-controller-memorydb-chart&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;Confirm that the &lt;code&gt;Deployment&lt;/code&gt; has restarted (currently &lt;code&gt;Running&lt;/code&gt;) and the &lt;code&gt;IRSA&lt;/code&gt; is properly configured:&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl get pods -n &lt;span class=&#34;nv&#34;&gt;$ACK_SYSTEM_NAMESPACE&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl describe pod -n &lt;span class=&#34;nv&#34;&gt;$ACK_SYSTEM_NAMESPACE&lt;/span&gt; ack-memorydb-controller-memorydb-chart-5975b8d757-k6x9k &lt;span class=&#34;p&#34;&gt;|&lt;/span&gt; grep &lt;span class=&#34;s2&#34;&gt;&amp;#34;^\s*AWS_&amp;#34;&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# The output should contain following two lines:&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nv&#34;&gt;AWS_ROLE_ARN&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;arn:aws:iam::&amp;lt;AWS_ACCOUNT_ID&amp;gt;:role/&amp;lt;IAM_ROLE_NAME&amp;gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nv&#34;&gt;AWS_WEB_IDENTITY_TOKEN_FILE&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;/var/run/secrets/eks.amazonaws.com/serviceaccount/token&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;Now that we&amp;rsquo;re done with the configuration, its time for&amp;hellip;&lt;/p&gt;
-&lt;h2&gt;&lt;code&gt;cdk8s&lt;/code&gt; in action!&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;cdk8s-in-action&#34;&gt;&lt;/span&gt;
-    &lt;a href=&#34;#cdk8s-in-action&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;We will go step by step:&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;Build and push the application Docker images to private registry in &lt;a href=&#34;https://docs.aws.amazon.com/AmazonECR/latest/userguide/what-is-ecr.html&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Amazon ECR&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;Deploy &lt;code&gt;MemoryDB&lt;/code&gt; along with the application and required configuration&lt;/li&gt;
-&lt;li&gt;Test the application&lt;/li&gt;
-&lt;/ul&gt;
-&lt;h3&gt;Build Docker image and push to ECR&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;build-docker-image-and-push-to-ecr&#34;&gt;&lt;/span&gt;
-    &lt;a href=&#34;#build-docker-image-and-push-to-ecr&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;Create ECR private repository&lt;/strong&gt;&lt;/p&gt;
-&lt;p&gt;Login to ECR:&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;aws ecr get-login-password --region &amp;lt;enter region&amp;gt; &lt;span class=&#34;p&#34;&gt;|&lt;/span&gt; docker login --username AWS --password-stdin &amp;lt;enter aws_account_id&amp;gt;.dkr.ecr.&amp;lt;enter region&amp;gt;.amazonaws.com&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;Create private repository:&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;aws ecr create-repository &lt;span class=&#34;se&#34;&gt;\
-&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;se&#34;&gt;&lt;/span&gt;    --repository-name memorydb-app &lt;span class=&#34;se&#34;&gt;\
-&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;se&#34;&gt;&lt;/span&gt;    --region &amp;lt;enter region&amp;gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;&lt;strong&gt;Build image and push to ECR&lt;/strong&gt;&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# if you&amp;#39;re on Mac M1&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;#export DOCKER_DEFAULT_PLATFORM=linux/amd64&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;docker build -t memorydb-app .
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;docker tag memorydb-app:latest &amp;lt;enter aws_account_id&amp;gt;.dkr.ecr.&amp;lt;enter region&amp;gt;.amazonaws.com/memorydb-app:latest
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;docker push &amp;lt;enter aws_account_id&amp;gt;.dkr.ecr.&amp;lt;enter region&amp;gt;.amazonaws.com/memorydb-app:latest&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;h3&gt;Use &lt;code&gt;cdk8s&lt;/code&gt; and &lt;code&gt;kubectl&lt;/code&gt; to deploy MemoryDB and the application&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;use-cdk8s-and-kubectl-to-deploy-memorydb-and-the-application&#34;&gt;&lt;/span&gt;
-    &lt;a href=&#34;#use-cdk8s-and-kubectl-to-deploy-memorydb-and-the-application&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;This is a ready-to-use &lt;code&gt;cdk8s&lt;/code&gt; project that you can use. The entire logic is in &lt;a href=&#34;https://github.com/abhirockzz/memorydb-ack-cdk8s-go/blob/master/memorydb-cdk8s/main.go&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;main.go file&lt;/a&gt; - I will dive into the nitty gritty of the code in the next section.&lt;/p&gt;
-&lt;p&gt;Clone the project from Github and change to the right directory:&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;pre&gt;&lt;code&gt;git clone https://github.com/abhirockzz/memorydb-ack-cdk8s-go.git
-cd memorydb-ack-cdk8s-go&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;&lt;strong&gt;Generate and deploy manifests&lt;/strong&gt;&lt;/p&gt;
-&lt;p&gt;Use &lt;code&gt;cdk8s synth&lt;/code&gt; to generate the manifest for &lt;code&gt;MemoryDB&lt;/code&gt;, the application as well as required configuration. We can then &lt;code&gt;apply&lt;/code&gt; it using &lt;code&gt;kubectl&lt;/code&gt;.&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;export&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;SUBNET_ID_LIST&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&amp;lt;enter comma-separated list of subnet IDs. should be same as your EKS cluster&amp;gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# for example:&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# export SUBNET_ID_LIST=subnet-086c4a45ec9a206e1,subnet-0d9a9c6d2ca7a24df,subnet-028ca54bb859a4994&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;export&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;SECURITY_GROUP_ID&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&amp;lt;enter security group ID&amp;gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# for example&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# export SECURITY_GROUP_ID=sg-06b6535ee64980616&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;export&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;DOCKER_IMAGE&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&amp;lt;enter ECR repo that you created earlier&amp;gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# example&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# export DOCKER_IMAGE=1234567891012.dkr.ecr.us-east-1.amazonaws.com/memorydb-app:latest&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;blockquote&gt;
-  &lt;p&gt;You can also add other environment variables &lt;code&gt;MEMORYDB_CLUSTER_NAME&lt;/code&gt;, &lt;code&gt;MEMORYDB_USERNAME&lt;/code&gt;, &lt;code&gt;MEMORYDB_PASSWORD&lt;/code&gt;. These are not mandatory and default to &lt;code&gt;memorydb-cluster-ack-cdk8s&lt;/code&gt;, &lt;code&gt;demouser&lt;/code&gt; and &lt;code&gt;Password123456789&lt;/code&gt; respectively&lt;/p&gt;
-&lt;/blockquote&gt;
-&lt;p&gt;To generate the manifests:&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;cdk8s synth
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# check the &amp;#34;dist&amp;#34; folder - you should see these files:&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;0000-memorydb.k8s.yaml
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;0001-config.k8s.yaml
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;0002-deployment.k8s.yaml&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;Let&amp;rsquo;s deploy them one by one, starting with the one which creates the &lt;code&gt;MemoryDB&lt;/code&gt; cluster. In addition to the cluster, it will also provision the supporting components including &lt;a href=&#34;https://docs.aws.amazon.com/memorydb/latest/devguide/components.html#whatis.components.acls&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;ACL&lt;/a&gt;, &lt;a href=&#34;https://docs.aws.amazon.com/memorydb/latest/devguide/components.html#whatis.components.user&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;User&lt;/a&gt; and &lt;a href=&#34;https://docs.aws.amazon.com/memorydb/latest/devguide/components.html#whatis.components.subnetgroups&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Subnet Group&lt;/a&gt;s.&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl apply -f dist/0000-memorydb.k8s.yaml
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;#output&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;secret/memdb-secret created
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;users.memorydb.services.k8s.aws/demouser created
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;acls.memorydb.services.k8s.aws/demo-acl created
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;subnetgroups.memorydb.services.k8s.aws/demo-subnet-group created
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;clusters.memorydb.services.k8s.aws/memorydb-cluster-ack-cdk8s&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;blockquote&gt;
-  &lt;p&gt;&lt;strong&gt;Kubernetes &lt;code&gt;Secret&lt;/code&gt;&lt;/strong&gt; is used to hold the password for &lt;code&gt;MemoryDB&lt;/code&gt; cluster user.&lt;/p&gt;
-&lt;/blockquote&gt;
-&lt;p&gt;This initiates the cluster creation. You can check the status using the AWS console. Once the creation is complete, you can test connectivity with &lt;code&gt;redis-cli&lt;/code&gt;:&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# run this from EC2 instance in the same subnet as the cluster&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;export&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;REDIS&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&amp;lt;enter cluster endpoint&amp;gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# example&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# export REDIS=clustercfg.memorydb-cluster-ack-cdk8s.smtjf4.memorydb.us-east-1.amazonaws.com&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;redis-cli -h &lt;span class=&#34;nv&#34;&gt;$REDIS&lt;/span&gt; -c --user demouser --pass Password123456789 --tls --insecure&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;Let&amp;rsquo;s apply second manifest. This will create configuration related components i.e. &lt;code&gt;ConfigMap&lt;/code&gt; and &lt;code&gt;FieldExport&lt;/code&gt;s - these are required by our application (to be deployed after this)&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl apply -f dist/0001-config.k8s.yaml
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;#output&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;configmap/export-memorydb-info created
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;fieldexports.services.k8s.aws/export-memorydb-endpoint created
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;fieldexports.services.k8s.aws/export-memorydb-username created&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;In this case, we create two &lt;code&gt;FieldExport&lt;/code&gt;s to extract data from the cluster (from &lt;code&gt;.status.clusterEndpoint.address&lt;/code&gt;) and user (&lt;code&gt;.spec.name&lt;/code&gt;) resources that we created before and seed it into a &lt;code&gt;ConfigMap&lt;/code&gt;.&lt;/p&gt;
-&lt;blockquote&gt;
-  &lt;p&gt;&lt;code&gt;ConfigMap&lt;/code&gt; and &lt;code&gt;FieldExport&lt;/code&gt;:&lt;/p&gt;
-&lt;p&gt;&lt;code&gt;FieldExport&lt;/code&gt; is an ACK component that can &lt;em&gt;&amp;ldquo;export any spec or status field from an ACK resource into a Kubernetes &lt;code&gt;ConfigMap&lt;/code&gt; or &lt;code&gt;Secret&lt;/code&gt;&amp;rdquo;&lt;/em&gt;. You can read up on the details in the &lt;a href=&#34;https://aws-controllers-k8s.github.io/community/docs/user-docs/field-export/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;ACK docs&lt;/a&gt; along with some examples.&lt;/p&gt;
-&lt;/blockquote&gt;
-&lt;p&gt;You should be able to confirm by checking the &lt;code&gt;FieldExport&lt;/code&gt; and &lt;code&gt;ConfigMap&lt;/code&gt;:&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl get fieldexport
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;#output&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;NAME                       AGE
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;export-memorydb-endpoint   20s
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;export-memorydb-username   20s
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl get configmap/export-memorydb-info -o yaml&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;We started out with a blank &lt;code&gt;ConfigMap&lt;/code&gt;, but &lt;code&gt;ACK&lt;/code&gt; magically populated it with the required attributes:&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-yaml&#34; data-lang=&#34;yaml&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nt&#34;&gt;apiVersion&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;v1&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;data&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;default.export-memorydb-endpoint&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;clustercfg.memorydb-cluster-ack-cdk8s.smtjf4.memorydb.us-east-1.amazonaws.com&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;default.export-memorydb-username&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;demouser&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;immutable&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;kc&#34;&gt;false&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;kind&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;ConfigMap&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;c&#34;&gt;#....omitted&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;Let&amp;rsquo;s create the application resources - &lt;code&gt;Deployment&lt;/code&gt; and the &lt;code&gt;Service&lt;/code&gt;.&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl apply -f dist/0003-deployment.k8s.yaml
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;#output&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;deployment.apps/memorydb-app created
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;service/memorydb-app-service configured&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;blockquote&gt;
-  &lt;p&gt;Since the Service type is &lt;code&gt;LoadBalancer&lt;/code&gt;, an appropriate &lt;a href=&#34;https://docs.aws.amazon.com/eks/latest/userguide/network-load-balancing.html&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;AWS Load Balancer will be provisioned&lt;/a&gt; to allow for external access.&lt;/p&gt;
-&lt;/blockquote&gt;
-&lt;p&gt;Check &lt;code&gt;Pod&lt;/code&gt; and &lt;code&gt;Service&lt;/code&gt;:&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl get pods
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl get service/memorydb-app-service
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# to get the load balancer IP&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nv&#34;&gt;APP_URL&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;$(&lt;/span&gt;kubectl get service/memorydb-app-service -o &lt;span class=&#34;nv&#34;&gt;jsonpath&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;{.status.loadBalancer.ingress[0].hostname}&amp;#34;&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;)&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;echo&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;$APP_URL&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# output example&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;a0042d5b5b0ad40abba9c6c42e6342a2-879424587.us-east-1.elb.amazonaws.com&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;You have deployed the application and know the endpoint over which it&amp;rsquo;s publicly accessible. Here is a high-level view of the current architecture:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;https://dev-to-uploads.s3.amazonaws.com/uploads/articles/0c7i0sjs5utencdyfy8s.png&#34; alt=&#34;Image description&#34; loading=&#34;lazy&#34; /&gt;&lt;/p&gt;
-&lt;h3&gt;Now you can access the application&amp;hellip;&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;now-you-can-access-the-application&#34;&gt;&lt;/span&gt;
-    &lt;a href=&#34;#now-you-can-access-the-application&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;It&amp;rsquo;s quite simple - it exposes a couple of HTTP endpoints to write and read data from Redis (you can check it on &lt;a href=&#34;https://github.com/abhirockzz/memorydb-ack-cdk8s-go/tree/master/memorydb-app&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;GitHub&lt;/a&gt;):&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;pre&gt;&lt;code&gt;# create a couple of users - this will be added as a `HASH` in Redis
-
-curl -i -X POST -d &amp;#39;{&amp;#34;email&amp;#34;:&amp;#34;user1@foo.com&amp;#34;, &amp;#34;name&amp;#34;:&amp;#34;user1&amp;#34;}&amp;#39; http://$APP_URL:9090/
-
-curl -i -X POST -d &amp;#39;{&amp;#34;email&amp;#34;:&amp;#34;user2@foo.com&amp;#34;, &amp;#34;name&amp;#34;:&amp;#34;user2&amp;#34;}&amp;#39; http://$APP_URL:9090/
-
-
-HTTP/1.1 200 OK
-Content-Length: 0
-
-# search for user via email
-curl -i http://$APP_URL:9090/user2@foo.com
-
-HTTP/1.1 200 OK
-Content-Length: 41
-Content-Type: text/plain; charset=utf-8
-
-{&amp;#34;email&amp;#34;:&amp;#34;user2@foo.com&amp;#34;,&amp;#34;name&amp;#34;:&amp;#34;user2&amp;#34;}&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;blockquote&gt;
-  &lt;p&gt;If you get a &lt;code&gt;Could not resolve host&lt;/code&gt; error while accessing the LB URL, wait for a minute or so and re-try&lt;/p&gt;
-&lt;/blockquote&gt;
-&lt;p&gt;Once you&amp;rsquo;re done&amp;hellip;&lt;/p&gt;
-&lt;h3&gt;&amp;hellip; don&amp;rsquo;t forget to delete resources..&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;-dont-forget-to-delete-resources&#34;&gt;&lt;/span&gt;
-    &lt;a href=&#34;#-dont-forget-to-delete-resources&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# delete MemoryDB cluster, configuration and the application&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl delete -f dist/
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# to uninstall the ACK controller&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;export&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;SERVICE&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;memorydb
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;helm uninstall -n &lt;span class=&#34;nv&#34;&gt;$ACK_SYSTEM_NAMESPACE&lt;/span&gt; ack-&lt;span class=&#34;nv&#34;&gt;$SERVICE&lt;/span&gt;-controller
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# delete the EKS cluster. if created via eksctl:&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;eksctl delete cluster --name &amp;lt;enter name of eks cluster&amp;gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;So far, you deployed the ACK controller for MemoryDB, setup a cluster, an application that connects to it and tested the end to end solution. Great!&lt;/p&gt;
-&lt;p&gt;Now let&amp;rsquo;s look at the &lt;code&gt;cdk8s&lt;/code&gt; code that makes it all happen. The logic is divided into three &lt;code&gt;Chart&lt;/code&gt;s. I will only focus on key sections of the code and rest will be omitted for brevity.&lt;/p&gt;
-&lt;blockquote&gt;
-  &lt;p&gt;You can refer to the complete code on &lt;a href=&#34;https://github.com/abhirockzz/memorydb-ack-cdk8s-go/tree/master/memorydb-cdk8s&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;GitHub&lt;/a&gt;&lt;/p&gt;
-&lt;/blockquote&gt;
-&lt;h2&gt;Code walk through&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;code-walk-through&#34;&gt;&lt;/span&gt;
-    &lt;a href=&#34;#code-walk-through&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;&lt;strong&gt;MemoryDB and related components&lt;/strong&gt;&lt;/p&gt;
-&lt;p&gt;We start by defining the &lt;code&gt;MemoryDB&lt;/code&gt; cluster along with the required components - ACL, User and Subnet Group.&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;kd&#34;&gt;func&lt;/span&gt; &lt;span class=&#34;nf&#34;&gt;NewMemoryDBChart&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;scope&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;constructs&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;Construct&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;id&lt;/span&gt; &lt;span class=&#34;kt&#34;&gt;string&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;props&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;*&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;MyChartProps&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;cdk8s&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;Chart&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;c1&#34;&gt;//...&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;secret&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;cdk8splus22&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;NewSecret&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;chart&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;password&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;cdk8splus22&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;SecretProps&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;nx&#34;&gt;Metadata&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;   &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;cdk8s&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;ApiObjectMetadata&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;Name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;secretName&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)},&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;nx&#34;&gt;StringData&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;kd&#34;&gt;map&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;[&lt;/span&gt;&lt;span class=&#34;kt&#34;&gt;string&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;]&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;*&lt;/span&gt;&lt;span class=&#34;kt&#34;&gt;string&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;password&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;memoryDBPassword&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)},&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;p&#34;&gt;})&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;user&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;users_memorydbservicesk8saws&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;NewUser&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;chart&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;user&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;users_memorydbservicesk8saws&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;UserProps&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;nx&#34;&gt;Metadata&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;cdk8s&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;ApiObjectMetadata&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;Name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;memoryDBUsername&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)},&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;nx&#34;&gt;Spec&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;users_memorydbservicesk8saws&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;UserSpec&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;Name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;         &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;memoryDBUsername&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;AccessString&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;memoryDBUserAccessString&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;AuthenticationMode&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;users_memorydbservicesk8saws&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;UserSpecAuthenticationMode&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;				&lt;span class=&#34;nx&#34;&gt;Type&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;Password&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;				&lt;span class=&#34;nx&#34;&gt;Passwords&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;[]&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;*&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;users_memorydbservicesk8saws&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;UserSpecAuthenticationModePasswords&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;					&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;Name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;secret&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(),&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;Key&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;secretKeyName&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)},&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;				&lt;span class=&#34;p&#34;&gt;},&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;p&#34;&gt;},&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;p&#34;&gt;},&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;p&#34;&gt;})&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;&lt;code&gt;ACL&lt;/code&gt; references the &lt;code&gt;User&lt;/code&gt; defined above:&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;acl&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;:=&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;acl_memorydbservicesk8saws&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;NewAcl&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;chart&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;acl&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;acl_memorydbservicesk8saws&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;AclProps&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;Metadata&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;cdk8s&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;ApiObjectMetadata&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;Name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;memoryDBACLName&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)},&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;Spec&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;acl_memorydbservicesk8saws&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;AclSpec&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;				&lt;span class=&#34;nx&#34;&gt;Name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;      &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;memoryDBACLName&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;				&lt;span class=&#34;nx&#34;&gt;UserNames&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Strings&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;*&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;user&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;()),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;p&#34;&gt;},&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;p&#34;&gt;})&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;The subnet IDs (for subnet group) as well as the security group ID for the cluster are read from environment variables.&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;subnetGroup&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;:=&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;subnetgroups_memorydbservicesk8saws&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;NewSubnetGroup&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;chart&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;sg&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;subnetgroups_memorydbservicesk8saws&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;SubnetGroupProps&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;Metadata&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;cdk8s&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;ApiObjectMetadata&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;Name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;memoryDBSubnetGroup&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)},&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;Spec&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;subnetgroups_memorydbservicesk8saws&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;SubnetGroupSpec&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;				&lt;span class=&#34;nx&#34;&gt;Name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;memoryDBSubnetGroup&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;				&lt;span class=&#34;nx&#34;&gt;SubnetIDs&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Strings&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;strings&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Split&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;subnetIDs&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;s&#34;&gt;&amp;#34;,&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;...&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt; &lt;span class=&#34;c1&#34;&gt;//same as EKS cluster&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;p&#34;&gt;},&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;p&#34;&gt;})&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;Finally, the &lt;code&gt;MemoryDB&lt;/code&gt; cluster is defined - it references all the resources created above (it has been omitted on purpose):&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;memoryDBCluster&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;memorydbservicesk8saws&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;NewCluster&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;chart&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;memorydb-ack-cdk8s&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;memorydbservicesk8saws&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;ClusterProps&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;Metadata&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;cdk8s&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;ApiObjectMetadata&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;Name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;memoryDBClusterName&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)},&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;Spec&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;memorydbservicesk8saws&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;ClusterSpec&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;				&lt;span class=&#34;nx&#34;&gt;Name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;                &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;memoryDBClusterName&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;				&lt;span class=&#34;c1&#34;&gt;//omitted&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;p&#34;&gt;},&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;p&#34;&gt;})&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;k&#34;&gt;return&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;chart&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;&lt;strong&gt;Configuration&lt;/strong&gt;&lt;/p&gt;
-&lt;p&gt;Then we move on to the next chart that handles the configuration related aspects. It defines a &lt;code&gt;ConfigMap&lt;/code&gt; (which is empty) and &lt;code&gt;FieldExport&lt;/code&gt;s -  one each for the MemoryDB cluster endpoint and username (the password is read from the &lt;code&gt;Secret&lt;/code&gt;)&lt;/p&gt;
-&lt;blockquote&gt;
-  &lt;p&gt;As soon as these are created, the &lt;code&gt;ConfigMap&lt;/code&gt; is populated with the required data as per &lt;code&gt;from&lt;/code&gt; and &lt;code&gt;to&lt;/code&gt; configuration in the &lt;code&gt;FieldExport&lt;/code&gt;.&lt;/p&gt;
-&lt;/blockquote&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;kd&#34;&gt;func&lt;/span&gt; &lt;span class=&#34;nf&#34;&gt;NewConfigChart&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;scope&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;constructs&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;Construct&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;id&lt;/span&gt; &lt;span class=&#34;kt&#34;&gt;string&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;props&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;*&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;MyChartProps&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;cdk8s&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;Chart&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;c1&#34;&gt;//...&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;cfgMap&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;cdk8splus22&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;NewConfigMap&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;chart&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;config-map&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;cdk8splus22&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;ConfigMapProps&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;Metadata&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;cdk8s&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;ApiObjectMetadata&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;				&lt;span class=&#34;nx&#34;&gt;Name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;configMapName&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)}})&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;fieldExportForClusterEndpoint&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;servicesk8saws&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;NewFieldExport&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;chart&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;fexp-cluster&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;servicesk8saws&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;FieldExportProps&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;nx&#34;&gt;Metadata&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;cdk8s&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;ApiObjectMetadata&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;Name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;fieldExportNameForClusterEndpoint&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)},&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;nx&#34;&gt;Spec&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;servicesk8saws&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;FieldExportSpec&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;From&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;servicesk8saws&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;FieldExportSpecFrom&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;Path&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;.status.clusterEndpoint.address&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;				&lt;span class=&#34;nx&#34;&gt;Resource&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;servicesk8saws&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;FieldExportSpecFromResource&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;					&lt;span class=&#34;nx&#34;&gt;Group&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;memorydb.services.k8s.aws&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;					&lt;span class=&#34;nx&#34;&gt;Kind&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;  &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;Cluster&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;					&lt;span class=&#34;nx&#34;&gt;Name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;  &lt;span class=&#34;nx&#34;&gt;memoryDBCluster&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;()}},&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;To&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;servicesk8saws&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;FieldExportSpecTo&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;				&lt;span class=&#34;nx&#34;&gt;Name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;cfgMap&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;				&lt;span class=&#34;nx&#34;&gt;Kind&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;servicesk8saws&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;FieldExportSpecToKind_CONFIGMAP&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;}}})&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;fieldExportForUsername&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;servicesk8saws&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;NewFieldExport&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;chart&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;fexp-username&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;servicesk8saws&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;FieldExportProps&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;nx&#34;&gt;Metadata&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;cdk8s&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;ApiObjectMetadata&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;Name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;fieldExportNameForUsername&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)},&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;nx&#34;&gt;Spec&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;servicesk8saws&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;FieldExportSpec&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;From&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;servicesk8saws&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;FieldExportSpecFrom&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;Path&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;.spec.name&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;				&lt;span class=&#34;nx&#34;&gt;Resource&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;servicesk8saws&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;FieldExportSpecFromResource&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;					&lt;span class=&#34;nx&#34;&gt;Group&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;memorydb.services.k8s.aws&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;					&lt;span class=&#34;nx&#34;&gt;Kind&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;  &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;User&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;					&lt;span class=&#34;nx&#34;&gt;Name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;  &lt;span class=&#34;nx&#34;&gt;user&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;()}},&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;To&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;servicesk8saws&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;FieldExportSpecTo&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;				&lt;span class=&#34;nx&#34;&gt;Name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;cfgMap&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;				&lt;span class=&#34;nx&#34;&gt;Kind&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;servicesk8saws&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;FieldExportSpecToKind_CONFIGMAP&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;}}})&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;k&#34;&gt;return&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;chart&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;&lt;strong&gt;The application chart&lt;/strong&gt;&lt;/p&gt;
-&lt;p&gt;Finally, we deal with the &lt;code&gt;Deployment&lt;/code&gt; (in its dedicated &lt;code&gt;Chart&lt;/code&gt;) - it makes use of the configuration objects we defined in the earlier chart:&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;kd&#34;&gt;func&lt;/span&gt; &lt;span class=&#34;nf&#34;&gt;NewDeploymentChart&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;scope&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;constructs&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;Construct&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;id&lt;/span&gt; &lt;span class=&#34;kt&#34;&gt;string&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;props&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;*&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;MyChartProps&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;cdk8s&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;Chart&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;c1&#34;&gt;//....&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;dep&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;:=&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;cdk8splus22&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;NewDeployment&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;chart&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;memorydb-app-deployment&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;cdk8splus22&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;DeploymentProps&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;nx&#34;&gt;Metadata&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;cdk8s&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;ApiObjectMetadata&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;Name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;memorydb-app&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)}})&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;The next important part is the container and it&amp;rsquo;s configuration. We specify the ECR image repository along with the environment variables - they reference the &lt;code&gt;ConfigMap&lt;/code&gt; we defined in the previous chart (everything is connected!):&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;//...&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;container&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;:=&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;dep&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;AddContainer&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;cdk8splus22&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;ContainerProps&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;Name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;  &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;memorydb-app-container&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;Image&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;appDockerImage&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;Port&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;  &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Number&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;appPort&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)})&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;container&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Env&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;().&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;AddVariable&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;MEMORYDB_CLUSTER_ENDPOINT&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;nx&#34;&gt;cdk8splus22&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;EnvValue_FromConfigMap&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;cfgMap&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;default.&amp;#34;&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;+*&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;fieldExportForClusterEndpoint&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;()),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;cdk8splus22&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;EnvValueFromConfigMapOptions&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;Optional&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Bool&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;kc&#34;&gt;false&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)}))&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;container&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Env&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;().&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;AddVariable&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;MEMORYDB_USERNAME&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;nx&#34;&gt;cdk8splus22&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;EnvValue_FromConfigMap&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;cfgMap&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;default.&amp;#34;&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;+*&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;fieldExportForUsername&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;()),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;cdk8splus22&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;EnvValueFromConfigMapOptions&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;Optional&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Bool&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;kc&#34;&gt;false&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)}))&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;container&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Env&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;().&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;AddVariable&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;MEMORYDB_PASSWORD&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;nx&#34;&gt;cdk8splus22&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;EnvValue_FromSecretValue&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;cdk8splus22&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;SecretValue&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;				&lt;span class=&#34;nx&#34;&gt;Secret&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;secret&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;				&lt;span class=&#34;nx&#34;&gt;Key&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;    &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;password&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)},&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;cdk8splus22&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;EnvValueFromSecretOptions&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{}))&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;Finally, we define the &lt;code&gt;Service&lt;/code&gt; (type &lt;code&gt;LoadBalancer&lt;/code&gt;) which enables external application access and tie it all together in the &lt;code&gt;main&lt;/code&gt; function:&lt;/p&gt;
-&lt;div class=&#34;hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code&#34;&gt;
-
-&lt;div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;//...&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;dep&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;ExposeViaService&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;		&lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;cdk8splus22&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;DeploymentExposeViaServiceOptions&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;Name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;        &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;memorydb-app-service&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;ServiceType&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;cdk8splus22&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;ServiceType_LOAD_BALANCER&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;			&lt;span class=&#34;nx&#34;&gt;Ports&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;[]&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;*&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;cdk8splus22&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;ServicePort&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;				&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;Protocol&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;cdk8splus22&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;Protocol_TCP&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;					&lt;span class=&#34;nx&#34;&gt;Port&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;       &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Number&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;lbPort&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;					&lt;span class=&#34;nx&#34;&gt;TargetPort&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;jsii&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Number&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;appPort&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)}}})&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;//...&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;kd&#34;&gt;func&lt;/span&gt; &lt;span class=&#34;nf&#34;&gt;main&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;()&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;app&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;:=&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;cdk8s&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;NewApp&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;kc&#34;&gt;nil&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;memorydb&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;:=&lt;/span&gt; &lt;span class=&#34;nf&#34;&gt;NewMemoryDBChart&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;app&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;s&#34;&gt;&amp;#34;memorydb&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;kc&#34;&gt;nil&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;config&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;:=&lt;/span&gt; &lt;span class=&#34;nf&#34;&gt;NewConfigChart&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;app&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;s&#34;&gt;&amp;#34;config&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;kc&#34;&gt;nil&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;config&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;AddDependency&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;memorydb&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;deployment&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;:=&lt;/span&gt; &lt;span class=&#34;nf&#34;&gt;NewDeploymentChart&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;app&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;s&#34;&gt;&amp;#34;deployment&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;kc&#34;&gt;nil&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;deployment&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;AddDependency&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;nx&#34;&gt;memorydb&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;nx&#34;&gt;config&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;	&lt;span class=&#34;nx&#34;&gt;app&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;Synth&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;()&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0&#34;&gt;
-  &lt;button
-    class=&#34;hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50&#34;
-    title=&#34;Copy code&#34;
-  &gt;
-    &lt;div class=&#34;copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-    &lt;div class=&#34;success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4&#34;&gt;&lt;/div&gt;
-  &lt;/button&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;p&gt;That&amp;rsquo;s all for now!&lt;/p&gt;
-&lt;h2&gt;Wrap up..&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;wrap-up&#34;&gt;&lt;/span&gt;
-    &lt;a href=&#34;#wrap-up&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;Combining AWS Controllers for Kubernetes and &lt;code&gt;cdk8s&lt;/code&gt; can prove useful if you want to manage AWS services as well as the Kubernetes applications - using code (not &lt;code&gt;yaml&lt;/code&gt;). In this blog you saw how to do this in the context of &lt;code&gt;MemoryDB&lt;/code&gt; and an application that was composed of a &lt;code&gt;Deployment&lt;/code&gt; and &lt;code&gt;Service&lt;/code&gt;. I encourage you to try out other AWS services as well - &lt;a href=&#34;https://aws-controllers-k8s.github.io/community/docs/community/services/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;here is a complete list&lt;/a&gt;.&lt;/p&gt;
-&lt;p&gt;Until then, Happy Building!&lt;/p&gt;
 
       </description>
     </item>

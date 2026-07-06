@@ -1,0 +1,128 @@
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Abhishek Gupta – Partitioning</title>
+    <link>https://abhirockzz.github.io/tags/partitioning/</link>
+    <description>Recent content in Partitioning on Abhishek Gupta</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en</language>
+    <copyright>© Abhishek Gupta, 2025</copyright>
+    <lastBuildDate>Mon, 06 Jul 2026 00:00:00 +0000</lastBuildDate>
+    
+	  <atom:link href="https://abhirockzz.github.io/tags/partitioning/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+      
+        
+      
+    
+    
+    <item>
+      <title>Need a different partition key in Azure Cosmos DB? Pick the right approach</title>
+      <link>https://abhirockzz.github.io/blog/change-partition-key-cosmos-db/</link>
+      <pubDate>Mon, 06 Jul 2026 00:00:00 +0000</pubDate>
+      
+      <guid>https://abhirockzz.github.io/blog/change-partition-key-cosmos-db/</guid>
+      <description>
+        
+        
+        &lt;p&gt;&lt;em&gt;Originally posted on &lt;a href=&#34;https://devblogs.microsoft.com/cosmosdb/need-a-different-partition-key-in-azure-cosmos-db-pick-the-right-approach/&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;https://devblogs.microsoft.com/cosmosdb/need-a-different-partition-key-in-azure-cosmos-db-pick-the-right-approach/&lt;/a&gt;&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;Once you create a container, its &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/partitioning&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;partition key&lt;/a&gt; is fixed at creation, and you can&amp;rsquo;t change it in place. However, if your original key starts causing problems like &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/how-to-query-container#avoid-cross-partition-queries&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;cross-partition queries&lt;/a&gt; or &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/troubleshoot-request-rate-too-large#how-to-identify-the-hot-partition&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;hot partitions&lt;/a&gt;, you need to consider your options for changing it. This post explains the mechanics of changing a partition key, and the tradeoffs between the options.&lt;/p&gt;
+&lt;p&gt;First, think about the &lt;strong&gt;intent&lt;/strong&gt; of your change:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Re-partition the data.&lt;/strong&gt; You want your items (and future &lt;em&gt;writes&lt;/em&gt;) to live under a different key. This means moving to a new container and there are three ways, from least to most effort: &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/change-partition-key&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Change partition key&lt;/a&gt; feature, &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/container-copy&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;container copy jobs&lt;/a&gt;, or a do-it-yourself migration.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Query by a different key without moving.&lt;/strong&gt; Your writes are fine where they are, and you only have &lt;em&gt;read&lt;/em&gt; patterns that fan out across partitions. A Global Secondary Index adds a separate, read-only, automatically-synchronized container with a different partition key and its own data model, a projection of your items (all properties, or just a subset). The source container stays unchanged.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Note that every &amp;ldquo;change the partition key&amp;rdquo; option is actually a &lt;strong&gt;move&lt;/strong&gt;: get your data into a &lt;em&gt;new&lt;/em&gt; container that has the new key, then point your app at it. The exception is a &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/global-secondary-indexes&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Global Secondary Index&lt;/a&gt;, which adds a different key for read patterns while the source container stays unchanged.&lt;/p&gt;
+&lt;p&gt;Let&amp;rsquo;s walk through each path and its tradeoffs.&lt;/p&gt;
+&lt;h2&gt;Re-partition the data&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;re-partition-the-data&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#re-partition-the-data&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;The three options below all land your data in a &lt;em&gt;new&lt;/em&gt; container with the new key. But, they differ in how much Azure Cosmos DB does for you, whether you can keep writing to the source while the copy runs, and how much control you have over the cutover.&lt;/p&gt;
+&lt;h3&gt;Option 1: the portal Change partition key feature (least effort)&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;option-1-the-portal-change-partition-key-feature-least-effort&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#option-1-the-portal-change-partition-key-feature-least-effort&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;The portal feature is the managed path. In the Azure portal, open &lt;strong&gt;Data Explorer&lt;/strong&gt;, pick your container, go to &lt;strong&gt;Scale &amp;amp; Settings → Partition Keys&lt;/strong&gt;, and select &lt;strong&gt;Change&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;The portal creates or selects a destination container in the same database, then copies your data into it using &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/container-copy&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;container copy jobs&lt;/a&gt; (Option 2 covers those, since they&amp;rsquo;re the same engine). If you let the portal create the destination container for you, all configurations except the partition key and unique keys are replicated to the destination, so you only restate those two. You can run the copy &lt;strong&gt;online&lt;/strong&gt; or &lt;strong&gt;offline&lt;/strong&gt; (the next section explains what that means). In online mode you finish the job by selecting &lt;strong&gt;Complete&lt;/strong&gt;, and once the copy is done you start using the new container with the new key and optionally delete the old one.&lt;/p&gt;
+&lt;div class=&#34;hx-overflow-x-auto hx-mt-6 hx-flex hx-rounded-lg hx-border hx-py-2 ltr:hx-pr-4 rtl:hx-pl-4 contrast-more:hx-border-current contrast-more:dark:hx-border-current hx-border-blue-200 hx-bg-blue-100 hx-text-blue-900 dark:hx-border-blue-200/30 dark:hx-bg-blue-900/30 dark:hx-text-blue-200&#34;&gt;
+  &lt;div class=&#34;ltr:hx-pl-3 ltr:hx-pr-2 rtl:hx-pr-3 rtl:hx-pl-2&#34;&gt;&lt;div class=&#34;hx-select-none hx-text-xl&#34; style=&#34;font-family: &#39;Apple Color Emoji&#39;, &#39;Segoe UI Emoji&#39;, &#39;Segoe UI Symbol&#39;;&#34;&gt;ℹ️&lt;/div&gt;&lt;/div&gt;
+
+  &lt;div class=&#34;hx-w-full hx-min-w-0 hx-leading-7&#34;&gt;
+    &lt;div class=&#34;hx-mt-6 hx-leading-7 first:hx-mt-0&#34;&gt;Read more in the Change partition key &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/change-partition-key#limitations&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;limitations&lt;/a&gt;.&lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+
+&lt;h3&gt;Option 2: container copy jobs directly (same engine, scriptable)&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;option-2-container-copy-jobs-directly-same-engine-scriptable&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#option-2-container-copy-jobs-directly-same-engine-scriptable&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;&lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/container-copy&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Container copy jobs&lt;/a&gt; are the engine behind the portal capability. You can also create and manage them yourself with &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/how-to-container-copy&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Azure CLI&lt;/a&gt; (via the &lt;code&gt;cosmosdb-preview&lt;/code&gt; extension), which is what you want for scripting, automation, or finer control. The workflow is: create the target container with the partition key (and throughput, unique keys, etc.) you want, create the copy job, monitor it, and cut over. When the source and destination are in &lt;em&gt;different&lt;/em&gt; accounts, you first give the destination account&amp;rsquo;s identity read access to the source container. Same-account copies don&amp;rsquo;t need this step.&lt;/p&gt;
+&lt;p&gt;Container copy has two modes: online, where writes continue during the copy, and offline, where you stop writes before the job starts.&lt;/p&gt;
+&lt;p&gt;Online mode keeps writes flowing during the copy and ends with a short Complete-then-cutover, but every source write is charged double RUs while online copy is enabled, and it needs continuous backup, &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/change-feed-modes?tabs=latest-version#all-versions-and-deletes-change-feed-mode&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;all-versions-and-deletes change feed&lt;/a&gt;, and the account-level capability switched on first. Offline skips those prerequisites at the cost of a write freeze on the source until you cut over. The &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/container-copy&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Container copy jobs&lt;/a&gt; documentation walks through the prerequisites and cutover for both modes.&lt;/p&gt;
+&lt;p&gt;Both modes run on a best-effort basis (there&amp;rsquo;s no guaranteed completion time), and jobs run one at a time in the write region. Two things are worth planning for: a copy doesn&amp;rsquo;t carry TTL across, so an item that hasn&amp;rsquo;t expired restarts its countdown in the destination, and you&amp;rsquo;ll want the target provisioned at roughly twice the source throughput to keep up.&lt;/p&gt;
+&lt;div class=&#34;hx-overflow-x-auto hx-mt-6 hx-flex hx-rounded-lg hx-border hx-py-2 ltr:hx-pr-4 rtl:hx-pl-4 contrast-more:hx-border-current contrast-more:dark:hx-border-current hx-border-yellow-100 hx-bg-yellow-50 hx-text-yellow-900 dark:hx-border-yellow-200/30 dark:hx-bg-yellow-700/30 dark:hx-text-yellow-200&#34;&gt;
+  &lt;div class=&#34;ltr:hx-pl-3 ltr:hx-pr-2 rtl:hx-pr-3 rtl:hx-pl-2&#34;&gt;&lt;div class=&#34;hx-select-none hx-text-xl&#34; style=&#34;font-family: &#39;Apple Color Emoji&#39;, &#39;Segoe UI Emoji&#39;, &#39;Segoe UI Symbol&#39;;&#34;&gt;⚠️&lt;/div&gt;&lt;/div&gt;
+
+  &lt;div class=&#34;hx-w-full hx-min-w-0 hx-leading-7&#34;&gt;
+    &lt;div class=&#34;hx-mt-6 hx-leading-7 first:hx-mt-0&#34;&gt;&lt;strong&gt;Before you cut over:&lt;/strong&gt; A new container is also your one window to turn on features that can only be set at creation, the clearest being hierarchical partition keys, so weigh them now if they fit your workload. And since you&amp;rsquo;re re-keying everything, confirm the new partition key value plus id is unique across the destination, or two formerly distinct items can collide.&lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+
+&lt;h3&gt;Option 3: roll your own migration (most control, most work)&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;option-3-roll-your-own-migration-most-control-most-work&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#option-3-roll-your-own-migration-most-control-most-work&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;p&gt;If you need transforms during the move, your container exceeds the container-copy limits, or you just want full ownership of the process, create the new container yourself and move the data with your own pipeline. The &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/migrate&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;large-scale migration guidance&lt;/a&gt; covers the building blocks:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Bulk ingestion&lt;/strong&gt; to load the new container fast: the .NET v3 SDK has it built in, and the &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/bulk-executor-overview&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;bulk executor library&lt;/a&gt; covers apps still on .NET SDK 2.x.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Azure Data Factory&lt;/strong&gt; for smaller datasets (configure source and sink, no code), or the &lt;strong&gt;Spark connector&lt;/strong&gt; if you already work in Spark.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/change-feed&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Change feed&lt;/a&gt;&lt;/strong&gt; to catch writes that land on the source after your bulk load and replay them into the new container until you cut over. Its default &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/change-feed-modes&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;latest-version mode&lt;/a&gt; skips deletes and TTL expirations, so use all-versions-and-deletes (which needs continuous backup) to handle delete operations.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Pre-create the destination with enough RU/s and turn off indexing during the load to hold down write cost. You own incremental sync, error handling, cutover, and any reshaping along the way.&lt;/p&gt;
+&lt;h2&gt;Query by a different key, without moving (global secondary index)&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;query-by-a-different-key-without-moving-global-secondary-index&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#query-by-a-different-key-without-moving-global-secondary-index&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;If your only pain is cross-partition queries (reads that fan out because your filter property isn&amp;rsquo;t the partition key), you may not need to move at all. For that case, use &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/global-secondary-indexes&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;global secondary indexes&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;A global secondary index (GSI) is a separate, read-only container keyed by a &lt;em&gt;different&lt;/em&gt; partition key, with its own data model. That model is a projection query over your items (&lt;code&gt;SELECT *&lt;/code&gt; for all properties, or just the subset you query), and it stays automatically synchronized with the source container. You keep writing to your existing container with its existing key, and queries whose filter matches the GSI&amp;rsquo;s partition key (the specific patterns you built the GSI for) can become single-partition queries against the GSI instead of cross-partition queries on the source. A GSI helps the patterns it&amp;rsquo;s keyed for, not every cross-partition query.&lt;/p&gt;
+&lt;p&gt;GSIs fit when changing your existing partition key would be disruptive, and you have multiple query patterns that no single key can satisfy. A GSI needs continuous backups on the account, stays eventually consistent regardless of your consistency level, and runs on autoscale with its own storage and RU costs. Once one exists, replace and delete on the source cost 50–100% more RU (creates aren&amp;rsquo;t affected), and &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/global-secondary-indexes&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;global secondary indexes&lt;/a&gt; cover the rest.&lt;/p&gt;
+&lt;p&gt;A GSI fixes reads. It doesn&amp;rsquo;t change where your &lt;em&gt;writes&lt;/em&gt; land, so it won&amp;rsquo;t relieve a write-side hot partition on the source. If your problem is write distribution, or you need a different primary key for the data, you&amp;rsquo;re back to the data re-partitioning option above and you have to move.&lt;/p&gt;
+&lt;h2&gt;To wrap up&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;to-wrap-up&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#to-wrap-up&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;If your writes need a different key, you end up moving the data, and the only question left is how much of the copy you hand to Azure Cosmos DB. If only your reads fan out, a GSI fixes that without changing where your writes land. The table below puts all four side by side.&lt;/p&gt;
+&lt;h3&gt;Decision table&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;decision-table&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#decision-table&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h3&gt;&lt;table&gt;
+  &lt;thead&gt;
+      &lt;tr&gt;
+          &lt;th&gt;Option&lt;/th&gt;
+          &lt;th&gt;Keep writing to the source during the move?&lt;/th&gt;
+          &lt;th&gt;Effort&lt;/th&gt;
+          &lt;th&gt;Use it when&lt;/th&gt;
+      &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;tbody&gt;
+      &lt;tr&gt;
+          &lt;td&gt;&lt;strong&gt;Portal &amp;ldquo;Change partition key&amp;rdquo;&lt;/strong&gt;&lt;/td&gt;
+          &lt;td&gt;Yes (online mode) or no (offline)&lt;/td&gt;
+          &lt;td&gt;Lowest&lt;/td&gt;
+          &lt;td&gt;You want point-and-click, container &amp;lt; 1,000,000 RU/s, &amp;lt; 4 TB, supported region&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+          &lt;td&gt;&lt;strong&gt;Container copy jobs (CLI)&lt;/strong&gt;&lt;/td&gt;
+          &lt;td&gt;Yes (online) or no (offline)&lt;/td&gt;
+          &lt;td&gt;Low–medium&lt;/td&gt;
+          &lt;td&gt;You want the managed engine but scripted, with explicit online/offline control&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+          &lt;td&gt;&lt;strong&gt;Roll your own (bulk / ADF / Spark + change feed)&lt;/strong&gt;&lt;/td&gt;
+          &lt;td&gt;Yes, if you build incremental sync yourself&lt;/td&gt;
+          &lt;td&gt;Highest&lt;/td&gt;
+          &lt;td&gt;You need transforms, are above the copy limits, or want full control of cutover&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+          &lt;td&gt;&lt;strong&gt;Global secondary index&lt;/strong&gt;&lt;/td&gt;
+          &lt;td&gt;N/A, source stays as-is, GSI auto-synced&lt;/td&gt;
+          &lt;td&gt;Medium&lt;/td&gt;
+          &lt;td&gt;The pain is cross-partition &lt;em&gt;reads&lt;/em&gt;, not write hot partitions, and you can keep the source key&lt;/td&gt;
+      &lt;/tr&gt;
+  &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;h2&gt;Learn more&lt;span class=&#34;hx-absolute -hx-mt-20&#34; id=&#34;learn-more&#34;&gt;&lt;/span&gt;
+    &lt;a href=&#34;#learn-more&#34; class=&#34;subheading-anchor&#34; aria-label=&#34;Permalink for this section&#34;&gt;&lt;/a&gt;&lt;/h2&gt;&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/partitioning&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Partitioning in Azure Cosmos DB&lt;/a&gt;, &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/change-partition-key&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Change the partition key (portal feature)&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/container-copy&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Container copy jobs&lt;/a&gt;, &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/how-to-container-copy&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Create and manage container copy jobs (CLI)&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/global-secondary-indexes&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Global secondary indexes&lt;/a&gt;, &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/hierarchical-partition-keys&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Hierarchical partition keys&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/migrate&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Migrate large amounts of data&lt;/a&gt;, &lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/bulk-executor-overview&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Bulk executor library overview&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;https://learn.microsoft.com/azure/cosmos-db/change-feed-modes&#34; target=&#34;_blank&#34; rel=&#34;noopener&#34;&gt;Change feed modes&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+      </description>
+    </item>
+    
+  </channel>
+</rss>
